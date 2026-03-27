@@ -1,0 +1,2847 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Killer Kalculator</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌯</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chelsea+Market&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #161616;
+      --surface2:  #1e1e1e;
+      --surface3:  #252525;
+      --border:    #2c2c2c;
+      --border2:   #383838;
+      --text:      #f0f0f0;
+      --muted:     #787878;
+      --muted2:    #555;
+      --red:       #b30000;
+      --red-hi:    #d40000;
+      --red-lo:    #6b0000;
+      --red-dim:   rgba(179,0,0,0.12);
+      --green:     #2ecc71;
+      --orange:    #e67e22;
+      --brand:     'Chelsea Market', cursive;
+      --sans:      'Inter', -apple-system, sans-serif;
+      --sidebar-w: 232px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       LOGIN
+    ══════════════════════════════════════════════════════════════════════════ */
+    #login-screen {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999;
+    }
+
+    #login-screen.hidden { display: none; }
+
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 52px 44px 44px;
+      width: 360px;
+    }
+
+    .login-logo {
+      font-family: var(--brand);
+      color: var(--red);
+      font-size: 26px;
+      letter-spacing: 0.5px;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .login-tagline {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 36px;
+      letter-spacing: 0.3px;
+    }
+
+    .field { margin-bottom: 14px; }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .field input:focus { border-color: var(--red); }
+
+    .btn-login {
+      width: 100%;
+      margin-top: 8px;
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 12px;
+      font-size: 15px;
+      font-family: var(--brand);
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .btn-login:hover { background: var(--red-hi); }
+    .btn-login:active { background: var(--red-lo); }
+
+    #login-error {
+      color: #ff6b6b;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 12px;
+      min-height: 16px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       APP SHELL
+    ══════════════════════════════════════════════════════════════════════════ */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #app.hidden { display: none; }
+
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    #header {
+      flex-shrink: 0;
+      height: 54px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 20px;
+      z-index: 10;
+    }
+
+    .brand {
+      font-family: var(--brand);
+      color: var(--red);
+      font-size: 20px;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .brand span { color: var(--muted2); font-size: 14px; margin-left: 2px; }
+
+    .period-bar {
+      display: flex;
+      gap: 3px;
+      flex: 1;
+    }
+
+    .pb {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--sans);
+      font-weight: 500;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+
+    .pb:hover { border-color: var(--border2); color: var(--text); }
+    .pb.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--sans);
+      transition: all .15s;
+    }
+
+    .btn-logout:hover { color: var(--text); border-color: var(--border2); }
+
+    /* ── Body ───────────────────────────────────────────────────────────────── */
+    #body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-nav {
+      padding: 12px 10px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--sans);
+      font-weight: 500;
+      text-align: left;
+      transition: all .15s;
+    }
+
+    .nav-btn:hover { background: var(--surface2); color: var(--text); }
+    .nav-btn.active { background: var(--red-dim); color: var(--red); }
+
+    .nav-btn svg { flex-shrink: 0; }
+
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted2);
+      padding: 14px 14px 6px;
+    }
+
+    .store-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+      position: relative;
+    }
+
+    .store-item:hover { background: var(--surface2); }
+    .store-item.active { border-left-color: var(--red); background: var(--red-dim); }
+
+    .si-name {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .si-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .si-rev {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .si-ly { font-size: 11px; font-weight: 600; }
+    .si-cost { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .up   { color: var(--green); }
+    .down { color: #e74c3c; }
+    .neu  { color: var(--muted); }
+
+    /* shimmer for loading */
+    .shimmer {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--surface3) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 3px;
+      display: inline-block;
+      height: 12px;
+    }
+
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── Main content ───────────────────────────────────────────────────────── */
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .metric-val {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .metric-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-green { background: rgba(46,204,113,.15); color: var(--green); }
+    .badge-red   { background: rgba(231,76,60,.15);  color: #e74c3c; }
+    .badge-gray  { background: var(--surface2);      color: var(--muted); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    /* ── Page headers ───────────────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: 22px;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .page-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .bc-link { cursor: pointer; color: var(--muted); }
+    .bc-link:hover { color: var(--text); }
+    .bc-sep { color: var(--border2); }
+
+    /* ── Section titles ─────────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Grid helpers ───────────────────────────────────────────────────────── */
+    .two-col   { display: grid; grid-template-columns: 1fr 1fr;    gap: 16px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Tables ─────────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+
+    th {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,.025); }
+
+    .td-rank { color: var(--muted); width: 28px; font-weight: 600; }
+    .td-num  { text-align: right; font-variant-numeric: tabular-nums; }
+    .td-rev  { font-weight: 600; text-align: right; }
+
+    /* ── Charts ─────────────────────────────────────────────────────────────── */
+    .chart-wrap {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ── Heatmap ─────────────────────────────────────────────────────────────── */
+    .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+
+    .heatmap {
+      display: inline-table;
+      border-spacing: 2px;
+      border-collapse: separate;
+    }
+
+    .hm-row { display: table-row; }
+
+    .hm-label {
+      display: table-cell;
+      font-size: 10px;
+      color: var(--muted);
+      padding: 0 8px 0 0;
+      vertical-align: middle;
+      white-space: nowrap;
+      min-width: 42px;
+    }
+
+    .hm-cell {
+      display: table-cell;
+      width: 28px; min-width: 28px;
+      height: 26px;
+      border-radius: 3px;
+      vertical-align: middle;
+      cursor: default;
+      position: relative;
+    }
+
+    .hm-cell[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111;
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .hm-header-row { display: table-row; }
+
+    .hm-hour-header {
+      display: table-cell;
+      font-size: 9px;
+      color: var(--muted2);
+      text-align: center;
+      padding-bottom: 5px;
+      min-width: 28px;
+    }
+
+    .hm-spacer { display: table-cell; min-width: 42px; }
+
+    /* ── Invoices form ───────────────────────────────────────────────────────── */
+    .invoice-form {
+      display: grid;
+      grid-template-columns: 1fr 140px 1fr 160px auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .f-group label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .f-group select,
+    .f-group input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 11px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .f-group select:focus,
+    .f-group input:focus { border-color: var(--red); }
+
+    .btn {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--sans);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+      height: 36px;
+    }
+    .btn.btn-secondary {
+      background: var(--bg2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn.btn-secondary:hover { background: var(--border); }
+
+    .btn:hover { background: var(--red-hi); }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-danger { background: transparent; border: none; color: var(--muted); padding: 4px 8px; font-size: 12px; }
+    .btn-danger:hover { color: #e74c3c; }
+
+    /* ── Loading spinner ─────────────────────────────────────────────────────── */
+    .spinner-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ─────────────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── Cost bar ────────────────────────────────────────────────────────────── */
+    /* ── Product mix bar ─────────────────────────────────────────────────────── */
+    .mix-bar {
+      height: 28px;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      margin-bottom: 14px;
+      background: var(--bg2);
+    }
+    .mix-bar > div { transition: width .4s ease; }
+    .mix-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+    }
+    .mix-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+    .mix-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+    .mix-cat  { color: var(--text-muted); }
+    .mix-pct  { font-weight: 700; }
+    .mix-count { color: var(--text-muted); }
+    .meat-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* ── Graphs ─────────────────────────────────────────────────────────────── */
+    .graph-controls { display:flex; flex-wrap:wrap; gap:20px; }
+    .graph-ctrl-group { display:flex; flex-direction:column; gap:8px; min-width:0; }
+    .graph-ctrl-label {
+      font-size:11px; font-weight:600; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--text-muted);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .graph-btn-group { display:flex; gap:4px; flex-wrap:wrap; }
+    .graph-btn {
+      background:var(--bg2); color:var(--text-muted); border:1px solid var(--border);
+      border-radius:5px; padding:5px 10px; font-size:12px; font-family:var(--mono);
+      cursor:pointer; transition:all .15s;
+    }
+    .graph-btn.active { background:var(--red); color:#fff; border-color:var(--red); }
+    .graph-btn:hover:not(.active) { background:var(--border); color:var(--text); }
+    .graph-date-input {
+      background:var(--bg2); border:1px solid var(--border); border-radius:6px;
+      padding:5px 8px; color:var(--text); font-family:var(--mono); font-size:12px; cursor:pointer;
+    }
+    .graph-store-checks { display:flex; flex-wrap:wrap; gap:8px 16px; }
+    .graph-store-check {
+      display:flex; align-items:center; gap:6px; font-size:13px;
+      cursor:pointer; white-space:nowrap;
+    }
+    .graph-store-check input { cursor:pointer; width:14px; height:14px; }
+    .graph-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
+    .graph-toggle-all {
+      background:none; border:none; color:var(--red); font-size:11px;
+      font-family:var(--mono); cursor:pointer; padding:0; text-decoration:underline;
+    }
+
+    .mix-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .cost-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 99px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .cost-fill {
+      height: 100%;
+      background: var(--red);
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+
+    /* ── Divider ─────────────────────────────────────────────────────────────── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+    /* ── Hamburger ───────────────────────────────────────────────────────────── */
+    .hamburger-btn {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .hamburger-btn:hover { background: var(--surface2); }
+
+    /* ── Sidebar overlay (mobile backdrop) ────────────────────────────────────── */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 19;
+    }
+    #sidebar-overlay.visible { display: block; }
+
+    /* ── Period select (mobile dropdown) ──────────────────────────────────────── */
+    .period-select-mobile {
+      display: none;
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--sans);
+      padding: 0 10px;
+      height: 44px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* ── Tablet (768px – 1024px) ─────────────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      :root { --sidebar-w: 200px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .three-col { grid-template-columns: 1fr 1fr; }
+      .invoice-form { grid-template-columns: 1fr 1fr; }
+      .hm-cell { width: 24px; min-width: 24px; }
+    }
+
+    /* ── Mobile (< 768px) ────────────────────────────────────────────────────── */
+    @media (max-width: 767px) {
+      html, body { overflow: auto; height: auto; }
+
+      #app { height: auto; min-height: 100vh; flex-direction: column; }
+
+      #header { padding: 0 10px; gap: 8px; height: 54px; }
+
+      .brand { font-size: 15px; }
+      .brand span { display: none; }
+
+      .hamburger-btn { display: flex; }
+
+      .period-bar { display: none; }
+      .period-select-mobile { display: block; }
+
+      .btn-logout { min-height: 44px; padding: 0 12px; font-size: 12px; }
+
+      #body { position: relative; overflow: visible; flex: none; }
+
+      #sidebar {
+        position: fixed;
+        top: 54px;
+        left: 0;
+        bottom: 0;
+        z-index: 20;
+        width: 270px;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 6px 0 24px rgba(0,0,0,.5);
+      }
+      #sidebar.open { transform: translateX(0); }
+
+      #main {
+        padding: 14px;
+        min-height: calc(100vh - 54px);
+      }
+
+      .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+      .invoice-form { grid-template-columns: 1fr; }
+
+      .page-title { font-size: 18px; }
+      .metric-val  { font-size: 22px; }
+
+      .card { padding: 14px; }
+
+      /* Touch-friendly tap targets */
+      .nav-btn    { min-height: 44px; padding: 10px; }
+      .store-item { padding: 12px 14px; }
+      .pb         { min-height: 44px; padding: 10px 14px; }
+      .btn        { min-height: 44px; padding: 10px 18px; }
+
+      /* Heatmap — smaller cells, rely on horizontal scroll */
+      .hm-cell { width: 20px; min-width: 20px; height: 20px; }
+      .hm-label { min-width: 34px; font-size: 9px; }
+      .hm-hour-header { min-width: 20px; font-size: 8px; }
+      .chart-wrap { height: 200px; }
+
+      /* Tables — reduce padding */
+      th, td { padding: 7px 8px; font-size: 12px; }
+
+      /* Login */
+      .login-box {
+        width: calc(100vw - 32px);
+        max-width: 360px;
+        padding: 36px 22px 28px;
+      }
+      .login-logo { font-size: 22px; }
+    }
+
+    /* ── Very small screens (< 400px) — single column KPIs ──────────────────── */
+    @media (max-width: 399px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     LOGIN
+══════════════════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">🌯 KILLER KALCULATOR 🌯</div>
+    <div class="login-tagline">Revenue Dashboard · Copenhagen</div>
+
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="username" autocomplete="username" placeholder="Username">
+    </div>
+
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" autocomplete="current-password" placeholder="Password">
+    </div>
+
+    <button class="btn-login" onclick="doLogin()">SIGN IN</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     APP
+══════════════════════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- Header -->
+  <div id="header">
+    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+    <div class="brand">🌯 KILLER KALCULATOR 🌯</div>
+
+    <div class="period-bar">
+      <button class="pb" data-period="today"       onclick="setPeriod('today')">Today</button>
+      <button class="pb" data-period="yesterday"   onclick="setPeriod('yesterday')">Yesterday</button>
+      <button class="pb" data-period="this-week"   onclick="setPeriod('this-week')">This Week</button>
+      <button class="pb" data-period="last-week"   onclick="setPeriod('last-week')">Last Week</button>
+      <button class="pb" data-period="this-month"  onclick="setPeriod('this-month')">This Month</button>
+      <button class="pb" data-period="last-month"  onclick="setPeriod('last-month')">Last Month</button>
+    </div>
+
+    <select class="period-select-mobile" onchange="setPeriod(this.value)">
+      <option value="today">Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="this-week">This Week</option>
+      <option value="last-week">Last Week</option>
+      <option value="this-month">This Month</option>
+      <option value="last-month">Last Month</option>
+    </select>
+
+    <button class="btn-logout" onclick="doLogout()">Sign out</button>
+  </div>
+
+  <!-- Sidebar overlay (mobile backdrop) -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Body -->
+  <div id="body">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-nav">
+        <button class="nav-btn" data-view="chain" onclick="setView('chain')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Chain Overview
+        </button>
+        <button class="nav-btn" data-view="invoices" onclick="setView('invoices')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
+          Supplier Invoices
+        </button>
+        <button class="nav-btn" data-view="graphs" onclick="setView('graphs')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+          Graphs
+        </button>
+        <button class="nav-btn" data-view="meat" onclick="setView('meat')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+          Meat Tracking
+        </button>
+      </div>
+
+      <div class="sidebar-section-label">Stores</div>
+      <div id="store-list"></div>
+    </div>
+
+    <!-- Main -->
+    <div id="main">
+      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const STORES = [
+  { id: 'indre-by',       name: 'Indre By'       },
+  { id: 'vesterbro',      name: 'Vesterbro'       },
+  { id: 'christianshavn', name: 'Christianshavn'  },
+  { id: 'fisketorvet',    name: 'Fisketorvet'     },
+  { id: 'frederiksberg',  name: 'Frederiksberg'   },
+  { id: 'norrebro',       name: 'Nørrebro'        }
+];
+
+const CREDS = { username: 'Killer Kebab', password: '!Killingit!' };
+
+// ── State ──────────────────────────────────────────────────────────────────────
+const state = {
+  period: 'today',
+  view:   'chain',
+  cache:  {},
+  invoices: [],
+  meat: []
+};
+
+const charts = {};
+
+// ── Persistence ────────────────────────────────────────────────────────────────
+function loadInvoices() {
+  try { state.invoices = JSON.parse(localStorage.getItem('kk_invoices') || '[]'); }
+  catch(e) { state.invoices = []; }
+}
+function saveInvoices() {
+  localStorage.setItem('kk_invoices', JSON.stringify(state.invoices));
+}
+function loadMeat() {
+  try { state.meat = JSON.parse(localStorage.getItem('kk_meat_tracking') || '[]'); }
+  catch(e) { state.meat = []; }
+}
+function saveMeat() {
+  localStorage.setItem('kk_meat_tracking', JSON.stringify(state.meat));
+}
+
+// ── Date utilities ─────────────────────────────────────────────────────────────
+function getDateRange(period) {
+  const now  = new Date();
+  const tod  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from, to;
+
+  switch (period) {
+    case 'today':
+      from = tod; to = now; break;
+
+    case 'yesterday': {
+      const d = new Date(tod); d.setDate(d.getDate() - 1);
+      from = d; to = new Date(tod.getTime() - 1); break;
+    }
+
+    case 'this-week': {
+      const d = new Date(tod);
+      const off = (d.getDay() + 6) % 7; // Mon=0
+      d.setDate(d.getDate() - off);
+      from = d; to = now; break;
+    }
+
+    case 'last-week': {
+      const d = new Date(tod);
+      const off = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - off - 7);
+      from = d;
+      to = new Date(d.getTime() + 7 * 86400000 - 1); break;
+    }
+
+    case 'this-month':
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      to   = now; break;
+
+    case 'last-month':
+      from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      to   = new Date(new Date(now.getFullYear(), now.getMonth(), 1).getTime() - 1); break;
+
+    default:
+      from = tod; to = now;
+  }
+
+  return {
+    from: Math.floor(from.getTime() / 1000),
+    to:   Math.floor(to.getTime()   / 1000)
+  };
+}
+
+function lyRange(period) {
+  const { from, to } = getDateRange(period);
+  const offset = 364 * 86400; // 52 weeks
+  return { from: from - offset, to: to - offset };
+}
+
+// Returns the Unix timestamp for midnight in Copenhagen time (Europe/Copenhagen)
+// for the calendar date that contains the given Unix timestamp.
+// Uses the 'sv' (Swedish) locale which reliably formats dates as 'YYYY-MM-DD HH:MM:SS'
+// across all browsers, avoiding hour12/formatToParts inconsistencies.
+function copenhagenMidnight(unixTs) {
+  const d = new Date(unixTs * 1000);
+
+  // 'sv' locale → 'YYYY-MM-DD' — reliable in all browsers
+  const dateStr = d.toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+  const [y, mo, dy] = dateStr.split('-').map(Number);
+
+  // Get Copenhagen's UTC offset by comparing noon UTC vs noon Copenhagen.
+  // Using noon avoids ambiguity around DST transition hours.
+  const noonUTC    = Date.UTC(y, mo - 1, dy, 12, 0, 0);
+  const noonCPHStr = new Date(noonUTC).toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
+  // noonCPHStr = 'YYYY-MM-DD 13:00:00' (CET, UTC+1) or 'YYYY-MM-DD 14:00:00' (CEST, UTC+2)
+  const offsetHours = parseInt(noonCPHStr.slice(11, 13), 10) - 12;
+
+  return (Date.UTC(y, mo - 1, dy) - offsetHours * 3600000) / 1000;
+}
+
+function daysInRange(from, to) {
+  const days = [];
+  let d = copenhagenMidnight(from);
+  while (d < to) {
+    days.push(d);
+    d += 86400; // the datetime filter in apiSalesRange handles any DST edge
+  }
+  return days;
+}
+
+function periodLabel(period) {
+  const map = {
+    'today': 'Today',
+    'yesterday': 'Yesterday',
+    'this-week': 'This Week',
+    'last-week': 'Last Week',
+    'this-month': 'This Month',
+    'last-month': 'Last Month'
+  };
+  return map[period] || period;
+}
+
+// ── Formatting ─────────────────────────────────────────────────────────────────
+function kr(n) {
+  if (n === null || n === undefined) return '—';
+  return new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 }).format(n);
+}
+
+function pct(n) {
+  if (n === null || n === undefined || !isFinite(n)) return '—';
+  return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+}
+
+function updown(n) {
+  if (n === null || n === undefined || !isFinite(n)) return 'neu';
+  return n >= 0 ? 'up' : 'down';
+}
+
+function badge(n) {
+  if (n === null || n === undefined || !isFinite(n)) return `<span class="metric-badge badge-gray">—</span>`;
+  const cls = n >= 0 ? 'badge-green' : 'badge-red';
+  const arrow = n >= 0 ? '▲' : '▼';
+  return `<span class="metric-badge ${cls}">${arrow} ${Math.abs(n).toFixed(1)}%</span>`;
+}
+
+// ── API ────────────────────────────────────────────────────────────────────────
+async function apiRevenue(storeId, from, to) {
+  const key = `rev:${storeId}:${from}:${to}`;
+  if (key in state.cache) return state.cache[key];
+
+  try {
+    const res  = await fetch(`/api/revenue/${storeId}/${from}/${to}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'API error');
+    const total = (data.location || []).reduce((s, l) => s + (l.amount || 0), 0);
+    state.cache[key] = total / 1.25;
+  } catch(e) {
+    console.warn(`Revenue error [${storeId}]:`, e.message);
+    state.cache[key] = null;
+  }
+  return state.cache[key];
+}
+
+async function apiAllRevenue(from, to) {
+  const key = `allrev:${from}:${to}`;
+  if (key in state.cache) return state.cache[key];
+
+  try {
+    const res  = await fetch(`/api/all-revenue/${from}/${to}`);
+    const data = await res.json();
+    const out  = {};
+    for (const [id, d] of Object.entries(data)) {
+      const total = (d.location || []).reduce((s, l) => s + (l.amount || 0), 0);
+      out[id] = total / 1.25;
+    }
+    state.cache[key] = out;
+  } catch(e) {
+    console.warn('All-revenue error:', e.message);
+    state.cache[key] = {};
+  }
+  return state.cache[key];
+}
+
+async function apiSalesDay(storeId, dayUnix) {
+  const key = `sales:${storeId}:${dayUnix}`;
+  if (key in state.cache) return state.cache[key];
+
+  try {
+    const res  = await fetch(`/api/sales/${storeId}/${dayUnix}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'API error');
+    state.cache[key] = data.data || [];
+  } catch(e) {
+    console.warn(`Sales error [${storeId} day ${dayUnix}]:`, e.message);
+    state.cache[key] = [];
+  }
+  return state.cache[key];
+}
+
+async function apiSalesRange(storeId, from, to) {
+  const days    = daysInRange(from, to);
+  const results = await Promise.all(days.map(d => apiSalesDay(storeId, d)));
+  return results.flat().filter(item => {
+    if (!item.datetime) return false;
+    const ts = new Date(item.datetime).getTime() / 1000;
+    return ts >= from && ts <= to;
+  });
+}
+
+// ── Planday helpers ────────────────────────────────────────────────────────────
+function normalizeName(str) {
+  return String(str).toLowerCase()
+    .replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/å/g, 'aa')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function deptToStoreId(deptName) {
+  const norm = normalizeName(deptName);
+  for (const s of STORES) {
+    if (norm.includes(normalizeName(s.name))) return s.id;
+  }
+  return null;
+}
+
+function unixToDateStr(unixTs) {
+  return new Date(unixTs * 1000).toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+}
+
+async function apiPlandaySalaries(from, to) {
+  const key = `planday:${from}:${to}`;
+  if (key in state.cache) {
+    console.log('[Planday] salaries cache hit:', state.cache[key]);
+    return state.cache[key];
+  }
+  try {
+    const fromStr = unixToDateStr(from);
+    const toStr   = unixToDateStr(to);
+    const url = `/api/planday/salaries/${fromStr}/${toStr}`;
+    console.log('[Planday] fetching salaries:', url);
+    const res  = await fetch(url);
+    const data = await res.json();
+    console.log('[Planday] salaries HTTP status:', res.status);
+    console.log('[Planday] salaries raw response:', JSON.stringify(data));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    // Verify each store ID matches what we expect
+    const knownIds = STORES.map(s => s.id);
+    const returnedIds = Object.keys(data);
+    console.log('[Planday] known store IDs:', knownIds);
+    console.log('[Planday] returned store IDs:', returnedIds);
+    const matched = returnedIds.filter(id => knownIds.includes(id));
+    console.log('[Planday] matched store IDs:', matched, '— unmatched:', returnedIds.filter(id => !knownIds.includes(id)));
+    state.cache[key] = data;
+  } catch(e) {
+    console.warn('[Planday] salaries error:', e.message);
+    state.cache[key] = {};
+  }
+  return state.cache[key];
+}
+
+// ── Invoice helpers ────────────────────────────────────────────────────────────
+function invoicesFor(storeId, from, to) {
+  const fromD = new Date(from * 1000);
+  const toD   = new Date(to   * 1000);
+  const months = new Set();
+  const d = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
+  while (d <= toD) {
+    months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    d.setMonth(d.getMonth() + 1);
+  }
+  return state.invoices
+    .filter(r => r.storeId === storeId && months.has(r.month))
+    .reduce((s, r) => s + r.amount, 0);
+}
+
+// ── Chart helper ───────────────────────────────────────────────────────────────
+function makeChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  const el = document.getElementById(id);
+  if (!el) return null;
+  Chart.defaults.color       = '#787878';
+  Chart.defaults.borderColor = '#2c2c2c';
+  Chart.defaults.font.family = 'Inter';
+  charts[id] = new Chart(el, config);
+  return charts[id];
+}
+
+// ── Heatmap ────────────────────────────────────────────────────────────────────
+function heatColor(val, max) {
+  if (!max || val <= 0) return 'rgba(255,255,255,0.04)'; // empty — dark/neutral
+  const t = Math.min(1, val / max);
+  // Low (#ffedd5 = 255,237,213)  →  High (#e85555 = 232,85,85)
+  const r = Math.round(255 + t * (232 - 255));
+  const g = Math.round(237 + t * ( 85 - 237));
+  const b = Math.round(213 + t * ( 85 - 213));
+  return `rgb(${r},${g},${b})`;
+}
+
+function buildHourlyMap(items) {
+  // Returns { 'YYYY-MM-DD': Float32Array(24) }
+  const map = {};
+  for (const item of items) {
+    if (!item.datetime) continue;
+    const dt = new Date(item.datetime);
+    if (isNaN(dt)) continue;
+    const day  = dt.toISOString().slice(0, 10);
+    const hour = dt.getHours();
+    if (!map[day]) map[day] = new Float32Array(24);
+    map[day][hour] += (item.priceexclvat || 0);
+  }
+  return map;
+}
+
+function renderHeatmap(containerId, hourlyMap, from, to) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const sortedDays = Object.keys(hourlyMap).sort();
+  if (!sortedDays.length) {
+    el.innerHTML = '<div class="empty">No sales data available for this period</div>';
+    return;
+  }
+
+  // Compute global max
+  let max = 0;
+  for (const arr of Object.values(hourlyMap)) {
+    for (const v of arr) if (v > max) max = v;
+  }
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = '<div class="heatmap-scroll"><table class="heatmap">';
+
+  // Hour headers
+  html += '<tr class="hm-header-row"><td class="hm-spacer"></td>';
+  for (let h = 0; h < 24; h++) {
+    html += `<td class="hm-hour-header">${h}</td>`;
+  }
+  html += '</tr>';
+
+  for (const day of sortedDays) {
+    const arr  = hourlyMap[day];
+    const dt   = new Date(day + 'T12:00:00');
+    const label = `${dayNames[dt.getDay()]} ${day.slice(5)}`;
+    html += `<tr class="hm-row"><td class="hm-label">${label}</td>`;
+    for (let h = 0; h < 24; h++) {
+      const v   = arr[h] || 0;
+      const col = heatColor(v, max);
+      const tip = v > 0 ? `${label} ${h}:00 · ${kr(v)}` : '';
+      html += `<td class="hm-cell" style="background:${col}" title="${tip}"></td>`;
+    }
+    html += '</tr>';
+  }
+
+  html += '</table></div>';
+  el.innerHTML = html;
+}
+
+// ── Top items ──────────────────────────────────────────────────────────────────
+function buildTopItems(items, limit = 10) {
+  const agg = {};
+  for (const item of items) {
+    const name = (item.productname || 'Unknown').trim();
+    if (!agg[name]) agg[name] = { count: 0, revenue: 0 };
+    agg[name].count   += (item.count || 1);
+    agg[name].revenue += (item.priceexclvat || 0);
+  }
+  return Object.entries(agg)
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit);
+}
+
+function topItemsTable(items) {
+  if (!items.length) return '<div class="empty">No item data available</div>';
+  let html = `<table>
+    <thead><tr>
+      <th style="width:28px">#</th>
+      <th>Item</th>
+      <th class="td-num">Qty</th>
+    </tr></thead><tbody>`;
+  items.forEach((it, i) => {
+    html += `<tr>
+      <td class="td-rank">${i + 1}</td>
+      <td>${escHtml(it.name)}</td>
+      <td class="td-num">${it.count}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Sidebar ─────────────────────────────────────────────────────────────────────
+function renderSidebarSkeleton() {
+  const list = document.getElementById('store-list');
+  list.innerHTML = STORES.map(s => `
+    <div class="store-item" id="si-${s.id}" data-id="${s.id}" onclick="setView('store:${s.id}')">
+      <div class="si-name">${s.name}</div>
+      <div class="si-row">
+        <span class="si-rev"><span class="shimmer" style="width:80px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadSidebar() {
+  const { from, to } = getDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+
+  // Kick off all fetches in parallel (revenue + planday)
+  const [results, salaries] = await Promise.all([
+    Promise.all(STORES.map(s => Promise.all([
+      apiRevenue(s.id, from, to),
+      apiRevenue(s.id, lyFrom, lyTo)
+    ]))),
+    apiPlandaySalaries(from, to)
+  ]);
+
+  STORES.forEach((s, i) => {
+    const el = document.getElementById(`si-${s.id}`);
+    if (!el) return;
+
+    const [rev, lyRev] = results[i];
+    const change   = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
+    const cost     = invoicesFor(s.id, from, to);
+    const costP    = (rev && cost) ? (cost / rev * 100) : null;
+    const salary   = salaries[s.id] || null;
+    const salaryP  = (rev && salary) ? (salary / rev * 100) : null;
+
+    const isActive = state.view === `store:${s.id}`;
+    el.className = `store-item${isActive ? ' active' : ''}`;
+
+    el.innerHTML = `
+      <div class="si-name">${s.name}</div>
+      <div class="si-row">
+        <span class="si-rev">${rev !== null ? kr(rev) : '—'}</span>
+        ${change !== null ? `<span class="si-ly ${updown(change)}">${pct(change)}</span>` : ''}
+      </div>
+      ${costP   !== null ? `<div class="si-cost">Cost: ${costP.toFixed(1)}%</div>` : ''}
+      ${salaryP !== null ? `<div class="si-cost">Salary: ${salaryP.toFixed(1)}%</div>` : ''}
+    `;
+  });
+}
+
+// ── Product mix helpers ────────────────────────────────────────────────────────
+function categorizeItems(items) {
+  const out = { rolls: 0, kombos: 0, kebab: 0, falafel: 0, chicken: 0 };
+  for (const item of items) {
+    const n = (item.name || item.productname || '').toLowerCase().trim();
+    const qty = parseInt(item.count || 1);
+    if (qty <= 0) continue;
+    const isKombo      = /kombo|combo/.test(n);
+    const isProtein    = /kebab|falafel|kylling|chicken|lamb/.test(n);
+    const isKillerRoll = n.startsWith('killer') && isProtein;
+    if (!isKombo && !isKillerRoll) continue;
+    if (isKombo) out.kombos += qty; else out.rolls += qty;
+    if (n.includes('lamb') || n.includes('kebab')) out.kebab += qty;
+    else if (n.includes('falafel')) out.falafel += qty;
+    else if (n.includes('chicken') || n.includes('kylling')) out.chicken += qty;
+  }
+  return out;
+}
+
+function makeMixBar(segments) {
+  const barHtml = segments.map(s =>
+    `<div style="width:${s.pct.toFixed(3)}%;background:${s.color};height:100%" title="${s.label}: ${s.pct.toFixed(1)}%"></div>`
+  ).join('');
+  const legendHtml = segments.map(s =>
+    `<div class="mix-legend-item">
+      <span class="mix-swatch" style="background:${s.color}"></span>
+      <span class="mix-cat">${s.label}</span>
+      <span class="mix-pct">${s.pct.toFixed(1)}%</span>
+      <span class="mix-count">(${s.count.toLocaleString('da-DK')}×)</span>
+    </div>`
+  ).join('');
+  return `<div class="mix-bar">${barHtml}</div><div class="mix-legend">${legendHtml}</div>`;
+}
+
+function renderProductMix(el, items) {
+  const c = categorizeItems(items);
+
+  // Bar 1: Rolls vs Kombos
+  const rkTotal = c.rolls + c.kombos;
+
+  // Bar 2: Protein mix (kebab + falafel + chicken across both rolls & kombos)
+  const protTotal = c.kebab + c.falafel + c.chicken;
+
+  if (!rkTotal && !protTotal) {
+    el.innerHTML = '<div class="empty">No categorized items in this period</div>';
+    return;
+  }
+
+  let html = '';
+
+  if (rkTotal) {
+    const seg = [
+      { label: 'Rolls',  count: c.rolls,  color: '#b30000', pct: c.rolls  / rkTotal * 100 },
+      { label: 'Kombos', count: c.kombos, color: '#5588ff', pct: c.kombos / rkTotal * 100 },
+    ].filter(s => s.count > 0);
+    html += `<div class="mix-section-label">Rolls vs Kombos</div>${makeMixBar(seg)}`;
+  }
+
+  if (protTotal) {
+    const seg = [
+      { label: 'Kebab',   count: c.kebab,   color: '#b30000', pct: c.kebab   / protTotal * 100 },
+      { label: 'Falafel', count: c.falafel, color: '#4ecca3', pct: c.falafel / protTotal * 100 },
+      { label: 'Chicken', count: c.chicken, color: '#f0a020', pct: c.chicken / protTotal * 100 },
+    ].filter(s => s.count > 0);
+    html += `<div class="mix-section-label" style="margin-top:18px">Protein Mix</div>${makeMixBar(seg)}`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Chain view ─────────────────────────────────────────────────────────────────
+async function renderChainView() {
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Chain Overview</div>
+      <div class="page-sub">${periodLabel(state.period)} · All 6 stores · Revenue excluding 25% VAT</div>
+    </div>
+    <div class="kpi-grid" id="chain-kpis">
+      ${[0,1,2,3,4].map(() => `<div class="card"><div class="card-title"><span class="shimmer" style="width:80px">&nbsp;</span></div><div class="metric-val"><span class="shimmer" style="width:120px">&nbsp;</span></div></div>`).join('')}
+    </div>
+    <div class="two-col" style="margin-bottom:16px">
+      <div class="card">
+        <div class="section-title">Revenue by Store</div>
+        <div class="chart-wrap"><canvas id="chain-bar-chart"></canvas></div>
+      </div>
+      <div class="card" id="chain-top-card">
+        <div class="section-title">Top Selling Items</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading items…</div>
+      </div>
+    </div>
+    <div class="card" id="chain-stores-card">
+      <div class="section-title">Store Breakdown</div>
+      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+    </div>
+    <div class="card" id="chain-mix-card" style="margin-top:16px">
+      <div class="section-title">Product Mix</div>
+      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+    </div>
+  `;
+
+  const { from, to } = getDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+
+  // Fetch revenue for current + LY + Planday salaries in parallel
+  const [curData, lyData, salaries] = await Promise.all([
+    apiAllRevenue(from, to),
+    apiAllRevenue(lyFrom, lyTo),
+    apiPlandaySalaries(from, to)
+  ]);
+
+  const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
+  const totalLY     = STORES.reduce((s, st) => s + (lyData[st.id]  || 0), 0);
+  const totalCost   = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
+  const totalSalary = STORES.reduce((s, st) => s + (salaries[st.id] || 0), 0);
+  const budget      = totalLY * 1.10;
+  const vsLY        = totalLY  ? ((totalRev - totalLY)  / totalLY  * 100) : null;
+  const vsBudget    = budget   ? ((totalRev - budget)   / budget   * 100) : null;
+  const chainCostP  = (totalRev && totalCost)   ? (totalCost   / totalRev * 100) : null;
+  const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
+
+  // KPIs
+  document.getElementById('chain-kpis').innerHTML = `
+    <div class="card">
+      <div class="card-title">Total Revenue ex VAT</div>
+      <div class="metric-val">${kr(totalRev)}</div>
+      <div class="metric-sub">${periodLabel(state.period)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">vs Same Period Last Year</div>
+      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
+      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(totalLY)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
+      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Food Cost % (Chain)</div>
+      <div class="metric-val ${chainCostP !== null ? (chainCostP > 35 ? 'down' : chainCostP < 25 ? 'up' : '') : ''}">${chainCostP !== null ? chainCostP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${totalCost ? 'Cost: ' + kr(totalCost) : 'Enter invoices to track'}</div>
+      ${chainCostP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainCostP)}%"></div></div>` : ''}
+    </div>
+    <div class="card">
+      <div class="card-title">Salary % (Chain)</div>
+      <div class="metric-val ${chainSalP !== null ? (chainSalP > 35 ? 'down' : chainSalP < 20 ? 'up' : '') : ''}">${chainSalP !== null ? chainSalP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${totalSalary ? 'Salary: ' + kr(totalSalary) : 'No Planday data'}</div>
+      ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
+    </div>
+  `;
+
+  // Bar chart
+  const labels  = STORES.map(s => s.name);
+  const curVals = STORES.map(s => curData[s.id] || 0);
+  const lyVals  = STORES.map(s => lyData[s.id]  || 0);
+
+  makeChart('chain-bar-chart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: periodLabel(state.period),
+          data: curVals,
+          backgroundColor: 'rgba(179,0,0,0.85)',
+          borderRadius: 4,
+          borderSkipped: false
+        },
+        {
+          label: 'Last Year',
+          data: lyVals,
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          borderRadius: 4,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#787878', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${kr(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878' } },
+        y: {
+          grid: { color: '#2c2c2c' },
+          ticks: {
+            color: '#787878',
+            callback: v => kr(v)
+          }
+        }
+      }
+    }
+  });
+
+  // Store breakdown table
+  let breakdownHtml = `<table>
+    <thead><tr>
+      <th>Store</th>
+      <th class="td-num">Revenue ex VAT</th>
+      <th class="td-num">vs LY</th>
+      <th class="td-num">vs Budget</th>
+      <th class="td-num">Cost %</th>
+      <th class="td-num">Salary %</th>
+    </tr></thead><tbody>`;
+
+  for (const s of STORES) {
+    const rev    = curData[s.id] || 0;
+    const ly     = lyData[s.id]  || 0;
+    const bgt    = ly * 1.10;
+    const chg    = ly     ? ((rev - ly)  / ly  * 100) : null;
+    const chgB   = bgt    ? ((rev - bgt) / bgt * 100) : null;
+    const cost   = invoicesFor(s.id, from, to);
+    const costP  = rev && cost ? (cost / rev * 100) : null;
+    const sal    = salaries[s.id] || null;
+    const salP   = rev && sal ? (sal / rev * 100) : null;
+
+    breakdownHtml += `<tr>
+      <td style="font-weight:600;cursor:pointer;color:var(--red)" onclick="setView('store:${s.id}')">${s.name}</td>
+      <td class="td-rev">${kr(rev)}</td>
+      <td class="td-num ${updown(chg)}">${pct(chg)}</td>
+      <td class="td-num ${updown(chgB)}">${pct(chgB)}</td>
+      <td class="td-num">${costP !== null ? costP.toFixed(1) + '%' : '—'}</td>
+      <td class="td-num">${salP  !== null ? salP.toFixed(1)  + '%' : '—'}</td>
+    </tr>`;
+  }
+
+  // Chain total row
+  breakdownHtml += `<tr style="border-top:1px solid var(--border2);font-weight:700">
+    <td>CHAIN TOTAL</td>
+    <td class="td-rev">${kr(totalRev)}</td>
+    <td class="td-num ${updown(vsLY)}">${pct(vsLY)}</td>
+    <td class="td-num ${updown(vsBudget)}">${pct(vsBudget)}</td>
+    <td class="td-num">${chainCostP !== null ? chainCostP.toFixed(1) + '%' : '—'}</td>
+    <td class="td-num">${chainSalP  !== null ? chainSalP.toFixed(1)  + '%' : '—'}</td>
+  </tr>`;
+
+  breakdownHtml += '</tbody></table>';
+  document.getElementById('chain-stores-card').innerHTML =
+    '<div class="section-title">Store Breakdown</div>' + breakdownHtml;
+
+  // Top items — only for ≤14 day ranges
+  const days = daysInRange(from, to);
+  const topCard = document.getElementById('chain-top-card');
+
+  const mixCard = document.getElementById('chain-mix-card');
+
+  if (days.length > 14) {
+    topCard.innerHTML = `<div class="section-title">Top Selling Items</div>
+      <div class="empty">Select a period of 14 days or less to view top items.<br>
+      Use individual store pages for longer periods.</div>`;
+    mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
+  } else {
+    // Fetch all stores' sales in parallel
+    const allItems = (await Promise.all(
+      STORES.map(s => apiSalesRange(s.id, from, to))
+    )).flat();
+
+    const top = buildTopItems(allItems, 15);
+    topCard.innerHTML = '<div class="section-title">Top Selling Items</div>' + topItemsTable(top);
+
+    mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
+    renderProductMix(document.getElementById('chain-mix-body'), allItems);
+  }
+}
+
+// ── Store view ─────────────────────────────────────────────────────────────────
+async function renderStoreView(storeId) {
+  const store = STORES.find(s => s.id === storeId);
+  if (!store) return;
+
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="breadcrumb">
+      <span class="bc-link" onclick="setView('chain')">Chain</span>
+      <span class="bc-sep">›</span>
+      <span>${store.name}</span>
+    </div>
+    <div class="page-header">
+      <div class="page-title">${store.name}</div>
+      <div class="page-sub">${periodLabel(state.period)} · Revenue excluding 25% VAT</div>
+    </div>
+    <div class="kpi-grid" id="store-kpis">
+      ${[0,1,2,3,4].map(() => `<div class="card"><div class="shimmer" style="width:70px;height:10px;margin-bottom:10px">&nbsp;</div><div class="shimmer" style="width:130px;height:24px">&nbsp;</div></div>`).join('')}
+    </div>
+    <div class="two-col" style="margin-bottom:16px">
+      <div class="card" id="store-top-card">
+        <div class="section-title">Top Selling Items</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+      </div>
+      <div class="card">
+        <div class="section-title">Daily Revenue</div>
+        <div class="chart-wrap"><canvas id="store-daily-chart"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px" id="store-mix-card">
+      <div class="section-title">Product Mix</div>
+      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+    </div>
+    <div class="card">
+      <div class="section-title">Hourly Revenue Heatmap</div>
+      <div id="store-heatmap"><div class="spinner-wrap"><div class="spinner"></div> Loading heatmap…</div></div>
+    </div>
+  `;
+
+  const { from, to } = getDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+
+  const [rev, lyRev, salaries] = await Promise.all([
+    apiRevenue(storeId, from, to),
+    apiRevenue(storeId, lyFrom, lyTo),
+    apiPlandaySalaries(from, to)
+  ]);
+
+  const budget   = lyRev ? lyRev * 1.10 : null;
+  const vsLY     = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
+  const vsBudget = (rev !== null && budget) ? ((rev - budget) / budget * 100) : null;
+  const cost     = invoicesFor(storeId, from, to);
+  const costP    = (rev && cost) ? (cost / rev * 100) : null;
+  const salary   = salaries[storeId] || null;
+  const salaryP  = (rev && salary) ? (salary / rev * 100) : null;
+
+  document.getElementById('store-kpis').innerHTML = `
+    <div class="card">
+      <div class="card-title">Revenue ex VAT</div>
+      <div class="metric-val">${kr(rev)}</div>
+      <div class="metric-sub">${periodLabel(state.period)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">vs Last Year</div>
+      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
+      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(lyRev)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
+      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Food Cost %</div>
+      <div class="metric-val ${costP !== null ? (costP > 35 ? 'down' : costP < 25 ? 'up' : '') : ''}">${costP !== null ? costP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${cost ? 'Cost: ' + kr(cost) : 'Enter invoices to track'}</div>
+      ${costP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,costP)}%"></div></div>` : ''}
+    </div>
+    <div class="card">
+      <div class="card-title">Salary %</div>
+      <div class="metric-val ${salaryP !== null ? (salaryP > 35 ? 'down' : salaryP < 20 ? 'up' : '') : ''}">${salaryP !== null ? salaryP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${salary ? 'Salary cost: ' + kr(salary) : 'No Planday data'}</div>
+      ${salaryP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,salaryP)}%"></div></div>` : ''}
+    </div>
+  `;
+
+  // Detailed sales for items + heatmap
+  const days = daysInRange(from, to);
+  const maxDays = 31;
+
+  if (days.length > maxDays) {
+    document.getElementById('store-top-card').innerHTML =
+      '<div class="section-title">Top Selling Items</div><div class="empty">Period too long. Select ≤31 days.</div>';
+    document.getElementById('store-mix-card').innerHTML =
+      '<div class="section-title">Product Mix</div><div class="empty">Period too long. Select ≤31 days.</div>';
+    document.getElementById('store-heatmap').innerHTML =
+      '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
+  } else {
+    const items = await apiSalesRange(storeId, from, to);
+
+    // Top items
+    const top = buildTopItems(items, 10);
+    document.getElementById('store-top-card').innerHTML =
+      '<div class="section-title">Top Selling Items</div>' + topItemsTable(top);
+
+    // Product mix
+    const mixCard = document.getElementById('store-mix-card');
+    mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="store-mix-body"></div>';
+    renderProductMix(document.getElementById('store-mix-body'), items);
+
+    // Daily revenue chart
+    const dailyMap = {};
+    for (const item of items) {
+      if (!item.datetime) continue;
+      const dt  = new Date(item.datetime);
+      if (isNaN(dt)) continue;
+      const day = dt.toISOString().slice(0, 10);
+      dailyMap[day] = (dailyMap[day] || 0) + (item.priceexclvat || 0);
+    }
+
+    const sortedDays = days.map(d => new Date(d * 1000).toISOString().slice(0, 10));
+    const dailyVals  = sortedDays.map(d => dailyMap[d] || 0);
+
+    makeChart('store-daily-chart', {
+      type: 'bar',
+      data: {
+        labels: sortedDays.map(d => {
+          const dt = new Date(d + 'T12:00:00');
+          return dt.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
+        }),
+        datasets: [{
+          label: 'Revenue ex VAT',
+          data: dailyVals,
+          backgroundColor: 'rgba(179,0,0,0.8)',
+          borderRadius: 4,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${kr(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878', maxRotation: 45 } },
+          y: {
+            grid: { color: '#2c2c2c' },
+            ticks: { color: '#787878', callback: v => kr(v) }
+          }
+        }
+      }
+    });
+
+    // Heatmap
+    const hourlyMap = buildHourlyMap(items);
+    renderHeatmap('store-heatmap', hourlyMap, from, to);
+  }
+}
+
+// ── Invoices view ──────────────────────────────────────────────────────────────
+function renderInvoicesView() {
+  if (!('invoiceStoreFilter' in state)) state.invoiceStoreFilter = 'all';
+
+  const main = document.getElementById('main');
+  const { from, to } = getDateRange(state.period);
+
+  // Months covered by the current period (for filtering invoices by date range)
+  const periodMonths = (() => {
+    const set = new Set();
+    const d = new Date(from * 1000);
+    d.setDate(1);
+    const end = new Date(to * 1000);
+    while (d <= end) {
+      set.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+    return set;
+  })();
+
+  // Invoices within the current period
+  const periodInvoices = state.invoices.filter(r => periodMonths.has(r.month));
+
+  // Filtered list for the history table
+  const filtered = (state.invoiceStoreFilter === 'all')
+    ? periodInvoices
+    : periodInvoices.filter(r => r.storeId === state.invoiceStoreFilter);
+
+  const sorted = [...filtered].sort((a, b) =>
+    b.month.localeCompare(a.month) || a.storeId.localeCompare(b.storeId)
+  );
+
+  // Invoice history table
+  let listHtml = '';
+  if (!sorted.length) {
+    listHtml = `<div class="empty">${state.invoiceStoreFilter === 'all' ? 'No invoices for this period' : 'No invoices for this store in this period'}</div>`;
+  } else {
+    listHtml = `<table>
+      <thead><tr>
+        <th>Store</th><th>Date</th><th>Supplier</th>
+        <th class="td-num">Amount (DKK)</th>
+        <th class="td-num">Cost %</th>
+        <th></th>
+      </tr></thead><tbody>`;
+
+    for (const r of sorted) {
+      const store = STORES.find(s => s.id === r.storeId);
+      listHtml += `<tr>
+        <td style="font-weight:600">${store ? store.name : r.storeId}</td>
+        <td>${r.date || r.month}</td>
+        <td>${escHtml(r.description || '—')}</td>
+        <td class="td-rev">${kr(r.amount)}</td>
+        <td class="td-num" id="cst-${r.id}">…</td>
+        <td><button class="btn-danger" onclick="deleteInvoice('${r.id}')">✕</button></td>
+      </tr>`;
+    }
+    listHtml += '</tbody></table>';
+  }
+
+  // Cost summary by store
+  let summaryHtml = `<table>
+    <thead><tr>
+      <th>Store</th>
+      <th class="td-num">Revenue ex VAT (${periodLabel(state.period)})</th>
+      <th class="td-num">Invoices (period months)</th>
+      <th class="td-num">Cost %</th>
+    </tr></thead><tbody>`;
+
+  for (const s of STORES) {
+    const costAmt = invoicesFor(s.id, from, to);
+    summaryHtml += `<tr>
+      <td style="font-weight:600">${s.name}</td>
+      <td class="td-rev" id="sumrev-${s.id}">—</td>
+      <td class="td-rev">${kr(costAmt)}</td>
+      <td class="td-num" id="sumcst-${s.id}">—</td>
+    </tr>`;
+  }
+  summaryHtml += '</tbody></table>';
+
+  // Store filter options
+  const filterOpts = `<option value="all"${state.invoiceStoreFilter==='all'?' selected':''}>All stores</option>`
+    + STORES.map(s => `<option value="${s.id}"${state.invoiceStoreFilter===s.id?' selected':''}>${s.name}</option>`).join('');
+
+  main.innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Supplier Invoices</div>
+      <div class="page-sub">Enter food cost invoices per store. Cost % is calculated against actual revenue.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-title">Add Invoice</div>
+      <div class="invoice-form">
+        <div class="f-group">
+          <label>Store</label>
+          <select id="rf-store">
+            ${STORES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f-group">
+          <label>Date</label>
+          <input type="date" id="rf-date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="f-group">
+          <label>Supplier</label>
+          <input type="text" id="rf-desc" placeholder="e.g. Meat supplier, Bread…">
+        </div>
+        <div class="f-group">
+          <label>Amount (DKK excl. VAT)</label>
+          <input type="number" id="rf-amount" placeholder="0" min="0" step="1">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn" onclick="addInvoice()">Add</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('scan-input').click()">📷 Scan Invoice</button>
+          <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceImage(this.files[0])">
+        </div>
+        <div id="scan-preview" style="display:none;margin-top:12px">
+          <img id="scan-thumb" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid var(--border)" alt="invoice photo">
+          <span id="scan-status" style="margin-left:10px;font-size:13px;color:var(--text-muted)"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-title">Cost Summary — ${periodLabel(state.period)}</div>
+      ${summaryHtml}
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-title">Spending by Supplier — ${periodLabel(state.period)}</div>
+      <div id="supplier-summary-wrap"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin-bottom:0">All Invoices — ${periodLabel(state.period)}</div>
+        <select style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);cursor:pointer"
+          onchange="state.invoiceStoreFilter=this.value;renderInvoicesView()">
+          ${filterOpts}
+        </select>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+
+  // Async: fetch revenue, fill summaries + supplier breakdown
+  (async () => {
+    const revMap   = await apiAllRevenue(from, to);
+    const totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
+
+    // Fill cost summary by store
+    for (const s of STORES) {
+      const rev   = revMap[s.id] || 0;
+      const cost  = invoicesFor(s.id, from, to);
+      const costP = (rev && cost) ? (cost / rev * 100) : null;
+      const revEl = document.getElementById(`sumrev-${s.id}`);
+      const cstEl = document.getElementById(`sumcst-${s.id}`);
+      if (revEl) revEl.textContent = kr(rev);
+      if (cstEl) cstEl.textContent = costP !== null ? costP.toFixed(1) + '%' : '—';
+    }
+
+    // Spending by supplier (all stores, period invoices)
+    const supplierTotals = {};
+    for (const r of periodInvoices) {
+      const key = (r.description || '—').trim();
+      supplierTotals[key] = (supplierTotals[key] || 0) + r.amount;
+    }
+    const supplierRows = Object.entries(supplierTotals)
+      .sort((a, b) => b[1] - a[1]);
+
+    const wrap = document.getElementById('supplier-summary-wrap');
+    if (wrap) {
+      if (!supplierRows.length) {
+        wrap.innerHTML = '<div class="empty">No invoices for this period</div>';
+      } else {
+        let tbl = `<table><thead><tr>
+          <th>Supplier</th>
+          <th class="td-num">Total Amount</th>
+          <th class="td-num">% of Revenue</th>
+        </tr></thead><tbody>`;
+        for (const [supplier, total] of supplierRows) {
+          const pct = totalRev ? (total / totalRev * 100).toFixed(1) + '%' : '—';
+          tbl += `<tr>
+            <td>${escHtml(supplier)}</td>
+            <td class="td-rev">${kr(total)}</td>
+            <td class="td-num">${pct}</td>
+          </tr>`;
+        }
+        tbl += '</tbody></table>';
+        wrap.innerHTML = tbl;
+      }
+    }
+
+    // Fill cost % per invoice row
+    for (const r of sorted) {
+      const el = document.getElementById(`cst-${r.id}`);
+      if (!el) continue;
+      const monthTs  = new Date(r.month + '-01T12:00:00');
+      const monthEnd = new Date(monthTs.getFullYear(), monthTs.getMonth() + 1, 0, 23, 59, 59);
+      const mFrom    = Math.floor(monthTs.getTime()  / 1000);
+      const mTo      = Math.floor(monthEnd.getTime() / 1000);
+      const rev = await apiRevenue(r.storeId, mFrom, mTo);
+      if (rev && rev > 0) {
+        el.textContent = (r.amount / rev * 100).toFixed(1) + '%';
+      } else {
+        el.textContent = '—';
+      }
+    }
+  })();
+}
+
+function addInvoice() {
+  const storeId     = document.getElementById('rf-store').value;
+  const date        = document.getElementById('rf-date').value;        // YYYY-MM-DD
+  const description = document.getElementById('rf-desc').value.trim();
+  const amount      = parseFloat(document.getElementById('rf-amount').value);
+
+  if (!storeId || !date || isNaN(amount) || amount <= 0) {
+    alert('Please select a store, pick a date, and enter a valid amount.');
+    return;
+  }
+
+  const month = date.slice(0, 7); // YYYY-MM — used for cost % grouping
+
+  state.invoices.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    storeId,
+    date,
+    month,
+    description,
+    amount
+  });
+
+  saveInvoices();
+  renderInvoicesView();
+  loadSidebar();
+}
+
+function deleteInvoice(id) {
+  state.invoices = state.invoices.filter(r => r.id !== id);
+  saveInvoices();
+  renderInvoicesView();
+  loadSidebar();
+}
+
+// ── Invoice scanning ───────────────────────────────────────────────────────────
+const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY';
+
+async function handleInvoiceImage(file) {
+  if (!file) return;
+
+  // Show thumbnail
+  const preview = document.getElementById('scan-preview');
+  const thumb   = document.getElementById('scan-thumb');
+  const status  = document.getElementById('scan-status');
+  if (!preview) return;
+
+  const objectUrl = URL.createObjectURL(file);
+  thumb.src = objectUrl;
+  preview.style.display = 'flex';
+  preview.style.alignItems = 'center';
+  status.textContent = 'Scanning…';
+
+  // Read as base64
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const mediaType = file.type || 'image/jpeg';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 256,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Extract the invoice details and respond with ONLY a JSON object (no markdown) with these fields: supplier (string, the vendor/supplier name), amount (number, total amount excluding VAT in DKK, or the total if VAT unknown), date (string in YYYY-MM-DD format). If a field cannot be determined, use null.' }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    const parsed = JSON.parse(text);
+
+    // Fill form fields
+    if (parsed.supplier) {
+      const descEl = document.getElementById('rf-desc');
+      if (descEl) descEl.value = parsed.supplier;
+    }
+    if (parsed.amount != null) {
+      const amtEl = document.getElementById('rf-amount');
+      if (amtEl) amtEl.value = Math.round(parsed.amount);
+    }
+    if (parsed.date) {
+      const dateEl = document.getElementById('rf-date');
+      if (dateEl) dateEl.value = parsed.date;
+    }
+
+    status.textContent = '✓ Fields filled';
+    status.style.color = 'var(--green, #22c55e)';
+  } catch(e) {
+    console.error('Invoice scan error:', e);
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+// ── Meat tracking view ─────────────────────────────────────────────────────────
+function renderMeatView() {
+  if (!('meatStoreFilter' in state)) state.meatStoreFilter = 'all';
+
+  const today = new Date().toISOString().slice(0, 10);
+  const storeOpts = STORES.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Filter + sort history
+  const rows = [...state.meat]
+    .filter(e => state.meatStoreFilter === 'all' || e.storeId === state.meatStoreFilter)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const filterOpts = `<option value="all"${state.meatStoreFilter==='all'?' selected':''}>All stores</option>`
+    + STORES.map(s => `<option value="${s.id}"${state.meatStoreFilter===s.id?' selected':''}>${s.name}</option>`).join('');
+
+  // History table
+  let historyHtml;
+  if (!rows.length) {
+    historyHtml = `<div class="empty">No entries yet${state.meatStoreFilter !== 'all' ? ' for this store' : ''}</div>`;
+  } else {
+    historyHtml = `<table>
+      <thead><tr>
+        <th>Date</th>
+        <th>Store</th>
+        <th class="td-num">Lamb AM (kg)</th>
+        <th class="td-num">Lamb PM (kg)</th>
+        <th class="td-num">Lamb Waste (kg)</th>
+        <th class="td-num">Lamb Waste %</th>
+        <th class="td-num">Chicken AM (kg)</th>
+        <th class="td-num">Chicken PM (kg)</th>
+        <th class="td-num">Chicken Waste (kg)</th>
+        <th class="td-num">Chicken Waste %</th>
+        <th>Sell-outs</th>
+        <th></th>
+      </tr></thead><tbody>`;
+
+    for (const e of rows) {
+      const store = STORES.find(s => s.id === e.storeId);
+      const lambWaste  = e.lambMorning  != null && e.lambEvening  != null ? +(e.lambMorning  - e.lambEvening).toFixed(2)  : null;
+      const chickWaste = e.chickMorning != null && e.chickEvening != null ? +(e.chickMorning - e.chickEvening).toFixed(2) : null;
+      const lambWasteP  = (lambWaste  != null && e.lambMorning  > 0) ? (lambWaste  / e.lambMorning  * 100).toFixed(1) + '%' : '—';
+      const chickWasteP = (chickWaste != null && e.chickMorning > 0) ? (chickWaste / e.chickMorning * 100).toFixed(1) + '%' : '—';
+
+      const sellouts = [
+        e.lambSellout  ? `Lamb: ${e.lambSellout}`    : null,
+        e.chickSellout ? `Chicken: ${e.chickSellout}` : null,
+      ].filter(Boolean).join(' / ') || '—';
+
+      historyHtml += `<tr>
+        <td>${e.date}</td>
+        <td style="font-weight:600">${store ? store.name : e.storeId}</td>
+        <td class="td-num">${e.lambMorning  != null ? e.lambMorning  : '—'}</td>
+        <td class="td-num">${e.lambEvening  != null ? e.lambEvening  : '—'}</td>
+        <td class="td-num">${lambWaste  != null ? lambWaste  : '—'}</td>
+        <td class="td-num ${lambWaste  != null && e.lambMorning  > 0 && (lambWaste/e.lambMorning*100)  > 15 ? 'down' : ''}">${lambWasteP}</td>
+        <td class="td-num">${e.chickMorning != null ? e.chickMorning : '—'}</td>
+        <td class="td-num">${e.chickEvening != null ? e.chickEvening : '—'}</td>
+        <td class="td-num">${chickWaste != null ? chickWaste : '—'}</td>
+        <td class="td-num ${chickWaste != null && e.chickMorning > 0 && (chickWaste/e.chickMorning*100) > 15 ? 'down' : ''}">${chickWasteP}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${escHtml(sellouts)}</td>
+        <td><button class="btn-danger" onclick="deleteMeatEntry('${e.id}')">✕</button></td>
+      </tr>`;
+    }
+    historyHtml += '</tbody></table>';
+  }
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Meat Tracking</div>
+      <div class="page-sub">Log daily meat stock levels per store to track waste and sell-out times.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="section-title">Log Entry</div>
+      <div class="invoice-form">
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="f-group" style="flex:1;min-width:140px">
+            <label>Store</label>
+            <select id="mt-store">${storeOpts}</select>
+          </div>
+          <div class="f-group" style="flex:1;min-width:140px">
+            <label>Date</label>
+            <input type="date" id="mt-date" value="${today}">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:4px">
+          <div style="flex:1;min-width:200px">
+            <div class="meat-section-label">Morning Stock</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div class="f-group" style="flex:1;min-width:120px">
+                <label>Lamb (kg)</label>
+                <input type="number" id="mt-lamb-am" placeholder="0.0" min="0" step="0.1">
+              </div>
+              <div class="f-group" style="flex:1;min-width:120px">
+                <label>Chicken (kg)</label>
+                <input type="number" id="mt-chick-am" placeholder="0.0" min="0" step="0.1">
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-width:200px">
+            <div class="meat-section-label">Evening Stock (remaining)</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div class="f-group" style="flex:1;min-width:120px">
+                <label>Lamb remaining (kg)</label>
+                <input type="number" id="mt-lamb-pm" placeholder="0.0" min="0" step="0.1">
+              </div>
+              <div class="f-group" style="flex:1;min-width:120px">
+                <label>Chicken remaining (kg)</label>
+                <input type="number" id="mt-chick-pm" placeholder="0.0" min="0" step="0.1">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:4px">
+          <div class="meat-section-label">Sell-outs (optional)</div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" id="mt-lamb-so-chk" onchange="document.getElementById('mt-lamb-so').disabled=!this.checked" style="width:16px;height:16px;cursor:pointer">
+              <label for="mt-lamb-so-chk" style="margin:0;cursor:pointer">Lamb sell-out</label>
+              <input type="time" id="mt-lamb-so" disabled style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-family:var(--mono);font-size:13px">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" id="mt-chick-so-chk" onchange="document.getElementById('mt-chick-so').disabled=!this.checked" style="width:16px;height:16px;cursor:pointer">
+              <label for="mt-chick-so-chk" style="margin:0;cursor:pointer">Chicken sell-out</label>
+              <input type="time" id="mt-chick-so" disabled style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-family:var(--mono);font-size:13px">
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" style="margin-top:12px" onclick="saveMeatEntry()">Save Entry</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin-bottom:0">History</div>
+        <select style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);cursor:pointer"
+          onchange="state.meatStoreFilter=this.value;renderMeatView()">
+          ${filterOpts}
+        </select>
+      </div>
+      ${historyHtml}
+    </div>
+  `;
+}
+
+function saveMeatEntry() {
+  const storeId    = document.getElementById('mt-store').value;
+  const date       = document.getElementById('mt-date').value;
+  const lambAm     = document.getElementById('mt-lamb-am').value;
+  const lambPm     = document.getElementById('mt-lamb-pm').value;
+  const chickAm    = document.getElementById('mt-chick-am').value;
+  const chickPm    = document.getElementById('mt-chick-pm').value;
+  const lambSoChk  = document.getElementById('mt-lamb-so-chk').checked;
+  const chickSoChk = document.getElementById('mt-chick-so-chk').checked;
+  const lambSo     = document.getElementById('mt-lamb-so').value;
+  const chickSo    = document.getElementById('mt-chick-so').value;
+
+  if (!storeId || !date) {
+    alert('Please select a store and date.');
+    return;
+  }
+
+  const entry = {
+    id:           Date.now().toString(36) + Math.random().toString(36).slice(2),
+    storeId,
+    date,
+    lambMorning:  lambAm  !== '' ? parseFloat(lambAm)  : null,
+    lambEvening:  lambPm  !== '' ? parseFloat(lambPm)  : null,
+    chickMorning: chickAm !== '' ? parseFloat(chickAm) : null,
+    chickEvening: chickPm !== '' ? parseFloat(chickPm) : null,
+    lambSellout:  lambSoChk  && lambSo  ? lambSo  : null,
+    chickSellout: chickSoChk && chickSo ? chickSo : null,
+  };
+
+  state.meat.push(entry);
+  saveMeat();
+  renderMeatView();
+}
+
+function deleteMeatEntry(id) {
+  state.meat = state.meat.filter(e => e.id !== id);
+  saveMeat();
+  renderMeatView();
+}
+
+// ── Graphs view ────────────────────────────────────────────────────────────────
+const GRAPH_STORE_COLORS = {
+  'indre-by':       '#b30000',
+  'vesterbro':      '#5588ff',
+  'christianshavn': '#4ecca3',
+  'fisketorvet':    '#f0a020',
+  'frederiksberg':  '#cc44cc',
+  'norrebro':       '#ffdd44',
+};
+
+function initGraphState() {
+  if (!('graphFrom' in state)) {
+    const to   = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 29);
+    state.graphFrom   = from.toISOString().slice(0, 10);
+    state.graphTo     = to.toISOString().slice(0, 10);
+    state.graphStores = new Set(STORES.map(s => s.id));
+    state.graphMetric = 'revenue';
+    state.graphType   = 'line';
+  }
+  // Remove daily if it was previously stored
+  if (!state.graphInterval || state.graphInterval === 'daily') state.graphInterval = 'weekly';
+}
+
+function renderGraphsView() {
+  initGraphState();
+  const main = document.getElementById('main');
+
+  const storeChecks = STORES.map(s => `
+    <label class="graph-store-check">
+      <input type="checkbox" value="${s.id}" ${state.graphStores.has(s.id) ? 'checked' : ''}
+        onchange="toggleGraphStore('${s.id}',this.checked)">
+      <span class="graph-dot" style="background:${GRAPH_STORE_COLORS[s.id]}"></span>
+      ${s.name}
+    </label>`).join('');
+
+  const allSel = state.graphStores.size === STORES.length;
+
+  const btnGroup = (pairs, stateKey, rerender) => pairs.map(([v, l]) =>
+    `<button class="graph-btn${state[stateKey]===v?' active':''}"
+      onclick="state.${stateKey}='${v}';${rerender}">${l}</button>`).join('');
+
+  main.innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Graphs</div>
+      <div class="page-sub">Custom date range · Compare stores over time</div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="graph-controls">
+
+        <div class="graph-ctrl-group">
+          <div class="graph-ctrl-label">Date Range</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="graph-date-input" type="date" id="g-from" value="${state.graphFrom}"
+              onchange="state.graphFrom=this.value;loadGraphData()">
+            <span style="color:var(--text-muted);font-size:12px">to</span>
+            <input class="graph-date-input" type="date" id="g-to" value="${state.graphTo}"
+              onchange="state.graphTo=this.value;loadGraphData()">
+          </div>
+        </div>
+
+        <div class="graph-ctrl-group">
+          <div class="graph-ctrl-label">Interval</div>
+          <div class="graph-btn-group">
+            ${btnGroup([['weekly','Weekly'],['monthly','Monthly']],'graphInterval','renderGraphsView()')}
+          </div>
+        </div>
+
+        <div class="graph-ctrl-group">
+          <div class="graph-ctrl-label">Metric</div>
+          <div class="graph-btn-group">
+            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %']],'graphMetric','renderGraphsView()')}
+          </div>
+        </div>
+
+        <div class="graph-ctrl-group">
+          <div class="graph-ctrl-label">Chart Type</div>
+          <div class="graph-btn-group">
+            ${btnGroup([['line','Line'],['bar','Bar']],'graphType','renderGraphsView()')}
+          </div>
+        </div>
+
+        <div class="graph-ctrl-group" style="flex-basis:100%">
+          <div class="graph-ctrl-label">
+            <span>Stores</span>
+            <button class="graph-toggle-all" onclick="toggleAllGraphStores()">
+              ${allSel ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
+          <div class="graph-store-checks">${storeChecks}</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card" id="graph-chart-card" style="min-height:220px">
+      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+    </div>
+  `;
+
+  loadGraphData();
+}
+
+function toggleGraphStore(storeId, checked) {
+  if (checked) state.graphStores.add(storeId);
+  else state.graphStores.delete(storeId);
+  loadGraphData();
+}
+
+function toggleAllGraphStores() {
+  state.graphStores = state.graphStores.size === STORES.length
+    ? new Set()
+    : new Set(STORES.map(s => s.id));
+  renderGraphsView();
+}
+
+// ── Graph bucketing helpers ─────────────────────────────────────────────────────
+function generateBuckets(fromStr, toStr, interval) {
+  const labels = [];
+  if (interval === 'daily') {
+    const d = new Date(fromStr + 'T12:00:00');
+    const end = new Date(toStr + 'T12:00:00');
+    while (d <= end) { labels.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+  } else if (interval === 'weekly') {
+    const d = new Date(fromStr + 'T12:00:00');
+    const wd = d.getDay();
+    d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1)); // back to Monday
+    const end = new Date(toStr + 'T12:00:00');
+    while (d <= end) { labels.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 7); }
+  } else {
+    const d = new Date(fromStr.slice(0, 7) + '-01T12:00:00');
+    const end = new Date(toStr.slice(0, 7) + '-01T12:00:00');
+    while (d <= end) {
+      labels.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+  }
+  return labels;
+}
+
+function itemBucket(datetimeStr, interval) {
+  const d = new Date(datetimeStr);
+  if (isNaN(d)) return null;
+  if (interval === 'daily')   return d.toISOString().slice(0, 10);
+  if (interval === 'monthly') return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const wd = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
+  return mon.toISOString().slice(0, 10);
+}
+
+// Returns {from, to} unix timestamps for a given bucket label + interval
+function bucketTimestamps(label, interval) {
+  if (interval === 'daily') {
+    return {
+      from: Math.floor(new Date(label + 'T00:00:00').getTime() / 1000),
+      to:   Math.floor(new Date(label + 'T23:59:59').getTime() / 1000),
+    };
+  } else if (interval === 'weekly') {
+    // label = Monday date; week ends on Sunday
+    const sun = new Date(label + 'T12:00:00');
+    sun.setDate(sun.getDate() + 6);
+    return {
+      from: Math.floor(new Date(label + 'T00:00:00').getTime() / 1000),
+      to:   Math.floor(new Date(sun.toISOString().slice(0, 10) + 'T23:59:59').getTime() / 1000),
+    };
+  } else {
+    // monthly: label = YYYY-MM
+    const [yr, mo] = label.split('-').map(Number);
+    const lastDay  = new Date(yr, mo, 0).getDate();
+    return {
+      from: Math.floor(new Date(`${label}-01T00:00:00`).getTime() / 1000),
+      to:   Math.floor(new Date(`${label}-${String(lastDay).padStart(2,'0')}T23:59:59`).getTime() / 1000),
+    };
+  }
+}
+
+// ISO week number (Monday-based, same as Danish/European standard)
+function isoWeekNumber(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  // Move to nearest Thursday to get the correct ISO week year
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+// Human-readable label for a bucket key
+function formatBucketLabel(key, interval) {
+  if (interval === 'weekly') {
+    return 'Uge ' + isoWeekNumber(key);
+  }
+  // monthly: key = YYYY-MM → "Mar 2026"
+  const [yr, mo] = key.split('-').map(Number);
+  return new Date(yr, mo - 1, 1).toLocaleDateString('da-DK', { month: 'short', year: 'numeric' });
+}
+
+// apiRevenue with 30 s timeout and 0-on-failure fallback
+async function safeApiRevenue(storeId, from, to) {
+  try {
+    const result = await Promise.race([
+      apiRevenue(storeId, from, to),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000)),
+    ]);
+    return result || 0;
+  } catch (e) {
+    console.warn(`[graphs] revenue fetch failed for ${storeId}:`, e.message);
+    return 0;
+  }
+}
+
+async function loadGraphData() {
+  const card = document.getElementById('graph-chart-card');
+  if (!card || state.view !== 'graphs') return;
+  card.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Loading…</div>';
+
+  const selectedStores = [...state.graphStores];
+  if (!selectedStores.length) {
+    card.innerHTML = '<div class="empty">Select at least one store.</div>';
+    return;
+  }
+
+  const fromTs = Math.floor(new Date(state.graphFrom + 'T00:00:00').getTime() / 1000);
+  const toTs   = Math.floor(new Date(state.graphTo   + 'T23:59:59').getTime() / 1000);
+  const bucketKeys    = generateBuckets(state.graphFrom, state.graphTo, state.graphInterval);
+  const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
+  const isPercent     = ['food-cost', 'salary', 'rolls'].includes(state.graphMetric);
+
+  // ── Revenue: one safeApiRevenue call per bucket per store, all in parallel ──
+  const revByStore = {}; // storeId → { bucketKey: number }
+  await Promise.all(selectedStores.map(async storeId => {
+    revByStore[storeId] = {};
+    await Promise.all(bucketKeys.map(async key => {
+      const { from: bkF, to: bkT } = bucketTimestamps(key, state.graphInterval);
+      revByStore[storeId][key] = await safeApiRevenue(storeId, bkF, bkT);
+    }));
+  }));
+
+  // ── Rolls %: fetch whole period items, bucket by item.datetime ─────────────
+  const allItems = {};
+  if (state.graphMetric === 'rolls') {
+    await Promise.all(selectedStores.map(async id => {
+      try { allItems[id] = await apiSalesRange(id, fromTs, toTs); }
+      catch(e) { allItems[id] = []; }
+    }));
+  }
+
+  // ── Salary: one Planday call per bucket (week or month) ────────────────────
+  const bucketSalaries = {}; // bucketKey → { storeId: cost }
+  if (state.graphMetric === 'salary') {
+    await Promise.all(bucketKeys.map(async key => {
+      const { from: bkF, to: bkT } = bucketTimestamps(key, state.graphInterval);
+      try { bucketSalaries[key] = await apiPlandaySalaries(bkF, bkT); }
+      catch(e) { bucketSalaries[key] = {}; }
+    }));
+  }
+
+  if (state.view !== 'graphs') return; // navigated away while fetching
+
+  // ── Build Chart.js datasets ─────────────────────────────────────────────────
+  const datasets = selectedStores.map(storeId => {
+    const store  = STORES.find(s => s.id === storeId);
+    const color  = GRAPH_STORE_COLORS[storeId] || '#888';
+    const revMap = revByStore[storeId]; // bucketKey → revenue
+
+    let data;
+
+    if (state.graphMetric === 'revenue') {
+      data = bucketKeys.map(k => revMap[k] || null);
+
+    } else if (state.graphMetric === 'food-cost') {
+      // Invoices have month-level granularity; map each invoice to the nearest bucket key
+      const costMap = {};
+      for (const inv of state.invoices) {
+        if (inv.storeId !== storeId) continue;
+        let bk;
+        if (state.graphInterval === 'monthly') {
+          bk = inv.month;
+        } else {
+          // weekly: Monday of the first day of this invoice's month
+          const d = new Date(inv.month + '-01T12:00:00');
+          const wd = d.getDay();
+          d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
+          bk = d.toISOString().slice(0, 10);
+        }
+        costMap[bk] = (costMap[bk] || 0) + inv.amount;
+      }
+      data = bucketKeys.map(k => {
+        const cost = costMap[k] || 0, rev = revMap[k] || 0;
+        return rev > 0 && cost > 0 ? cost / rev * 100 : null;
+      });
+
+    } else if (state.graphMetric === 'salary') {
+      data = bucketKeys.map(k => {
+        const sal = (bucketSalaries[k] || {})[storeId] || 0;
+        const rev = revMap[k] || 0;
+        return rev > 0 && sal > 0 ? sal / rev * 100 : null;
+      });
+
+    } else if (state.graphMetric === 'rolls') {
+      const bucketMap = {};
+      for (const item of (allItems[storeId] || [])) {
+        const key = itemBucket(item.datetime, state.graphInterval);
+        if (!key) continue;
+        (bucketMap[key] = bucketMap[key] || []).push(item);
+      }
+      data = bucketKeys.map(k => {
+        const its = bucketMap[k];
+        if (!its || !its.length) return null;
+        const c = categorizeItems(its);
+        const tot = c.rolls + c.kombos;
+        return tot > 0 ? c.rolls / tot * 100 : null;
+      });
+    }
+
+    const isLine = state.graphType === 'line';
+    return {
+      label: store.name,
+      data,
+      borderColor: color,
+      backgroundColor: isLine ? color + '28' : color + 'bb',
+      borderWidth: isLine ? 2 : 0,
+      borderRadius: isLine ? 0 : 4,
+      tension: 0.35,
+      pointRadius: bucketKeys.length > 45 ? 0 : 3,
+      pointHoverRadius: 5,
+      fill: false,
+      spanGaps: true,
+    };
+  });
+
+  card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
+
+  makeChart('graph-canvas', {
+    type: state.graphType,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#787878', font: { size: 11 }, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              if (v == null) return ` ${ctx.dataset.label}: —`;
+              return isPercent ? ` ${ctx.dataset.label}: ${v.toFixed(1)}%` : ` ${ctx.dataset.label}: ${kr(v)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878', maxRotation: 45, maxTicksLimit: 24 } },
+        y: {
+          grid: { color: '#2c2c2c' },
+          beginAtZero: isPercent,
+          ticks: { color: '#787878', callback: v => isPercent ? v.toFixed(0) + '%' : kr(v) }
+        }
+      }
+    }
+  });
+}
+
+// ── App control ────────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen  = sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('visible', !isOpen);
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('visible');
+}
+
+function setView(view) {
+  state.view = view;
+  closeSidebar(); // close on mobile after navigation
+  updateNav();
+  renderMain();
+}
+
+function setPeriod(period) {
+  state.period = period;
+  state.cache  = {}; // Clear cache on period change
+
+  // Update period buttons
+  document.querySelectorAll('.pb').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === period);
+  });
+
+  // Sync mobile select
+  const sel = document.querySelector('.period-select-mobile');
+  if (sel) sel.value = period;
+
+  renderSidebarSkeleton();
+  loadSidebar();
+  renderMain();
+}
+
+function updateNav() {
+  // Period buttons
+  document.querySelectorAll('.pb').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === state.period);
+  });
+
+  // Nav buttons
+  document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === state.view);
+  });
+
+  // Store items
+  document.querySelectorAll('.store-item[data-id]').forEach(el => {
+    el.classList.toggle('active', state.view === `store:${el.dataset.id}`);
+  });
+}
+
+function renderMain() {
+  updateNav();
+  if (state.view === 'chain') {
+    renderChainView();
+  } else if (state.view.startsWith('store:')) {
+    renderStoreView(state.view.slice(6));
+  } else if (state.view === 'invoices') {
+    renderInvoicesView();
+  } else if (state.view === 'meat') {
+    renderMeatView();
+  } else if (state.view === 'graphs') {
+    renderGraphsView();
+  }
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────────
+function doLogin() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+
+  if (u === CREDS.username && p === CREDS.password) {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    errEl.textContent = '';
+    sessionStorage.setItem('kk_auth', '1');
+    boot();
+  } else {
+    errEl.textContent = 'Invalid username or password';
+    document.getElementById('password').value = '';
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('kk_auth');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+  state.cache = {};
+}
+
+// Allow Enter key on login form
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('login-screen').classList.contains('hidden')) {
+    doLogin();
+  }
+});
+
+// ── Boot ────────────────────────────────────────────────────────────────────────
+function boot() {
+  loadInvoices();
+  loadMeat();
+
+  // Set active period button
+  document.querySelectorAll('.pb').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === state.period);
+  });
+
+  renderSidebarSkeleton();
+  loadSidebar();
+  renderMain();
+}
+
+// Auto-login if session active
+(function init() {
+  if (sessionStorage.getItem('kk_auth') === '1') {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
