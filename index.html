@@ -837,6 +837,14 @@
     @media (max-width: 399px) {
       .kpi-grid { grid-template-columns: 1fr; }
     }
+
+    @media (max-width: 767px) {
+      .chain-sections      { display: flex; flex-direction: column; }
+      .chain-stores-wrap   { order: 1; margin-bottom: 16px; margin-top: 0 !important; }
+      .chain-mix-wrap      { order: 2; margin-bottom: 16px; margin-top: 0 !important; }
+      .chain-kpis-wrap     { order: 3; margin-bottom: 16px; }
+      .chain-charts-wrap   { order: 4; }
+    }
   </style>
 </head>
 <body>
@@ -1477,26 +1485,30 @@ async function renderChainView() {
       <div class="page-title">Chain Overview</div>
       <div class="page-sub">${periodLabel(state.period)} · All 6 stores · Revenue excluding 25% VAT</div>
     </div>
-    <div class="kpi-grid" id="chain-kpis">
-      ${[0,1,2,3,4].map(() => `<div class="card"><div class="card-title"><span class="shimmer" style="width:80px">&nbsp;</span></div><div class="metric-val"><span class="shimmer" style="width:120px">&nbsp;</span></div></div>`).join('')}
-    </div>
-    <div class="two-col" style="margin-bottom:16px">
-      <div class="card">
-        <div class="section-title">Revenue by Store</div>
-        <div class="chart-wrap"><canvas id="chain-bar-chart"></canvas></div>
+    <div class="chain-sections">
+      <div class="chain-kpis-wrap">
+        <div class="kpi-grid" id="chain-kpis">
+          ${[0,1,2,3,4].map(() => `<div class="card"><div class="card-title"><span class="shimmer" style="width:80px">&nbsp;</span></div><div class="metric-val"><span class="shimmer" style="width:120px">&nbsp;</span></div></div>`).join('')}
+        </div>
       </div>
-      <div class="card" id="chain-top-card">
-        <div class="section-title">Top Selling Items</div>
-        <div class="spinner-wrap"><div class="spinner"></div> Loading items…</div>
+      <div class="two-col chain-charts-wrap" style="margin-bottom:16px">
+        <div class="card">
+          <div class="section-title">Revenue by Store</div>
+          <div class="chart-wrap"><canvas id="chain-bar-chart"></canvas></div>
+        </div>
+        <div class="card" id="chain-top-card">
+          <div class="section-title">Top Selling Items</div>
+          <div class="spinner-wrap"><div class="spinner"></div> Loading items…</div>
+        </div>
       </div>
-    </div>
-    <div class="card" id="chain-stores-card">
-      <div class="section-title">Store Breakdown</div>
-      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
-    </div>
-    <div class="card" id="chain-mix-card" style="margin-top:16px">
-      <div class="section-title">Product Mix</div>
-      <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+      <div class="card chain-stores-wrap" id="chain-stores-card">
+        <div class="section-title">Store Breakdown</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+      </div>
+      <div class="card chain-mix-wrap" id="chain-mix-card" style="margin-top:16px">
+        <div class="section-title">Product Mix</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
+      </div>
     </div>
   `;
 
