@@ -889,6 +889,8 @@
       <button class="pb" data-period="last-week"   onclick="setPeriod('last-week')">Last Week</button>
       <button class="pb" data-period="this-month"  onclick="setPeriod('this-month')">This Month</button>
       <button class="pb" data-period="last-month"  onclick="setPeriod('last-month')">Last Month</button>
+<button class="pb" data-period="this-year"   onclick="setPeriod('this-year')">This Year</button>
+<button class="pb" data-period="last-year"   onclick="setPeriod('last-year')">Last Year</button>
     </div>
 
     <select class="period-select-mobile" onchange="setPeriod(this.value)">
@@ -898,6 +900,8 @@
       <option value="last-week">Last Week</option>
       <option value="this-month">This Month</option>
       <option value="last-month">Last Month</option>
+<option value="this-year">This Year</option>
+<option value="last-year">Last Year</option>
     </select>
 
     <button class="btn-logout" onclick="doLogout()">Sign out</button>
@@ -1022,6 +1026,14 @@ function getDateRange(period) {
       from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       to   = new Date(new Date(now.getFullYear(), now.getMonth(), 1).getTime() - 1); break;
 
+    case 'this-year':
+      from = new Date(now.getFullYear(), 0, 1);
+      to   = now; break;
+
+    case 'last-year':
+      from = new Date(now.getFullYear() - 1, 0, 1);
+      to   = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59); break;
+
     default:
       from = tod; to = now;
   }
@@ -1076,7 +1088,9 @@ function periodLabel(period) {
     'this-week': 'This Week',
     'last-week': 'Last Week',
     'this-month': 'This Month',
-    'last-month': 'Last Month'
+    'last-month': 'Last Month',
+    'this-year':  'This Year',
+    'last-year':  'Last Year'
   };
   return map[period] || period;
 }
