@@ -891,6 +891,7 @@
       <button class="pb" data-period="last-month"  onclick="setPeriod('last-month')">Last Month</button>
 <button class="pb" data-period="this-year"   onclick="setPeriod('this-year')">This Year</button>
 <button class="pb" data-period="last-year"   onclick="setPeriod('last-year')">Last Year</button>
+<button class="pb" data-period="custom" onclick="openCustomPicker()">Custom</button>
     </div>
 
     <select class="period-select-mobile" onchange="setPeriod(this.value)">
@@ -902,6 +903,7 @@
       <option value="last-month">Last Month</option>
 <option value="this-year">This Year</option>
 <option value="last-year">Last Year</option>
+<option value="custom">Custom…</option>
     </select>
 
     <button class="btn-logout" onclick="doLogout()">Sign out</button>
@@ -909,6 +911,23 @@
 
   <!-- Sidebar overlay (mobile backdrop) -->
   <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div id="custom-picker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#1e1e1e;border:1px solid #2c2c2c;border-radius:12px;padding:28px 24px;width:320px;max-width:calc(100vw - 32px)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:20px">Custom Date Range</div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:#787878;display:block;margin-bottom:5px">From</label>
+      <input type="date" id="custom-from" style="width:100%;background:#161616;border:1px solid #2c2c2c;border-radius:6px;padding:8px 11px;color:#f0f0f0;font-size:13px;outline:none">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:#787878;display:block;margin-bottom:5px">To</label>
+      <input type="date" id="custom-to" style="width:100%;background:#161616;border:1px solid #2c2c2c;border-radius:6px;padding:8px 11px;color:#f0f0f0;font-size:13px;outline:none">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="applyCustomPicker()" style="flex:1;background:#b30000;color:#fff;border:none;border-radius:6px;padding:10px;font-size:13px;font-weight:600;cursor:pointer">Apply</button>
+      <button onclick="closeCustomPicker()" style="flex:1;background:transparent;color:#787878;border:1px solid #2c2c2c;border-radius:6px;padding:10px;font-size:13px;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
 
   <!-- Body -->
   <div id="body">
@@ -1034,6 +1053,15 @@ function getDateRange(period) {
       from = new Date(now.getFullYear() - 1, 0, 1);
       to   = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59); break;
 
+    case 'custom':
+      if (state.customFrom && state.customTo) {
+        from = new Date(state.customFrom + 'T00:00:00');
+        to   = new Date(state.customTo   + 'T23:59:59');
+      } else {
+        from = tod; to = now;
+      }
+      break;
+
     default:
       from = tod; to = now;
   }
@@ -1090,7 +1118,8 @@ function periodLabel(period) {
     'this-month': 'This Month',
     'last-month': 'Last Month',
     'this-year':  'This Year',
-    'last-year':  'Last Year'
+    'last-year':  'Last Year',
+    'custom':     state.customFrom && state.customTo ? state.customFrom + ' → ' + state.customTo : 'Custom'
   };
   return map[period] || period;
 }
@@ -1902,6 +1931,7 @@ function renderInvoicesView() {
         <th class="td-num">Amount (DKK)</th>
         <th class="td-num">Cost %</th>
         <th></th>
+        <th></th>
       </tr></thead><tbody>`;
 
     for (const r of sorted) {
@@ -1912,6 +1942,7 @@ function renderInvoicesView() {
         <td>${escHtml(r.description || '—')}</td>
         <td class="td-rev">${kr(r.amount)}</td>
         <td class="td-num" id="cst-${r.id}">…</td>
+        <td><button class="btn-danger" onclick="editInvoice('${r.id}')" style="color:var(--muted)">✎</button></td>
         <td><button class="btn-danger" onclick="deleteInvoice('${r.id}')">✕</button></td>
       </tr>`;
     }
@@ -1963,7 +1994,14 @@ function renderInvoicesView() {
         </div>
         <div class="f-group">
           <label>Supplier</label>
-          <input type="text" id="rf-desc" placeholder="e.g. Meat supplier, Bread…">
+          <select id="rf-desc">
+  <option value="">Select supplier…</option>
+  <option value="Hørkram">Hørkram</option>
+  <option value="Tayyib">Tayyib</option>
+  <option value="Cytex">Cytex</option>
+  <option value="Gamma">Gamma</option>
+  <option value="Royal">Royal</option>
+</select>
         </div>
         <div class="f-group">
           <label>Amount (DKK excl. VAT)</label>
@@ -1987,7 +2025,15 @@ function renderInvoicesView() {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="section-title">Spending by Supplier — ${periodLabel(state.period)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin-bottom:0">Spending by Supplier</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="sup-from" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="renderInvoicesView()">
+          <span style="color:var(--muted);font-size:12px">to</span>
+          <input type="date" id="sup-to" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="renderInvoicesView()">
+          <button class="btn" style="padding:4px 12px;font-size:12px;height:auto" onclick="clearSupplierFilter()">Clear</button>
+        </div>
+      </div>
       <div id="supplier-summary-wrap"><div class="empty">Loading…</div></div>
     </div>
 
@@ -2020,8 +2066,19 @@ function renderInvoicesView() {
     }
 
     // Spending by supplier (all stores, period invoices)
+    const supFromEl = document.getElementById('sup-from');
+    const supToEl   = document.getElementById('sup-to');
+    const supFrom   = supFromEl && supFromEl.value ? supFromEl.value : null;
+    const supTo     = supToEl   && supToEl.value   ? supToEl.value   : null;
+
+    const supplierFiltered = state.invoices.filter(r => {
+      if (supFrom && r.date < supFrom) return false;
+      if (supTo   && r.date > supTo)   return false;
+      return true;
+    });
+
     const supplierTotals = {};
-    for (const r of periodInvoices) {
+    for (const r of supplierFiltered) {
       const key = (r.description || '—').trim();
       supplierTotals[key] = (supplierTotals[key] || 0) + r.amount;
     }
@@ -2071,16 +2128,16 @@ function renderInvoicesView() {
 
 function addInvoice() {
   const storeId     = document.getElementById('rf-store').value;
-  const date        = document.getElementById('rf-date').value;        // YYYY-MM-DD
-  const description = document.getElementById('rf-desc').value.trim();
+  const date        = document.getElementById('rf-date').value;
+  const description = document.getElementById('rf-desc').value;
   const amount      = parseFloat(document.getElementById('rf-amount').value);
 
-  if (!storeId || !date || isNaN(amount) || amount <= 0) {
-    alert('Please select a store, pick a date, and enter a valid amount.');
+  if (!storeId || !date || !description || isNaN(amount) || amount <= 0) {
+    alert('Please select a store, date, supplier, and enter a valid amount.');
     return;
   }
 
-  const month = date.slice(0, 7); // YYYY-MM — used for cost % grouping
+  const month = date.slice(0, 7);
 
   state.invoices.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2),
@@ -2094,6 +2151,32 @@ function addInvoice() {
   saveInvoices();
   renderInvoicesView();
   loadSidebar();
+}
+
+function editInvoice(id) {
+  const r = state.invoices.find(i => i.id === id);
+  if (!r) return;
+  const newAmount = parseFloat(prompt('Edit amount (DKK):', r.amount));
+  if (isNaN(newAmount) || newAmount <= 0) return;
+  const newDesc = prompt('Edit supplier:', r.description);
+  if (!newDesc) return;
+  const newDate = prompt('Edit date (YYYY-MM-DD):', r.date);
+  if (!newDate) return;
+  r.amount = newAmount;
+  r.description = newDesc;
+  r.date = newDate;
+  r.month = newDate.slice(0, 7);
+  saveInvoices();
+  renderInvoicesView();
+  loadSidebar();
+}
+
+function clearSupplierFilter() {
+  const f = document.getElementById('sup-from');
+  const t = document.getElementById('sup-to');
+  if (f) f.value = '';
+  if (t) t.value = '';
+  renderInvoicesView();
 }
 
 function deleteInvoice(id) {
@@ -2741,6 +2824,30 @@ async function loadGraphData() {
 }
 
 // ── App control ────────────────────────────────────────────────────────────────
+function openCustomPicker() {
+  const now = new Date().toISOString().slice(0, 10);
+  document.getElementById('custom-from').value = state.customFrom || now;
+  document.getElementById('custom-to').value   = state.customTo   || now;
+  document.getElementById('custom-picker').style.display = 'flex';
+}
+
+function closeCustomPicker() {
+  document.getElementById('custom-picker').style.display = 'none';
+}
+
+function applyCustomPicker() {
+  const from = document.getElementById('custom-from').value;
+  const to   = document.getElementById('custom-to').value;
+  if (!from || !to || from > to) {
+    alert('Please select a valid date range where the start date is before the end date.');
+    return;
+  }
+  state.customFrom = from;
+  state.customTo   = to;
+  closeCustomPicker();
+  setPeriod('custom');
+}
+
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
