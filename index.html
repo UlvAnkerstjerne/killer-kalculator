@@ -845,6 +845,41 @@
       .chain-kpis-wrap     { order: 3; margin-bottom: 16px; }
       .chain-charts-wrap   { order: 4; }
     }
+
+    /* ── Katering ─────────────────────────────────────────────────── */
+    .katering-wrap        { max-width: 640px; margin: 0 auto; padding: 0 0 40px; }
+    .katering-section     { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .katering-section h3  { margin: 0 0 14px; font-size: .85rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .katering-field       { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .katering-field label { flex: 1; font-size: .92rem; }
+    .katering-field input[type=number] { width: 90px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: .95rem; }
+    .katering-check       { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .93rem; cursor: pointer; }
+    .katering-check input { width: 16px; height: 16px; cursor: pointer; }
+    .katering-btn-row     { display: flex; gap: 10px; margin-top: 4px; }
+    .katering-btn         { padding: 9px 22px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: .93rem; font-weight: 600; cursor: pointer; }
+    .katering-btn:hover   { opacity: .88; }
+    .katering-btn.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .katering-portions-toggle { background: none; border: none; color: var(--accent); font-size: .85rem; cursor: pointer; padding: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 4px; }
+    .katering-portions-body   { display: none; }
+    .katering-portions-body.open { display: block; }
+    .portions-grid        { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .portions-grid label  { font-size: .82rem; color: var(--muted); display: block; margin-bottom: 2px; }
+    .portions-grid input  { width: 100%; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: .88rem; }
+    .kat-results-table    { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .kat-results-table th { text-align: left; padding: 6px 8px; color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+    .kat-results-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    .kat-results-table tr:last-child td { border-bottom: none; }
+    .kat-results-table .kat-group-header td { background: var(--bg); font-weight: 600; font-size: .8rem; color: var(--muted); padding: 8px 8px 4px; }
+    .kat-results-table .kat-indent td:first-child { padding-left: 20px; }
+    .kat-qty-col          { text-align: right; font-variant-numeric: tabular-nums; }
+
+    @media print {
+      body > *                     { visibility: hidden; }
+      #kat-print-area,
+      #kat-print-area *            { visibility: visible; }
+      #kat-print-area              { position: fixed; top: 0; left: 0; width: 100%; }
+      .katering-btn-row            { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -951,6 +986,10 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
           Meat Tracking
         </button>
+        <button class="nav-btn" data-view="katering" onclick="setView('katering')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+          Killer Katering
+        </button>
       </div>
 
       <div class="sidebar-section-label">Stores</div>
@@ -986,7 +1025,12 @@ const state = {
   view:   'chain',
   cache:  {},
   invoices: [],
-  meat: []
+  meat: [],
+  kateringGuests: 0,
+  kateringLam: false,
+  kateringKylling: false,
+  kateringLemonade: false,
+  kateringResultsHtml: '',
 };
 
 const charts = {};
@@ -2903,6 +2947,326 @@ function updateNav() {
   });
 }
 
+// ── Killer Katering ─────────────────────────────────────────────────────────
+
+const KAT_PORTIONS_KEY = 'kk_katering_portions';
+
+const KAT_DEFAULTS = {
+  hummus:          80,
+  cousCous:       150,
+  koleslaw:       100,
+  rodbeder:        50,
+  beetrootLabneh:  75,
+  falafelDej:     100,
+  harissa:         30,
+  fladbroed:        1,
+  lam:             50,
+  kylling:         50,
+  lemonade:         1,
+};
+
+function getKateringPortions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(KAT_PORTIONS_KEY) || '{}');
+    return Object.assign({}, KAT_DEFAULTS, stored);
+  } catch { return Object.assign({}, KAT_DEFAULTS); }
+}
+
+function saveKateringPortions() {
+  const p = {};
+  for (const key of Object.keys(KAT_DEFAULTS)) {
+    const el = document.getElementById('kp-' + key);
+    if (el) p[key] = parseFloat(el.value) || KAT_DEFAULTS[key];
+  }
+  localStorage.setItem(KAT_PORTIONS_KEY, JSON.stringify(p));
+  return p;
+}
+
+function toggleKateringPortions() {
+  const body = document.getElementById('kat-portions-body');
+  const lbl  = document.getElementById('kat-portions-lbl');
+  const open = body.classList.toggle('open');
+  lbl.textContent = open ? '▲ Skjul portionsstørrelser' : '▼ Rediger portionsstørrelser';
+}
+
+function beregnKatering() {
+  const p      = saveKateringPortions();
+  const guests = parseInt(document.getElementById('kat-guests').value) || 0;
+  if (guests <= 0) { alert('Angiv antal gæster.'); return; }
+
+  const withLam      = document.getElementById('kat-lam').checked;
+  const withKylling  = document.getElementById('kat-kylling').checked;
+  const withLemonade = document.getElementById('kat-lemonade').checked;
+
+  // Accumulate ingredients in grams (or pcs)
+  const ing = {};
+  function add(name, grams) {
+    ing[name] = (ing[name] || 0) + grams;
+  }
+
+  const n = guests;
+
+  // Hummus
+  add('Hummus',             p.hummus * n);
+
+  // Cous Cous Salat (200g per person total batch)
+  const cc = p.cousCous * n;
+  const CC_TOTAL = 80 + 240 + 100 + 8 + 26 + 20 + 1.6 + 1.2 + 1;  // = 477.8 per 200g? No — these are per-batch ratios scaled to cc
+  // Recipe (for 200g portion): couscous 80, aubergine 240, bagte pebre 100, persille 8, olivenolie 26, zaatar 20, hvidløg 1.6, honning 1.2, salt 1
+  // Scale to cc grams:
+  const CC_SUM = 80 + 240 + 100 + 8 + 26 + 20 + 1.6 + 1.2 + 1;
+  add('Couscous',           (80   / CC_SUM) * cc);
+  add('Aubergine',          (240  / CC_SUM) * cc);
+  add('Bagte pebre',        (100  / CC_SUM) * cc);
+  add('Persille',           (8    / CC_SUM) * cc);
+  add('Olivenolie',         (26   / CC_SUM) * cc);
+  add('Za\'atar',           (20   / CC_SUM) * cc);
+  add('Hvidløg',            (1.6  / CC_SUM) * cc);
+  add('Honning',            (1.2  / CC_SUM) * cc);
+  add('Salt',               (1    / CC_SUM) * cc);
+
+  // Koleslaw (æble = 2 stk à 130g = 260g)
+  const kl = p.koleslaw * n;
+  const KL_SUM = 1000 + 260 + 50;  // = 1310
+  add('Kål',                (1000 / 1310) * kl);
+  add('Æble',               (260  / 1310) * kl);
+  add('Persille',           (50   / 1310) * kl);
+
+  // Bagte Rødbeder (75g per person)
+  const rb = p.rodbeder * n;
+  const RB_SUM = 1000 + 30 + 100 + 1000 + 5 + 30;  // = 2165
+  add('Rødbede',            (1000 / 2165) * rb);
+  add('Olivenolie',         (30   / 2165) * rb);
+  add('Dild',               (100  / 2165) * rb);
+  add('Salt',               (1000 / 2165) * rb);
+  add('Spidskommen',        (5    / 2165) * rb);
+  add('Citronsaft',         (30   / 2165) * rb);
+
+  // Beetroot Labneh (75g per person)
+  const bl = p.beetrootLabneh * n;
+  const BL_SUM = 1000 + 500 + 400 + 50;  // = 1950
+  add('Labneh',             (1000 / 1950) * bl);
+  add('Rødbede',            (500  / 1950) * bl);
+  add('Salt',               (400  / 1950) * bl);
+  add('Spidskommen',        (50   / 1950) * bl);
+
+  // Falafel dej (100g per person) + fritureolie
+  const fd = p.falafelDej * n;
+  const FD_SUM = 6000 + 1000 + 140 + 200 + 1400 + 50 + 50 + 50 + 40;  // = 8930
+  add('Kikærter',           (6000 / 8930) * fd);
+  add('Løg',                (1000 / 8930) * fd);
+  add('Salt',               (140  / 8930) * fd);
+  add('Citronsaft',         (200  / 8930) * fd);
+  add('Persille',           (1400 / 8930) * fd);
+  add('Koriander',          (50   / 8930) * fd);
+  add('Cumin',              (50   / 8930) * fd);
+  add('Chili flager',       (50   / 8930) * fd);
+  add('Natron',             (40   / 8930) * fd);
+  add('Fritureolie',        50 * n);
+
+  // Harissa (30g per person)
+  const ha = p.harissa * n;
+  const HA_SUM = 5000 + 1760 + 1600 + 1000 + 100 + 500 + 60;  // = 10020
+  add('Flåede tomater',     (5000 / 10020) * ha);
+  add('Tomatkoncentrat',    (1760 / 10020) * ha);
+  add('Olivenolie',         (1600 / 10020) * ha);
+  add('Friske chili',       (1000 / 10020) * ha);
+  add('Garam masala',       (100  / 10020) * ha);
+  add('Tørret chili',       (500  / 10020) * ha);
+  add('Salt',               (60   / 10020) * ha);
+
+  // Fladbrød
+  const fbStk = Math.ceil(p.fladbroed * n);
+
+  // Tilvalg
+  if (withLam)      add('Lammebov (rå)',     (80 / 50) * p.lam * n);
+  if (withKylling)  add('Kyllingelår (rå)',  (80 / 50) * p.kylling * n);
+
+  let lemonadeBottles = 0;
+  const lemIng = {};
+  if (withLemonade) {
+    lemonadeBottles = Math.ceil(p.lemonade * n);
+    lemIng['Citronjuice']    = (1000 / 36) * lemonadeBottles;
+    lemIng['Limejuice']      = (1000 / 36) * lemonadeBottles;
+    lemIng['Sukker']         = (1550 / 36) * lemonadeBottles;
+    lemIng['Citron til skal'] = (3000 / 36) * lemonadeBottles;
+  }
+
+  // Round helper
+  function roundQty(g) {
+    if (g >= 1000) return Math.ceil(g / 10) * 10;
+    if (g >= 100)  return Math.ceil(g / 10) * 10;
+    return Math.ceil(g);
+  }
+  function fmtG(g) {
+    if (g >= 1000) return (g / 1000).toFixed(2).replace(/\.?0+$/, '') + ' kg';
+    return roundQty(g) + ' g';
+  }
+
+  // Build results HTML grouped into sections
+  const retter = [
+    ['Hummus',          fmtG(roundQty(ing['Hummus']))],
+    ['Couscous',        fmtG(roundQty(ing['Couscous']))],
+    ['Aubergine',       fmtG(roundQty(ing['Aubergine']))],
+    ['Bagte pebre',     fmtG(roundQty(ing['Bagte pebre']))],
+    ["Za'atar",         fmtG(roundQty(ing["Za'atar"]))],
+    ['Honning',         fmtG(roundQty(ing['Honning']))],
+    ['Kål',             fmtG(roundQty(ing['Kål']))],
+    ['Æble',            fmtG(roundQty(ing['Æble']))],
+    ['Rødbede',         fmtG(roundQty(ing['Rødbede']))],
+    ['Labneh',          fmtG(roundQty(ing['Labneh']))],
+    ['Dild',            fmtG(roundQty(ing['Dild']))],
+    ['Kikærter',        fmtG(roundQty(ing['Kikærter']))],
+    ['Løg',             fmtG(roundQty(ing['Løg']))],
+    ['Koriander',       fmtG(roundQty(ing['Koriander']))],
+    ['Cumin',           fmtG(roundQty(ing['Cumin']))],
+    ['Chili flager',    fmtG(roundQty(ing['Chili flager']))],
+    ['Natron',          fmtG(roundQty(ing['Natron']))],
+    ['Fritureolie',     fmtG(roundQty(ing['Fritureolie']))],
+    ['Flåede tomater',  fmtG(roundQty(ing['Flåede tomater']))],
+    ['Tomatkoncentrat', fmtG(roundQty(ing['Tomatkoncentrat']))],
+    ['Friske chili',    fmtG(roundQty(ing['Friske chili']))],
+    ['Garam masala',    fmtG(roundQty(ing['Garam masala']))],
+    ['Tørret chili',    fmtG(roundQty(ing['Tørret chili']))],
+  ];
+
+  // Shared ingredients (persille, olivenolie, salt, spidskommen, citronsaft, hvidløg)
+  const saucer = [
+    ['Persille',        fmtG(roundQty(ing['Persille']))],
+    ['Olivenolie',      fmtG(roundQty(ing['Olivenolie']))],
+    ['Salt',            fmtG(roundQty(ing['Salt']))],
+    ['Spidskommen',     fmtG(roundQty(ing['Spidskommen']))],
+    ['Citronsaft',      fmtG(roundQty(ing['Citronsaft']))],
+    ['Hvidløg',         fmtG(roundQty(ing['Hvidløg']))],
+  ];
+
+  function rowsHtml(rows) {
+    return rows.map(([name, qty]) =>
+      `<tr class="kat-indent"><td>${name}</td><td class="kat-qty-col">${qty}</td></tr>`
+    ).join('');
+  }
+
+  let tilvaegHTML = '';
+  if (withLam)      tilvaegHTML += `<tr class="kat-indent"><td>Lammebov (rå)</td><td class="kat-qty-col">${fmtG(roundQty(ing['Lammebov (rå)']))}</td></tr>`;
+  if (withKylling)  tilvaegHTML += `<tr class="kat-indent"><td>Kyllingelår (rå)</td><td class="kat-qty-col">${fmtG(roundQty(ing['Kyllingelår (rå)']))}</td></tr>`;
+  if (withLemonade) {
+    tilvaegHTML += `<tr class="kat-indent"><td>Citronjuice</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Citronjuice']))}</td></tr>`;
+    tilvaegHTML += `<tr class="kat-indent"><td>Limejuice</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Limejuice']))}</td></tr>`;
+    tilvaegHTML += `<tr class="kat-indent"><td>Sukker</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Sukker']))}</td></tr>`;
+    tilvaegHTML += `<tr class="kat-indent"><td>Citron til skal</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Citron til skal']))}</td></tr>`;
+  }
+
+  const html = `
+    <div id="kat-print-area">
+      <div style="margin-bottom:10px; font-size:.85rem; color:var(--muted);">
+        Beregnet for <strong>${n} gæster</strong>${withLam ? ' · Lammekød' : ''}${withKylling ? ' · Kyllingekød' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
+      </div>
+      <table class="kat-results-table">
+        <thead><tr><th>Ingrediens</th><th class="kat-qty-col">Mængde</th></tr></thead>
+        <tbody>
+          <tr class="kat-group-header"><td colspan="2">Retter &amp; Saucer</td></tr>
+          ${rowsHtml(retter)}
+          <tr class="kat-group-header"><td colspan="2">Krydderier &amp; Basale</td></tr>
+          ${rowsHtml(saucer)}
+          <tr class="kat-group-header"><td colspan="2">Brød</td></tr>
+          <tr class="kat-indent"><td>Fladbrød</td><td class="kat-qty-col">${fbStk} stk</td></tr>
+          ${tilvaegHTML ? `<tr class="kat-group-header"><td colspan="2">Tilvalg</td></tr>${tilvaegHTML}` : ''}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('kat-results').innerHTML = html;
+  document.getElementById('kat-results').style.display = 'block';
+  document.getElementById('kat-print-btn').style.display = 'inline-flex';
+}
+
+function renderKateringView() {
+  const main = document.getElementById('main');
+  const p = getKateringPortions();
+
+  const portionFields = [
+    ['hummus',         'Hummus (g/pers)',              p.hummus],
+    ['cousCous',       'Cous Cous Salat (g/pers)',     p.cousCous],
+    ['koleslaw',       'Koleslaw (g/pers)',             p.koleslaw],
+    ['rodbeder',       'Bagte Rødbeder (g/pers)',       p.rodbeder],
+    ['beetrootLabneh', 'Beetroot Labneh (g/pers)',      p.beetrootLabneh],
+    ['falafelDej',     'Falafel dej (g/pers)',          p.falafelDej],
+    ['harissa',        'Harissa (g/pers)',               p.harissa],
+    ['fladbroed',      'Fladbrød (stk/pers)',           p.fladbroed],
+    ['lam',            'Lammekød portion (g/pers)',     p.lam],
+    ['kylling',        'Kyllingekød portion (g/pers)',  p.kylling],
+    ['lemonade',       'Lemonade (flasker/pers)',       p.lemonade],
+  ];
+
+  main.innerHTML = `
+    <div class="view-header">
+      <h2>Killer Katering</h2>
+    </div>
+    <div class="katering-wrap">
+
+      <div class="katering-section">
+        <h3>Gæster &amp; Tilvalg</h3>
+        <div class="katering-field">
+          <label>Antal gæster</label>
+          <input type="number" id="kat-guests" min="1" value="${state.kateringGuests || ''}" placeholder="0">
+        </div>
+        <label class="katering-check">
+          <input type="checkbox" id="kat-lam" ${state.kateringLam ? 'checked' : ''}>
+          Lammekød
+        </label>
+        <label class="katering-check">
+          <input type="checkbox" id="kat-kylling" ${state.kateringKylling ? 'checked' : ''}>
+          Kyllingekød
+        </label>
+        <label class="katering-check">
+          <input type="checkbox" id="kat-lemonade" ${state.kateringLemonade ? 'checked' : ''}>
+          Killer Lemonade
+        </label>
+      </div>
+
+      <div class="katering-section">
+        <h3>Portionsstørrelser</h3>
+        <button class="katering-portions-toggle" onclick="toggleKateringPortions()">
+          <span id="kat-portions-lbl">▼ Rediger portionsstørrelser</span>
+        </button>
+        <div id="kat-portions-body" class="katering-portions-body">
+          <div class="portions-grid">
+            ${portionFields.map(([key, lbl, val]) => `
+              <div>
+                <label>${lbl}</label>
+                <input type="number" id="kp-${key}" value="${val}" step="any">
+              </div>`).join('')}
+          </div>
+          <div style="margin-top:10px; font-size:.8rem; color:var(--muted);">Portionsstørrelser gemmes automatisk ved beregning.</div>
+        </div>
+      </div>
+
+      <div class="katering-btn-row">
+        <button class="katering-btn" onclick="
+          state.kateringGuests  = parseInt(document.getElementById('kat-guests').value) || 0;
+          state.kateringLam     = document.getElementById('kat-lam').checked;
+          state.kateringKylling = document.getElementById('kat-kylling').checked;
+          state.kateringLemonade = document.getElementById('kat-lemonade').checked;
+          beregnKatering();
+          state.kateringResultsHtml = document.getElementById('kat-results').innerHTML;">
+          Beregn
+        </button>
+        <button class="katering-btn secondary" id="kat-print-btn" style="display:none;" onclick="window.print()">
+          Udskriv
+        </button>
+      </div>
+
+      <div class="katering-section" id="kat-results" style="display:none;"></div>
+    </div>`;
+
+  // Restore previous results if any
+  if (state.kateringResultsHtml) {
+    document.getElementById('kat-results').innerHTML = state.kateringResultsHtml;
+    document.getElementById('kat-results').style.display = 'block';
+    document.getElementById('kat-print-btn').style.display = 'inline-flex';
+  }
+}
+
 function renderMain() {
   updateNav();
   if (state.view === 'chain') {
@@ -2915,6 +3279,8 @@ function renderMain() {
     renderMeatView();
   } else if (state.view === 'graphs') {
     renderGraphsView();
+  } else if (state.view === 'katering') {
+    renderKateringView();
   }
 }
 
