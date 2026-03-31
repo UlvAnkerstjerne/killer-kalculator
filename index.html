@@ -873,6 +873,37 @@
     .kat-results-table .kat-indent td:first-child { padding-left: 20px; }
     .kat-qty-col          { text-align: right; font-variant-numeric: tabular-nums; }
 
+    /* ── Katering tabs ──────────────────────────────────────────────── */
+    .kat-tabs             { display: flex; gap: 4px; margin-bottom: 16px; }
+    .kat-tab-btn          { padding: 7px 18px; border-radius: 7px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: .88rem; font-weight: 500; cursor: pointer; }
+    .kat-tab-btn.active   { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .kat-tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── Katering recipe editor ──────────────────────────────────────── */
+    .kat-recipe-card      { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+    .kat-recipe-header    { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .kat-recipe-name      { flex: 1; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; font-weight: 600; }
+    .kat-recipe-meta      { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .kat-recipe-meta label { font-size: .78rem; color: var(--muted); display: block; margin-bottom: 3px; }
+    .kat-recipe-meta input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: .9rem; box-sizing: border-box; }
+    .kat-ing-table        { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: .88rem; }
+    .kat-ing-table th     { text-align: left; padding: 5px 6px; color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+    .kat-ing-table td     { padding: 4px 4px; border-bottom: 1px solid var(--border); }
+    .kat-ing-table tr:last-child td { border-bottom: none; }
+    .kat-ing-name         { width: 100%; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: .88rem; box-sizing: border-box; }
+    .kat-ing-grams        { width: 80px; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: .88rem; }
+    .kat-del-ing-btn      { background: none; border: none; color: var(--muted); font-size: 1rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; line-height: 1; }
+    .kat-del-ing-btn:hover { color: #e05555; background: var(--bg); }
+    .kat-del-recipe-btn   { background: none; border: 1px solid var(--border); color: var(--muted); font-size: .78rem; cursor: pointer; padding: 5px 10px; border-radius: 6px; white-space: nowrap; }
+    .kat-del-recipe-btn:hover { color: #e05555; border-color: #e05555; }
+    .kat-add-ing-btn      { background: none; border: 1px dashed var(--border); color: var(--muted); font-size: .82rem; cursor: pointer; padding: 6px 12px; border-radius: 6px; width: 100%; }
+    .kat-add-ing-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .kat-gem-bar          { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 12px 0; display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+    #kat-gem-btn          { padding: 9px 24px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: .93rem; font-weight: 600; cursor: pointer; }
+    #kat-gem-btn:hover    { opacity: .88; }
+    #kat-gem-btn:disabled { opacity: .55; cursor: default; }
+    .kat-gem-msg          { font-size: .85rem; color: var(--muted); }
+
     @media print {
       body > *                     { visibility: hidden; }
       #kat-print-area,
@@ -1031,6 +1062,8 @@ const state = {
   kateringKylling: false,
   kateringLemonade: false,
   kateringResultsHtml: '',
+  kateringRecipes: null,
+  kateringTab: 'beregner',
 };
 
 const charts = {};
@@ -2950,33 +2983,24 @@ function updateNav() {
 // ── Killer Katering ─────────────────────────────────────────────────────────
 
 const KAT_PORTIONS_KEY = 'kk_katering_portions';
+const KAT_ORDER = ['hummus','couscous','koleslaw','rodbeder','labneh','falafel','harissa','flatbread','lam','kylling','lemonade'];
+const KAT_TILVALG = new Set(['lam','kylling','lemonade']);
 
-const KAT_DEFAULTS = {
-  hummus:          80,
-  cousCous:       150,
-  koleslaw:       100,
-  rodbeder:        50,
-  beetrootLabneh:  75,
-  falafelDej:     100,
-  harissa:         30,
-  fladbroed:        1,
-  lam:             50,
-  kylling:         50,
-  lemonade:         1,
-};
-
-function getKateringPortions() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(KAT_PORTIONS_KEY) || '{}');
-    return Object.assign({}, KAT_DEFAULTS, stored);
-  } catch { return Object.assign({}, KAT_DEFAULTS); }
+function getKateringPortions(recipes) {
+  const stored = {};
+  try { Object.assign(stored, JSON.parse(localStorage.getItem(KAT_PORTIONS_KEY) || '{}')); } catch {}
+  const result = {};
+  for (const [id, recipe] of Object.entries(recipes || {})) {
+    result[id] = (stored[id] != null) ? stored[id] : recipe.defaultPortion;
+  }
+  return result;
 }
 
-function saveKateringPortions() {
+function saveKateringPortions(recipes) {
   const p = {};
-  for (const key of Object.keys(KAT_DEFAULTS)) {
-    const el = document.getElementById('kp-' + key);
-    if (el) p[key] = parseFloat(el.value) || KAT_DEFAULTS[key];
+  for (const id of Object.keys(recipes || {})) {
+    const el = document.getElementById('kp-' + id);
+    if (el) p[id] = parseFloat(el.value) || recipes[id].defaultPortion;
   }
   localStorage.setItem(KAT_PORTIONS_KEY, JSON.stringify(p));
   return p;
@@ -2990,7 +3014,9 @@ function toggleKateringPortions() {
 }
 
 function beregnKatering() {
-  const p      = saveKateringPortions();
+  const recipes = state.kateringRecipes;
+  if (!recipes) { alert('Opskrifter ikke indlæst.'); return; }
+
   const guests = parseInt(document.getElementById('kat-guests').value) || 0;
   if (guests <= 0) { alert('Angiv antal gæster.'); return; }
 
@@ -2998,104 +3024,45 @@ function beregnKatering() {
   const withKylling  = document.getElementById('kat-kylling').checked;
   const withLemonade = document.getElementById('kat-lemonade').checked;
 
-  // Accumulate ingredients in grams (or pcs)
+  const portionSizes = saveKateringPortions(recipes);
+
   const ing = {};
-  function add(name, grams) {
-    ing[name] = (ing[name] || 0) + grams;
+  function add(name, grams) { ing[name] = (ing[name] || 0) + grams; }
+
+  let flatbreadStk = 0;
+
+  for (const id of KAT_ORDER) {
+    const recipe = recipes[id];
+    if (!recipe) continue;
+    if (id === 'lam'      && !withLam)      continue;
+    if (id === 'kylling'  && !withKylling)  continue;
+    if (id === 'lemonade' && !withLemonade) continue;
+
+    const portion = portionSizes[id] != null ? portionSizes[id] : recipe.defaultPortion;
+
+    if (id === 'flatbread') {
+      flatbreadStk = Math.ceil(portion * guests);
+      continue;
+    }
+
+    if (id === 'lemonade') {
+      const bottles = Math.ceil(portion * guests);
+      for (const item of recipe.ingredients) {
+        add(item.name, (item.grams / recipe.batchSize) * bottles);
+      }
+      continue;
+    }
+
+    const totalG = portion * guests;
+    for (const item of recipe.ingredients) {
+      add(item.name, (item.grams / recipe.batchSize) * totalG);
+    }
+
+    if (id === 'falafel') add('Fritureolie', 50 * guests);
   }
 
-  const n = guests;
-
-  // Hummus
-  add('Hummus',             p.hummus * n);
-
-  // Cous Cous Salat (200g per person total batch)
-  const cc = p.cousCous * n;
-  const CC_TOTAL = 80 + 240 + 100 + 8 + 26 + 20 + 1.6 + 1.2 + 1;  // = 477.8 per 200g? No — these are per-batch ratios scaled to cc
-  // Recipe (for 200g portion): couscous 80, aubergine 240, bagte pebre 100, persille 8, olivenolie 26, zaatar 20, hvidløg 1.6, honning 1.2, salt 1
-  // Scale to cc grams:
-  const CC_SUM = 80 + 240 + 100 + 8 + 26 + 20 + 1.6 + 1.2 + 1;
-  add('Couscous',           (80   / CC_SUM) * cc);
-  add('Aubergine',          (240  / CC_SUM) * cc);
-  add('Bagte pebre',        (100  / CC_SUM) * cc);
-  add('Persille',           (8    / CC_SUM) * cc);
-  add('Olivenolie',         (26   / CC_SUM) * cc);
-  add('Za\'atar',           (20   / CC_SUM) * cc);
-  add('Hvidløg',            (1.6  / CC_SUM) * cc);
-  add('Honning',            (1.2  / CC_SUM) * cc);
-  add('Salt',               (1    / CC_SUM) * cc);
-
-  // Koleslaw (æble = 2 stk à 130g = 260g)
-  const kl = p.koleslaw * n;
-  const KL_SUM = 1000 + 260 + 50;  // = 1310
-  add('Kål',                (1000 / 1310) * kl);
-  add('Æble',               (260  / 1310) * kl);
-  add('Persille',           (50   / 1310) * kl);
-
-  // Bagte Rødbeder (75g per person)
-  const rb = p.rodbeder * n;
-  const RB_SUM = 1000 + 30 + 100 + 1000 + 5 + 30;  // = 2165
-  add('Rødbede',            (1000 / 2165) * rb);
-  add('Olivenolie',         (30   / 2165) * rb);
-  add('Dild',               (100  / 2165) * rb);
-  add('Salt',               (1000 / 2165) * rb);
-  add('Spidskommen',        (5    / 2165) * rb);
-  add('Citronsaft',         (30   / 2165) * rb);
-
-  // Beetroot Labneh (75g per person)
-  const bl = p.beetrootLabneh * n;
-  const BL_SUM = 1000 + 500 + 400 + 50;  // = 1950
-  add('Labneh',             (1000 / 1950) * bl);
-  add('Rødbede',            (500  / 1950) * bl);
-  add('Salt',               (400  / 1950) * bl);
-  add('Spidskommen',        (50   / 1950) * bl);
-
-  // Falafel dej (100g per person) + fritureolie
-  const fd = p.falafelDej * n;
-  const FD_SUM = 6000 + 1000 + 140 + 200 + 1400 + 50 + 50 + 50 + 40;  // = 8930
-  add('Kikærter',           (6000 / 8930) * fd);
-  add('Løg',                (1000 / 8930) * fd);
-  add('Salt',               (140  / 8930) * fd);
-  add('Citronsaft',         (200  / 8930) * fd);
-  add('Persille',           (1400 / 8930) * fd);
-  add('Koriander',          (50   / 8930) * fd);
-  add('Cumin',              (50   / 8930) * fd);
-  add('Chili flager',       (50   / 8930) * fd);
-  add('Natron',             (40   / 8930) * fd);
-  add('Fritureolie',        50 * n);
-
-  // Harissa (30g per person)
-  const ha = p.harissa * n;
-  const HA_SUM = 5000 + 1760 + 1600 + 1000 + 100 + 500 + 60;  // = 10020
-  add('Flåede tomater',     (5000 / 10020) * ha);
-  add('Tomatkoncentrat',    (1760 / 10020) * ha);
-  add('Olivenolie',         (1600 / 10020) * ha);
-  add('Friske chili',       (1000 / 10020) * ha);
-  add('Garam masala',       (100  / 10020) * ha);
-  add('Tørret chili',       (500  / 10020) * ha);
-  add('Salt',               (60   / 10020) * ha);
-
-  // Fladbrød
-  const fbStk = Math.ceil(p.fladbroed * n);
-
-  // Tilvalg
-  if (withLam)      add('Lammebov (rå)',     (80 / 50) * p.lam * n);
-  if (withKylling)  add('Kyllingelår (rå)',  (80 / 50) * p.kylling * n);
-
-  let lemonadeBottles = 0;
-  const lemIng = {};
-  if (withLemonade) {
-    lemonadeBottles = Math.ceil(p.lemonade * n);
-    lemIng['Citronjuice']    = (1000 / 36) * lemonadeBottles;
-    lemIng['Limejuice']      = (1000 / 36) * lemonadeBottles;
-    lemIng['Sukker']         = (1550 / 36) * lemonadeBottles;
-    lemIng['Citron til skal'] = (3000 / 36) * lemonadeBottles;
-  }
-
-  // Round helper
   function roundQty(g) {
-    if (g >= 1000) return Math.ceil(g / 10) * 10;
-    if (g >= 100)  return Math.ceil(g / 10) * 10;
+    if (g >= 100) return Math.ceil(g / 10) * 10;
     return Math.ceil(g);
   }
   function fmtG(g) {
@@ -3103,74 +3070,21 @@ function beregnKatering() {
     return roundQty(g) + ' g';
   }
 
-  // Build results HTML grouped into sections
-  const retter = [
-    ['Hummus',          fmtG(roundQty(ing['Hummus']))],
-    ['Couscous',        fmtG(roundQty(ing['Couscous']))],
-    ['Aubergine',       fmtG(roundQty(ing['Aubergine']))],
-    ['Bagte pebre',     fmtG(roundQty(ing['Bagte pebre']))],
-    ["Za'atar",         fmtG(roundQty(ing["Za'atar"]))],
-    ['Honning',         fmtG(roundQty(ing['Honning']))],
-    ['Kål',             fmtG(roundQty(ing['Kål']))],
-    ['Æble',            fmtG(roundQty(ing['Æble']))],
-    ['Rødbede',         fmtG(roundQty(ing['Rødbede']))],
-    ['Labneh',          fmtG(roundQty(ing['Labneh']))],
-    ['Dild',            fmtG(roundQty(ing['Dild']))],
-    ['Kikærter',        fmtG(roundQty(ing['Kikærter']))],
-    ['Løg',             fmtG(roundQty(ing['Løg']))],
-    ['Koriander',       fmtG(roundQty(ing['Koriander']))],
-    ['Cumin',           fmtG(roundQty(ing['Cumin']))],
-    ['Chili flager',    fmtG(roundQty(ing['Chili flager']))],
-    ['Natron',          fmtG(roundQty(ing['Natron']))],
-    ['Fritureolie',     fmtG(roundQty(ing['Fritureolie']))],
-    ['Flåede tomater',  fmtG(roundQty(ing['Flåede tomater']))],
-    ['Tomatkoncentrat', fmtG(roundQty(ing['Tomatkoncentrat']))],
-    ['Friske chili',    fmtG(roundQty(ing['Friske chili']))],
-    ['Garam masala',    fmtG(roundQty(ing['Garam masala']))],
-    ['Tørret chili',    fmtG(roundQty(ing['Tørret chili']))],
-  ];
-
-  // Shared ingredients (persille, olivenolie, salt, spidskommen, citronsaft, hvidløg)
-  const saucer = [
-    ['Persille',        fmtG(roundQty(ing['Persille']))],
-    ['Olivenolie',      fmtG(roundQty(ing['Olivenolie']))],
-    ['Salt',            fmtG(roundQty(ing['Salt']))],
-    ['Spidskommen',     fmtG(roundQty(ing['Spidskommen']))],
-    ['Citronsaft',      fmtG(roundQty(ing['Citronsaft']))],
-    ['Hvidløg',         fmtG(roundQty(ing['Hvidløg']))],
-  ];
-
-  function rowsHtml(rows) {
-    return rows.map(([name, qty]) =>
-      `<tr class="kat-indent"><td>${name}</td><td class="kat-qty-col">${qty}</td></tr>`
-    ).join('');
-  }
-
-  let tilvaegHTML = '';
-  if (withLam)      tilvaegHTML += `<tr class="kat-indent"><td>Lammebov (rå)</td><td class="kat-qty-col">${fmtG(roundQty(ing['Lammebov (rå)']))}</td></tr>`;
-  if (withKylling)  tilvaegHTML += `<tr class="kat-indent"><td>Kyllingelår (rå)</td><td class="kat-qty-col">${fmtG(roundQty(ing['Kyllingelår (rå)']))}</td></tr>`;
-  if (withLemonade) {
-    tilvaegHTML += `<tr class="kat-indent"><td>Citronjuice</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Citronjuice']))}</td></tr>`;
-    tilvaegHTML += `<tr class="kat-indent"><td>Limejuice</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Limejuice']))}</td></tr>`;
-    tilvaegHTML += `<tr class="kat-indent"><td>Sukker</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Sukker']))}</td></tr>`;
-    tilvaegHTML += `<tr class="kat-indent"><td>Citron til skal</td><td class="kat-qty-col">${fmtG(roundQty(lemIng['Citron til skal']))}</td></tr>`;
-  }
+  const ingRows = Object.keys(ing).sort((a, b) => a.localeCompare(b, 'da')).map(name =>
+    `<tr class="kat-indent"><td>${name}</td><td class="kat-qty-col">${fmtG(ing[name])}</td></tr>`
+  ).join('');
 
   const html = `
     <div id="kat-print-area">
       <div style="margin-bottom:10px; font-size:.85rem; color:var(--muted);">
-        Beregnet for <strong>${n} gæster</strong>${withLam ? ' · Lammekød' : ''}${withKylling ? ' · Kyllingekød' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
+        Beregnet for <strong>${guests} gæster</strong>${withLam ? ' · Lammekød' : ''}${withKylling ? ' · Kyllingekød' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
       </div>
       <table class="kat-results-table">
         <thead><tr><th>Ingrediens</th><th class="kat-qty-col">Mængde</th></tr></thead>
         <tbody>
-          <tr class="kat-group-header"><td colspan="2">Retter &amp; Saucer</td></tr>
-          ${rowsHtml(retter)}
-          <tr class="kat-group-header"><td colspan="2">Krydderier &amp; Basale</td></tr>
-          ${rowsHtml(saucer)}
-          <tr class="kat-group-header"><td colspan="2">Brød</td></tr>
-          <tr class="kat-indent"><td>Fladbrød</td><td class="kat-qty-col">${fbStk} stk</td></tr>
-          ${tilvaegHTML ? `<tr class="kat-group-header"><td colspan="2">Tilvalg</td></tr>${tilvaegHTML}` : ''}
+          ${ingRows}
+          ${flatbreadStk ? '<tr class="kat-group-header"><td colspan="2">Brød</td></tr>' +
+            '<tr class="kat-indent"><td>Fladbrød</td><td class="kat-qty-col">' + flatbreadStk + ' stk</td></tr>' : ''}
         </tbody>
       </table>
     </div>`;
@@ -3180,91 +3094,210 @@ function beregnKatering() {
   document.getElementById('kat-print-btn').style.display = 'inline-flex';
 }
 
-function renderKateringView() {
-  const main = document.getElementById('main');
-  const p = getKateringPortions();
+function switchKateringTab(tab) {
+  state.kateringTab = tab;
+  document.querySelectorAll('.kat-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'beregner') renderKateringBeregnerTab();
+  else renderKateringOpskrifterTab();
+}
 
-  const portionFields = [
-    ['hummus',         'Hummus (g/pers)',              p.hummus],
-    ['cousCous',       'Cous Cous Salat (g/pers)',     p.cousCous],
-    ['koleslaw',       'Koleslaw (g/pers)',             p.koleslaw],
-    ['rodbeder',       'Bagte Rødbeder (g/pers)',       p.rodbeder],
-    ['beetrootLabneh', 'Beetroot Labneh (g/pers)',      p.beetrootLabneh],
-    ['falafelDej',     'Falafel dej (g/pers)',          p.falafelDej],
-    ['harissa',        'Harissa (g/pers)',               p.harissa],
-    ['fladbroed',      'Fladbrød (stk/pers)',           p.fladbroed],
-    ['lam',            'Lammekød portion (g/pers)',     p.lam],
-    ['kylling',        'Kyllingekød portion (g/pers)',  p.kylling],
-    ['lemonade',       'Lemonade (flasker/pers)',       p.lemonade],
-  ];
+function renderKateringBeregnerTab() {
+  const recipes    = state.kateringRecipes;
+  const portionSizes = getKateringPortions(recipes);
+
+  const portionUnit = id => id === 'flatbread' ? 'stk/pers' : id === 'lemonade' ? 'fl./pers' : 'g/pers';
+  const portionFields = KAT_ORDER.filter(id => recipes[id]).map(id =>
+    [id, recipes[id].name, portionSizes[id], portionUnit(id)]
+  );
+
+  document.getElementById('kat-content').innerHTML = `
+    <div class="katering-section">
+      <h3>Gæster &amp; Tilvalg</h3>
+      <div class="katering-field">
+        <label>Antal gæster</label>
+        <input type="number" id="kat-guests" min="1" value="${state.kateringGuests || ''}" placeholder="0">
+      </div>
+      <label class="katering-check">
+        <input type="checkbox" id="kat-lam" ${state.kateringLam ? 'checked' : ''}>
+        Lammekød
+      </label>
+      <label class="katering-check">
+        <input type="checkbox" id="kat-kylling" ${state.kateringKylling ? 'checked' : ''}>
+        Kyllingekød
+      </label>
+      <label class="katering-check">
+        <input type="checkbox" id="kat-lemonade" ${state.kateringLemonade ? 'checked' : ''}>
+        Killer Lemonade
+      </label>
+    </div>
+
+    <div class="katering-section">
+      <h3>Portionsstørrelser</h3>
+      <button class="katering-portions-toggle" onclick="toggleKateringPortions()">
+        <span id="kat-portions-lbl">▼ Rediger portionsstørrelser</span>
+      </button>
+      <div id="kat-portions-body" class="katering-portions-body">
+        <div class="portions-grid">
+          ${portionFields.map(([id, lbl, val, unit]) => `
+            <div>
+              <label>${lbl} (${unit})</label>
+              <input type="number" id="kp-${id}" value="${val}" step="any">
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:10px; font-size:.8rem; color:var(--muted);">Portionsstørrelser gemmes automatisk ved beregning.</div>
+      </div>
+    </div>
+
+    <div class="katering-btn-row">
+      <button class="katering-btn" onclick="
+        state.kateringGuests   = parseInt(document.getElementById('kat-guests').value) || 0;
+        state.kateringLam      = document.getElementById('kat-lam').checked;
+        state.kateringKylling  = document.getElementById('kat-kylling').checked;
+        state.kateringLemonade = document.getElementById('kat-lemonade').checked;
+        beregnKatering();
+        state.kateringResultsHtml = document.getElementById('kat-results').innerHTML;">
+        Beregn
+      </button>
+      <button class="katering-btn secondary" id="kat-print-btn" style="display:none;" onclick="window.print()">
+        Udskriv
+      </button>
+    </div>
+
+    <div class="katering-section" id="kat-results" style="display:none;"></div>`;
+
+  if (state.kateringResultsHtml) {
+    document.getElementById('kat-results').innerHTML = state.kateringResultsHtml;
+    document.getElementById('kat-results').style.display = 'block';
+    document.getElementById('kat-print-btn').style.display = 'inline-flex';
+  }
+}
+
+function addKateringIngredient(recipeId) {
+  const card  = document.querySelector(`.kat-recipe-card[data-id="${recipeId}"]`);
+  const tbody = card.querySelector('tbody');
+  const tr    = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="kat-ing-name" placeholder="Ingrediens"></td>
+    <td><input type="number" class="kat-ing-grams" value="0" step="any"></td>
+    <td><button class="kat-del-ing-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('.kat-ing-name').focus();
+}
+
+function deleteKateringRecipe(id) {
+  const r = state.kateringRecipes[id];
+  if (!confirm('Slet opskriften "' + (r ? r.name : id) + '"?')) return;
+  delete state.kateringRecipes[id];
+  renderKateringOpskrifterTab();
+}
+
+async function gemKateringOpskrifter() {
+  const btn = document.getElementById('kat-gem-btn');
+  const msg = document.getElementById('kat-gem-msg');
+  const recipes = {};
+  document.querySelectorAll('.kat-recipe-card').forEach(card => {
+    const id             = card.dataset.id;
+    const name           = card.querySelector('.kat-recipe-name').value.trim();
+    const defaultPortion = parseFloat(card.querySelector('.kat-recipe-portion').value) || 1;
+    const batchSize      = parseFloat(card.querySelector('.kat-recipe-batch').value)   || 1;
+    const ingredients    = [];
+    card.querySelectorAll('tbody tr').forEach(row => {
+      const n = row.querySelector('.kat-ing-name').value.trim();
+      const g = parseFloat(row.querySelector('.kat-ing-grams').value) || 0;
+      if (n) ingredients.push({ name: n, grams: g });
+    });
+    recipes[id] = { name, defaultPortion, batchSize, ingredients };
+  });
+
+  btn.disabled    = true;
+  btn.textContent = 'Gemmer…';
+  if (msg) msg.textContent = '';
+  try {
+    await fetch('/api/katering-recipes', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(recipes)
+    });
+    state.kateringRecipes = recipes;
+    if (msg) {
+      msg.textContent = 'Gemt ✓';
+      setTimeout(() => { if (msg) msg.textContent = ''; }, 2500);
+    }
+  } catch (e) {
+    if (msg) msg.textContent = 'Fejl – prøv igen';
+  }
+  btn.disabled    = false;
+  btn.textContent = 'Gem alle ændringer';
+}
+
+function renderKateringOpskrifterTab() {
+  const recipes    = state.kateringRecipes;
+  const ids        = Object.keys(recipes);
+  const numRecipes = ids.length;
+
+  const cardsHtml = ids.map(id => {
+    const r       = recipes[id];
+    const ingRows = r.ingredients.map(ing => `
+      <tr>
+        <td><input type="text"   class="kat-ing-name"  value="${ing.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"></td>
+        <td><input type="number" class="kat-ing-grams" value="${ing.grams}" step="any"></td>
+        <td><button class="kat-del-ing-btn" onclick="this.closest('tr').remove()" title="Slet">×</button></td>
+      </tr>`).join('');
+    return `
+      <div class="kat-recipe-card" data-id="${id}">
+        <div class="kat-recipe-header">
+          <input class="kat-recipe-name" type="text" value="${r.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">
+          ${numRecipes > 1 ? `<button class="kat-del-recipe-btn" onclick="deleteKateringRecipe('${id}')">Slet opskrift</button>` : ''}
+        </div>
+        <div class="kat-recipe-meta">
+          <div><label>Portion pr. person (g)</label><input type="number" class="kat-recipe-portion" value="${r.defaultPortion}" step="any"></div>
+          <div><label>Samlet batch (g)</label><input type="number" class="kat-recipe-batch" value="${r.batchSize}" step="any"></div>
+        </div>
+        <table class="kat-ing-table">
+          <thead><tr><th>Ingrediens</th><th>Gram i batch</th><th></th></tr></thead>
+          <tbody>${ingRows}</tbody>
+        </table>
+        <button class="kat-add-ing-btn" onclick="addKateringIngredient('${id}')">+ Tilføj ingrediens</button>
+      </div>`;
+  }).join('');
+
+  document.getElementById('kat-content').innerHTML = `
+    ${cardsHtml}
+    <div class="kat-gem-bar">
+      <button id="kat-gem-btn" onclick="gemKateringOpskrifter()">Gem alle ændringer</button>
+      <span class="kat-gem-msg" id="kat-gem-msg"></span>
+    </div>`;
+}
+
+async function renderKateringView() {
+  const main = document.getElementById('main');
+
+  if (!state.kateringRecipes) {
+    main.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div> Indlæser opskrifter…</div>`;
+    try {
+      const r = await fetch('/api/katering-recipes');
+      state.kateringRecipes = await r.json();
+    } catch (e) {
+      main.innerHTML = `<div class="view-header"><h2>Killer Katering</h2></div>
+        <p style="color:#e05555;padding:20px">Kunne ikke indlæse opskrifter fra serveren.</p>`;
+      return;
+    }
+  }
 
   main.innerHTML = `
     <div class="view-header">
       <h2>Killer Katering</h2>
     </div>
     <div class="katering-wrap">
-
-      <div class="katering-section">
-        <h3>Gæster &amp; Tilvalg</h3>
-        <div class="katering-field">
-          <label>Antal gæster</label>
-          <input type="number" id="kat-guests" min="1" value="${state.kateringGuests || ''}" placeholder="0">
-        </div>
-        <label class="katering-check">
-          <input type="checkbox" id="kat-lam" ${state.kateringLam ? 'checked' : ''}>
-          Lammekød
-        </label>
-        <label class="katering-check">
-          <input type="checkbox" id="kat-kylling" ${state.kateringKylling ? 'checked' : ''}>
-          Kyllingekød
-        </label>
-        <label class="katering-check">
-          <input type="checkbox" id="kat-lemonade" ${state.kateringLemonade ? 'checked' : ''}>
-          Killer Lemonade
-        </label>
+      <div class="kat-tabs">
+        <button class="kat-tab-btn ${state.kateringTab === 'beregner'   ? 'active' : ''}" data-tab="beregner"   onclick="switchKateringTab('beregner')">Beregner</button>
+        <button class="kat-tab-btn ${state.kateringTab === 'opskrifter' ? 'active' : ''}" data-tab="opskrifter" onclick="switchKateringTab('opskrifter')">Opskrifter</button>
       </div>
-
-      <div class="katering-section">
-        <h3>Portionsstørrelser</h3>
-        <button class="katering-portions-toggle" onclick="toggleKateringPortions()">
-          <span id="kat-portions-lbl">▼ Rediger portionsstørrelser</span>
-        </button>
-        <div id="kat-portions-body" class="katering-portions-body">
-          <div class="portions-grid">
-            ${portionFields.map(([key, lbl, val]) => `
-              <div>
-                <label>${lbl}</label>
-                <input type="number" id="kp-${key}" value="${val}" step="any">
-              </div>`).join('')}
-          </div>
-          <div style="margin-top:10px; font-size:.8rem; color:var(--muted);">Portionsstørrelser gemmes automatisk ved beregning.</div>
-        </div>
-      </div>
-
-      <div class="katering-btn-row">
-        <button class="katering-btn" onclick="
-          state.kateringGuests  = parseInt(document.getElementById('kat-guests').value) || 0;
-          state.kateringLam     = document.getElementById('kat-lam').checked;
-          state.kateringKylling = document.getElementById('kat-kylling').checked;
-          state.kateringLemonade = document.getElementById('kat-lemonade').checked;
-          beregnKatering();
-          state.kateringResultsHtml = document.getElementById('kat-results').innerHTML;">
-          Beregn
-        </button>
-        <button class="katering-btn secondary" id="kat-print-btn" style="display:none;" onclick="window.print()">
-          Udskriv
-        </button>
-      </div>
-
-      <div class="katering-section" id="kat-results" style="display:none;"></div>
+      <div id="kat-content"></div>
     </div>`;
 
-  // Restore previous results if any
-  if (state.kateringResultsHtml) {
-    document.getElementById('kat-results').innerHTML = state.kateringResultsHtml;
-    document.getElementById('kat-results').style.display = 'block';
-    document.getElementById('kat-print-btn').style.display = 'inline-flex';
-  }
+  if (state.kateringTab === 'opskrifter') renderKateringOpskrifterTab();
+  else renderKateringBeregnerTab();
 }
 
 function renderMain() {

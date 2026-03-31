@@ -4,6 +4,7 @@
 const express = require('express');
 const axios   = require('axios');
 const path    = require('path');
+const fs      = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -852,6 +853,48 @@ app.get('/api/planday/salaries/:from/:to', async (req, res) => {
       error:    err.message,
       upstream: err.response?.data
     });
+  }
+});
+
+// ── Katering recipes ──────────────────────────────────────────────────────────
+
+const KATERING_RECIPES_PATH = path.join(__dirname, 'data', 'katering-recipes.json');
+
+const KATERING_RECIPES_DEFAULT = {
+  hummus:    { name: 'Hummus',                  defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Hummus',             grams: 80   }] },
+  couscous:  { name: 'Perle Cous Cous Salat',   defaultPortion: 150, batchSize: 3075,  ingredients: [{ name: 'Perle-couscous',     grams: 400  }, { name: 'Aubergine',     grams: 1200 }, { name: 'Bagte pebre',    grams: 500  }, { name: 'Persille',      grams: 40   }, { name: 'Olivenolie',    grams: 130  }, { name: 'Zaatar',        grams: 100  }, { name: 'Hvidløg',       grams: 8    }, { name: 'Honning',       grams: 6    }, { name: 'Salt',          grams: 5    }] },
+  koleslaw:  { name: 'Killer Koleslaw',          defaultPortion: 100, batchSize: 1310,  ingredients: [{ name: 'Kål',               grams: 1000 }, { name: 'Æble',          grams: 260  }, { name: 'Persille',      grams: 50   }] },
+  rodbeder:  { name: 'Bagte Rødbeder',           defaultPortion: 50,  batchSize: 2165,  ingredients: [{ name: 'Rødbede',           grams: 1000 }, { name: 'Olivenolie',    grams: 30   }, { name: 'Dild, frost',   grams: 100  }, { name: 'Salt',          grams: 1000 }, { name: 'Spidskommen',   grams: 5    }, { name: 'Citronsaft',    grams: 30   }] },
+  labneh:    { name: 'Beetroot Labneh',          defaultPortion: 75,  batchSize: 1950,  ingredients: [{ name: 'Labneh',            grams: 1000 }, { name: 'Rødbede',       grams: 500  }, { name: 'Salt',          grams: 400  }, { name: 'Spidskommen',   grams: 50   }] },
+  falafel:   { name: 'Falafel',                  defaultPortion: 100, batchSize: 8930,  ingredients: [{ name: 'Kikærter',          grams: 6000 }, { name: 'Løg',           grams: 1000 }, { name: 'Salt',          grams: 140  }, { name: 'Citronsaft',    grams: 200  }, { name: 'Persille',      grams: 1400 }, { name: 'Koriander stødt', grams: 50 }, { name: 'Cumin',         grams: 50   }, { name: 'Chili flager',  grams: 50   }, { name: 'Sodium bicarbonate', grams: 40 }] },
+  harissa:   { name: 'Harissa Chili Sauce',      defaultPortion: 30,  batchSize: 10020, ingredients: [{ name: 'Flåede tomater',    grams: 5000 }, { name: 'Tomatkoncentrat', grams: 1760 }, { name: 'Olivenolie',  grams: 1600 }, { name: 'Friske chili',  grams: 1000 }, { name: 'Garam masala',  grams: 100  }, { name: 'Tørret chili',  grams: 500  }, { name: 'Salt',          grams: 60   }] },
+  flatbread: { name: 'Fladbrød',                 defaultPortion: 1,   batchSize: 1,     ingredients: [{ name: 'Fladbrød',          grams: 1    }] },
+  lam:       { name: 'Lammekød (tilvalg)',        defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Lammebov',          grams: 80   }] },
+  kylling:   { name: 'Kyllingekød (tilvalg)',     defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Kyllingelår',       grams: 80   }] },
+  lemonade:  { name: 'Killer Lemonade (tilvalg)', defaultPortion: 1,   batchSize: 36,    ingredients: [{ name: 'Citronjuice',       grams: 1000 }, { name: 'Limejuice',     grams: 1000 }, { name: 'Sukker',        grams: 1550 }, { name: 'Citron til skal', grams: 3000 }] }
+};
+
+app.get('/api/katering-recipes', (_req, res) => {
+  try {
+    if (fs.existsSync(KATERING_RECIPES_PATH)) {
+      const data = JSON.parse(fs.readFileSync(KATERING_RECIPES_PATH, 'utf8'));
+      return res.json(data);
+    }
+  } catch (e) {
+    console.error('[katering-recipes] read error:', e.message);
+  }
+  res.json(KATERING_RECIPES_DEFAULT);
+});
+
+app.post('/api/katering-recipes', (req, res) => {
+  try {
+    const dir = path.dirname(KATERING_RECIPES_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(KATERING_RECIPES_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[katering-recipes] write error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
