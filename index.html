@@ -1445,20 +1445,10 @@ function buildTopItems(items, limit = 10) {
     agg[name].count   += (item.count || 1);
     agg[name].revenue += (item.priceexclvat || 0);
   }
-  const result = Object.entries(agg)
+  return Object.entries(agg)
     .map(([name, v]) => ({ name, ...v }))
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, limit);
-
-  // Always include "Killer Kombo - Kylling" by unit count even when its order value is 0 kr
-  // and it fell below the revenue-ranked cut-off
-  const KK_RE = /^killer\s+kombo\s*-\s*kylling$/i;
-  if (!result.some(it => KK_RE.test(it.name))) {
-    const kkEntry = Object.entries(agg).find(([name]) => KK_RE.test(name));
-    if (kkEntry) result.push({ name: kkEntry[0], ...kkEntry[1] });
-  }
-
-  return result;
 }
 
 function topItemsTable(items) {
@@ -1542,12 +1532,7 @@ function categorizeItems(items) {
   const out = { rolls: 0, kombos: 0, kebab: 0, falafel: 0, chicken: 0 };
   for (const item of items) {
     const n = (item.name || item.productname || '').toLowerCase().trim();
-    const isKomboKylling = n === 'killer kombo - kylling';
-    // For zero-value "Killer Kombo - Kylling" orders the API may return count 0 or "0";
-    // treat those as 1 unit. All other items keep the existing behaviour.
-    const qty = isKomboKylling
-      ? Math.max(parseInt(item.count) || 1, 1)
-      : parseInt(item.count || 1);
+    const qty = parseInt(item.count || 1);
     if (qty <= 0) continue;
     const isKombo      = /kombo|combo/.test(n);
     const isProtein    = /kebab|falafel|kylling|chicken|lamb/.test(n);
