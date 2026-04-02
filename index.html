@@ -1447,7 +1447,7 @@ function buildTopItems(items, limit = 10) {
   }
   return Object.entries(agg)
     .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a, b) => b.count - a.count)
     .slice(0, limit);
 }
 
