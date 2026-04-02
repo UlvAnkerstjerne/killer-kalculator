@@ -1440,6 +1440,7 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
 function buildTopItems(items, limit = 10) {
   const agg = {};
   for (const item of items) {
+    if (!item.priceexclvat || item.priceexclvat === 0) continue;
     const name = (item.productname || 'Unknown').trim();
     if (!agg[name]) agg[name] = { count: 0, revenue: 0 };
     agg[name].count   += (item.count || 1);
