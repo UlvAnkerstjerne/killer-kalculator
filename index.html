@@ -1441,9 +1441,6 @@ function buildTopItems(items, limit = 10) {
   const agg = {};
   for (const item of items) {
     const name = (item.productname || 'Unknown').trim();
-    const isKomboVoucher = name.toLowerCase().includes('killer kombo');
-    const hasValue = (item.priceexclvat || 0) > 0;
-    if (!hasValue && !isKomboVoucher) continue;
     if (!agg[name]) agg[name] = { count: 0, revenue: 0 };
     agg[name].count   += (item.count || 1);
     agg[name].revenue += (item.priceexclvat || 0);
