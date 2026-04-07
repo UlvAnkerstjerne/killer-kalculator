@@ -1456,10 +1456,7 @@ function buildProductMetricCards(items, lyItems) {
   function countByKeyword(arr, kw) {
     let n = 0;
     for (const item of arr) {
-      if ((item.productname || '').toLowerCase().includes(kw)) {
-        if (!item.priceexclvat || item.priceexclvat === 0) continue;
-        n += (item.count || 1);
-      }
+      if ((item.productname || '').toLowerCase().includes(kw)) n += (item.count || 1);
     }
     return n;
   }
