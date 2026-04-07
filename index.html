@@ -1065,6 +1065,7 @@ const state = {
   kateringRecipes: null,
   kateringTab: 'beregner',
 };
+let renderGeneration = 0;
 
 const charts = {};
 
@@ -1279,8 +1280,7 @@ async function apiSalesDay(storeId, dayUnix) {
 }
 
 async function apiSalesRange(storeId, from, to) {
-  const days = daysInRange(from, to);
-  console.log('apiSalesRange:', storeId, 'from:', from, 'to:', to, 'days:', days, 'days.length:', days.length);
+  const days    = daysInRange(from, to);
   const results = await Promise.all(days.map(d => apiSalesDay(storeId, d)));
   return results.flat().filter(item => {
     if (!item.datetime) return false;
@@ -1621,7 +1621,7 @@ function renderProductMix(el, items) {
 }
 
 // ── Chain view ─────────────────────────────────────────────────────────────────
-async function renderChainView() {
+async function renderChainView(myGen) {
   const main = document.getElementById('main');
   main.innerHTML = `
     <div class="page-header">
@@ -1659,6 +1659,7 @@ async function renderChainView() {
     apiAllRevenue(lyFrom, lyTo),
     apiPlandaySalaries(from, to)
   ]);
+  if (renderGeneration !== myGen) return;
 
   const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
   const totalLY     = STORES.reduce((s, st) => s + (lyData[st.id]  || 0), 0);
@@ -1806,6 +1807,7 @@ async function renderChainView() {
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
     const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat());
+    if (renderGeneration !== myGen) return;
 
     document.getElementById('chain-salgstal').innerHTML = salgstalHtml(allItems);
 
@@ -1815,7 +1817,7 @@ async function renderChainView() {
 }
 
 // ── Store view ─────────────────────────────────────────────────────────────────
-async function renderStoreView(storeId) {
+async function renderStoreView(storeId, myGen) {
   const store = STORES.find(s => s.id === storeId);
   if (!store) return;
 
@@ -1852,6 +1854,7 @@ async function renderStoreView(storeId) {
     apiRevenue(storeId, lyFrom, lyTo),
     apiPlandaySalaries(from, to)
   ]);
+  if (renderGeneration !== myGen) return;
 
   const budget   = lyRev ? lyRev * 1.10 : null;
   const vsLY     = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
@@ -1903,6 +1906,7 @@ async function renderStoreView(storeId) {
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
     const items = await apiSalesRange(storeId, from, to);
+    if (renderGeneration !== myGen) return;
 
     document.getElementById('store-salgstal').innerHTML = salgstalHtml(items);
 
@@ -3253,11 +3257,12 @@ async function renderKateringView() {
 }
 
 function renderMain() {
+  const myGen = ++renderGeneration;
   updateNav();
   if (state.view === 'chain') {
-    renderChainView();
+    renderChainView(myGen);
   } else if (state.view.startsWith('store:')) {
-    renderStoreView(state.view.slice(6));
+    renderStoreView(state.view.slice(6), myGen);
   } else if (state.view === 'invoices') {
     renderInvoicesView();
   } else if (state.view === 'meat') {
