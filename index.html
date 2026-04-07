@@ -1453,6 +1453,26 @@ function buildTopItems(items, limit = 10) {
 }
 
 
+function countItems(arr, kw) {
+  return arr.filter(i => (i.productname || '').toLowerCase().includes(kw)).length;
+}
+
+function salgstalHtml(items) {
+  const stats = [
+    { label: 'Killer Lemonade', kw: 'lemonade' },
+    { label: 'Falafel Cup',     kw: '3 x falafel' },
+    { label: 'Killer Pale Ale', kw: 'killer pale ale' },
+  ];
+  return '<div class="section-title" style="margin-bottom:8px">Salgstal</div><div class="kpi-grid">' +
+    stats.map(s =>
+      `<div class="card">
+        <div class="metric-val">${countItems(items, s.kw)}</div>
+        <div class="card-title">${s.label}</div>
+      </div>`
+    ).join('') +
+    '</div>';
+}
+
 function topItemsTable(items) {
   if (!items.length) return '<div class="empty">No item data available</div>';
   let html = `<table>
@@ -1613,6 +1633,7 @@ async function renderChainView() {
           ${[0,1,2,3,4].map(() => `<div class="card"><div class="card-title"><span class="shimmer" style="width:80px">&nbsp;</span></div><div class="metric-val"><span class="shimmer" style="width:120px">&nbsp;</span></div></div>`).join('')}
         </div>
       </div>
+      <div id="chain-salgstal" style="margin-bottom:16px"></div>
       <div class="card chain-charts-wrap" style="margin-bottom:16px">
         <div class="section-title">Revenue by Store</div>
         <div class="chart-wrap"><canvas id="chain-bar-chart"></canvas></div>
@@ -1780,9 +1801,12 @@ async function renderChainView() {
   const mixCard = document.getElementById('chain-mix-card');
 
   if (days.length > 14) {
+    document.getElementById('chain-salgstal').innerHTML = '';
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
     const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat());
+
+    document.getElementById('chain-salgstal').innerHTML = salgstalHtml(allItems);
 
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
     renderProductMix(document.getElementById('chain-mix-body'), allItems);
@@ -1808,6 +1832,7 @@ async function renderStoreView(storeId) {
     <div class="kpi-grid" id="store-kpis">
       ${[0,1,2,3,4].map(() => `<div class="card"><div class="shimmer" style="width:70px;height:10px;margin-bottom:10px">&nbsp;</div><div class="shimmer" style="width:130px;height:24px">&nbsp;</div></div>`).join('')}
     </div>
+    <div id="store-salgstal" style="margin-bottom:16px"></div>
     <div class="card" style="margin-bottom:16px" id="store-mix-card">
       <div class="section-title">Product Mix</div>
       <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
@@ -1870,12 +1895,15 @@ async function renderStoreView(storeId) {
   const maxDays = 31;
 
   if (days.length > maxDays) {
+    document.getElementById('store-salgstal').innerHTML = '';
     document.getElementById('store-mix-card').innerHTML =
       '<div class="section-title">Product Mix</div><div class="empty">Period too long. Select ≤31 days.</div>';
     document.getElementById('store-heatmap').innerHTML =
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
     const items = await apiSalesRange(storeId, from, to);
+
+    document.getElementById('store-salgstal').innerHTML = salgstalHtml(items);
 
     // Product mix
     const mixCard = document.getElementById('store-mix-card');
