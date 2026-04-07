@@ -171,9 +171,6 @@ app.get('/api/revenue/:storeId/:from/:to', async (req, res) => {
   if (!store) return res.status(404).json({ error: 'Unknown store' });
   try {
     const r = await posGet(`/getByUnixTimeSales/${req.params.from}/${req.params.to}`, store);
-    const sample = r.data?.data || r.data || [];
-    console.log('REVENUE STRUCTURE - keys:', Object.keys(r.data || {}));
-    console.log('REVENUE SAMPLE items:', JSON.stringify(sample.slice(0, 3)));
     res.json(r.data);
   } catch (err) {
     res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
