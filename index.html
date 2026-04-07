@@ -1454,13 +1454,10 @@ function buildTopItems(items, limit = 10) {
 
 
 function countItems(arr, kw) {
-  const matches = arr.filter(i => (i.productname || '').toLowerCase().includes(kw));
-  console.log('countItems:', kw, '— arr.length:', arr.length, '— matches:', matches.length);
-  return matches.length;
+  return arr.filter(i => (i.productname || '').toLowerCase().includes(kw)).length;
 }
 
 function salgstalHtml(items) {
-  console.log('salgstalHtml called with items.length:', items.length);
   const stats = [
     { label: 'Killer Lemonade', kw: 'lemonade' },
     { label: 'Falafel Cup',     kw: '3 x falafel' },
