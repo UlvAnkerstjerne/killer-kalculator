@@ -1183,6 +1183,7 @@ function daysInRange(from, to) {
     days.push(d);
     d += 86400; // the datetime filter in apiSalesRange handles any DST edge
   }
+  console.log('DAYS IN RANGE:', days.length, days.map(d => new Date(d * 1000).toISOString()));
   return days;
 }
 
