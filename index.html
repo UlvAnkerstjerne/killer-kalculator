@@ -1280,13 +1280,17 @@ async function apiSalesDay(storeId, dayUnix) {
 }
 
 async function apiSalesRange(storeId, from, to) {
-  const days    = daysInRange(from, to);
+  const days = daysInRange(from, to);
+  console.log('apiSalesRange:', storeId, 'days.length:', days.length);
   const results = await Promise.all(days.map(d => apiSalesDay(storeId, d)));
-  return results.flat().filter(item => {
+  const flat = results.flat();
+  const filtered = flat.filter(item => {
     if (!item.datetime) return false;
     const ts = new Date(item.datetime).getTime() / 1000;
     return ts >= from && ts <= to;
   });
+  console.log('apiSalesRange result:', storeId, 'flat:', flat.length, 'filtered:', filtered.length);
+  return filtered;
 }
 
 // ── Planday helpers ────────────────────────────────────────────────────────────
