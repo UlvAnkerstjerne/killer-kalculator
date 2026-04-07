@@ -1454,7 +1454,9 @@ function buildTopItems(items, limit = 10) {
 
 
 function countItems(arr, kw) {
-  return arr.filter(i => (i.productname || '').toLowerCase().includes(kw)).length;
+  const matches = arr.filter(i => (i.productname || '').toLowerCase().includes(kw));
+  console.log('countItems:', kw, '— arr.length:', arr.length, '— matches:', matches.length);
+  return matches.length;
 }
 
 function salgstalHtml(items) {
