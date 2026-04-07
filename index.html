@@ -1463,10 +1463,10 @@ function buildProductMetricCards(items, lyItems) {
 
   const curLemonade   = countByKeyword(items, 'lemonade');
   const curPaleAle    = countByKeyword(items, 'pale ale');
-  const curFalafelCup = countByKeyword(items, 'falafel cup');
+  const curFalafelCup = countByKeyword(items, 'falafel ball');
   const lyLemonade    = lyItems ? countByKeyword(lyItems, 'lemonade')    : null;
   const lyPaleAle     = lyItems ? countByKeyword(lyItems, 'pale ale')    : null;
-  const lyFalafelCup  = lyItems ? countByKeyword(lyItems, 'falafel cup') : null;
+  const lyFalafelCup  = lyItems ? countByKeyword(lyItems, 'falafel ball') : null;
 
   const c        = categorizeItems(items);
   const rkTotal  = c.rolls + c.kombos;
@@ -1483,7 +1483,7 @@ function buildProductMetricCards(items, lyItems) {
   const rows = [
     { label: 'Killer Lemonade', val: curLemonade   + ' stk', sub: subHtml(curLemonade,   lyLemonade)   },
     { label: 'Killer Pale Ale', val: curPaleAle    + ' stk', sub: subHtml(curPaleAle,    lyPaleAle)    },
-    { label: 'Falafel Cup',     val: curFalafelCup + ' stk', sub: subHtml(curFalafelCup, lyFalafelCup) },
+    { label: 'Falafel Balls',     val: curFalafelCup + ' stk', sub: subHtml(curFalafelCup, lyFalafelCup) },
     { label: 'Kombo %',         val: komboP,                  sub: 'af produktmix'                      },
     { label: 'Kylling %',       val: kyllingP,                sub: 'af produktmix'                      },
   ];
