@@ -1453,6 +1453,9 @@ function buildTopItems(items, limit = 10) {
 }
 
 function buildProductMetricCards(items, lyItems) {
+  const lemonadeItems = items.filter(i => (i.productname || '').toLowerCase().includes('lemonade'));
+  console.log('LEMONADE ITEMS:', lemonadeItems.length, lemonadeItems.map(i => ({ name: i.productname, count: i.count, price: i.priceexclvat })));
+
   function countByKeyword(arr, kw) {
     let n = 0;
     for (const item of arr) {
