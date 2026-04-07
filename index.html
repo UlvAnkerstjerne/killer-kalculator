@@ -1279,7 +1279,8 @@ async function apiSalesDay(storeId, dayUnix) {
 }
 
 async function apiSalesRange(storeId, from, to) {
-  const days    = daysInRange(from, to);
+  const days = daysInRange(from, to);
+  console.log('apiSalesRange:', storeId, 'from:', from, 'to:', to, 'days:', days, 'days.length:', days.length);
   const results = await Promise.all(days.map(d => apiSalesDay(storeId, d)));
   return results.flat().filter(item => {
     if (!item.datetime) return false;
