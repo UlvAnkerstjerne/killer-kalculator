@@ -1785,6 +1785,9 @@ async function renderChainView() {
 
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
     renderProductMix(document.getElementById('chain-mix-body'), allItems);
+
+    const lemonadeCount = allItems.filter(i => (i.productname || '').toLowerCase().includes('lemonade')).length;
+    document.getElementById('chain-kpis').insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">Killer Lemonade</div><div class="metric-val">${lemonadeCount}</div><div class="metric-sub">stk solgt</div></div>`);
   }
 }
 
@@ -1880,6 +1883,9 @@ async function renderStoreView(storeId) {
     const mixCard = document.getElementById('store-mix-card');
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="store-mix-body"></div>';
     renderProductMix(document.getElementById('store-mix-body'), items);
+
+    const lemonadeCount = items.filter(i => (i.productname || '').toLowerCase().includes('lemonade')).length;
+    document.getElementById('store-kpis').insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">Killer Lemonade</div><div class="metric-val">${lemonadeCount}</div><div class="metric-sub">stk solgt</div></div>`);
 
     // Heatmap
     const hourlyMap = buildHourlyMap(items);
