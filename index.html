@@ -1463,10 +1463,10 @@ function buildProductMetricCards(items, lyItems) {
 
   const curLemonade   = countByKeyword(items, 'lemonade');
   const curPaleAle    = countByKeyword(items, 'pale ale');
-  const curFalafelCup = countByKeyword(items, 'falafel ball');
+  const curFalafelCup = countByKeyword(items, '3 x falafel ball');
   const lyLemonade    = lyItems ? countByKeyword(lyItems, 'lemonade')    : null;
   const lyPaleAle     = lyItems ? countByKeyword(lyItems, 'pale ale')    : null;
-  const lyFalafelCup  = lyItems ? countByKeyword(lyItems, 'falafel ball') : null;
+  const lyFalafelCup  = lyItems ? countByKeyword(lyItems, '3 x falafel ball') : null;
 
   const c        = categorizeItems(items);
   const rkTotal  = c.rolls + c.kombos;
