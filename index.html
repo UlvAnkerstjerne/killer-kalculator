@@ -1452,6 +1452,51 @@ function buildTopItems(items, limit = 10) {
     .slice(0, limit);
 }
 
+function buildProductMetricCards(items, lyItems) {
+  function countByKeyword(arr, kw) {
+    let n = 0;
+    for (const item of arr) {
+      if ((item.productname || '').toLowerCase().includes(kw)) n += (item.count || 1);
+    }
+    return n;
+  }
+
+  const curLemonade   = countByKeyword(items, 'lemonade');
+  const curPaleAle    = countByKeyword(items, 'pale ale');
+  const curFalafelCup = countByKeyword(items, 'falafel cup');
+  const lyLemonade    = lyItems ? countByKeyword(lyItems, 'lemonade')    : null;
+  const lyPaleAle     = lyItems ? countByKeyword(lyItems, 'pale ale')    : null;
+  const lyFalafelCup  = lyItems ? countByKeyword(lyItems, 'falafel cup') : null;
+
+  const c        = categorizeItems(items);
+  const rkTotal  = c.rolls + c.kombos;
+  const prTotal  = c.kebab + c.falafel + c.chicken;
+  const komboP   = rkTotal ? (c.kombos  / rkTotal * 100).toFixed(1) + '%' : '—';
+  const kyllingP = prTotal ? (c.chicken / prTotal * 100).toFixed(1) + '%' : '—';
+
+  function subHtml(cur, ly) {
+    if (ly === null) return '';
+    const chg = ly > 0 ? (cur - ly) / ly * 100 : null;
+    return (chg !== null ? `<span class="${updown(chg)}">${pct(chg)}</span> &nbsp; ` : '') + ly + ' stk LY';
+  }
+
+  const rows = [
+    { label: 'Killer Lemonade', val: curLemonade   + ' stk', sub: subHtml(curLemonade,   lyLemonade)   },
+    { label: 'Killer Pale Ale', val: curPaleAle    + ' stk', sub: subHtml(curPaleAle,    lyPaleAle)    },
+    { label: 'Falafel Cup',     val: curFalafelCup + ' stk', sub: subHtml(curFalafelCup, lyFalafelCup) },
+    { label: 'Kombo %',         val: komboP,                  sub: 'af produktmix'                      },
+    { label: 'Kylling %',       val: kyllingP,                sub: 'af produktmix'                      },
+  ];
+
+  return rows.map((r, i) =>
+    `<div style="padding:10px 0${i < rows.length - 1 ? ';border-bottom:1px solid var(--border)' : ''}">
+      <div class="card-title">${r.label}</div>
+      <div class="metric-val" style="font-size:1.2rem;margin:3px 0">${r.val}</div>
+      <div class="metric-sub">${r.sub}</div>
+    </div>`
+  ).join('');
+}
+
 function topItemsTable(items) {
   if (!items.length) return '<div class="empty">No item data available</div>';
   let html = `<table>
@@ -1618,7 +1663,7 @@ async function renderChainView() {
           <div class="chart-wrap"><canvas id="chain-bar-chart"></canvas></div>
         </div>
         <div class="card" id="chain-top-card">
-          <div class="section-title">Top Selling Items</div>
+          <div class="section-title">Salgsnøgletal</div>
           <div class="spinner-wrap"><div class="spinner"></div> Loading items…</div>
         </div>
       </div>
@@ -1787,18 +1832,18 @@ async function renderChainView() {
   const mixCard = document.getElementById('chain-mix-card');
 
   if (days.length > 14) {
-    topCard.innerHTML = `<div class="section-title">Top Selling Items</div>
-      <div class="empty">Select a period of 14 days or less to view top items.<br>
+    topCard.innerHTML = `<div class="section-title">Salgsnøgletal</div>
+      <div class="empty">Select a period of 14 days or less to view product metrics.<br>
       Use individual store pages for longer periods.</div>`;
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
-    // Fetch all stores' sales in parallel
-    const allItems = (await Promise.all(
-      STORES.map(s => apiSalesRange(s.id, from, to))
-    )).flat();
+    // Fetch current + LY item-level sales in parallel
+    const [allItems, lyAllItems] = await Promise.all([
+      Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat()),
+      Promise.all(STORES.map(s => apiSalesRange(s.id, lyFrom, lyTo))).then(r => r.flat())
+    ]);
 
-    const top = buildTopItems(allItems, 15);
-    topCard.innerHTML = '<div class="section-title">Top Selling Items</div>' + topItemsTable(top);
+    topCard.innerHTML = '<div class="section-title">Salgsnøgletal</div>' + buildProductMetricCards(allItems, lyAllItems);
 
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
     renderProductMix(document.getElementById('chain-mix-body'), allItems);
@@ -1826,7 +1871,7 @@ async function renderStoreView(storeId) {
     </div>
     <div class="two-col" style="margin-bottom:16px">
       <div class="card" id="store-top-card">
-        <div class="section-title">Top Selling Items</div>
+        <div class="section-title">Salgsnøgletal</div>
         <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
       </div>
       <div class="card">
@@ -1897,18 +1942,19 @@ async function renderStoreView(storeId) {
 
   if (days.length > maxDays) {
     document.getElementById('store-top-card').innerHTML =
-      '<div class="section-title">Top Selling Items</div><div class="empty">Period too long. Select ≤31 days.</div>';
+      '<div class="section-title">Salgsnøgletal</div><div class="empty">Period too long. Select ≤31 days.</div>';
     document.getElementById('store-mix-card').innerHTML =
       '<div class="section-title">Product Mix</div><div class="empty">Period too long. Select ≤31 days.</div>';
     document.getElementById('store-heatmap').innerHTML =
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
-    const items = await apiSalesRange(storeId, from, to);
+    const [items, lyItems] = await Promise.all([
+      apiSalesRange(storeId, from, to),
+      apiSalesRange(storeId, lyFrom, lyTo)
+    ]);
 
-    // Top items
-    const top = buildTopItems(items, 10);
     document.getElementById('store-top-card').innerHTML =
-      '<div class="section-title">Top Selling Items</div>' + topItemsTable(top);
+      '<div class="section-title">Salgsnøgletal</div>' + buildProductMetricCards(items, lyItems);
 
     // Product mix
     const mixCard = document.getElementById('store-mix-card');
