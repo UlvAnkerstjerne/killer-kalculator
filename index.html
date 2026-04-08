@@ -1064,6 +1064,7 @@ const state = {
   kateringResultsHtml: '',
   kateringRecipes: null,
   kateringTab: 'beregner',
+  editingInvoiceId: null,
 };
 
 const charts = {};
@@ -2025,7 +2026,7 @@ function renderInvoicesView() {
           <input type="number" id="rf-amount" placeholder="0" min="0" step="1">
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn" onclick="addInvoice()">Add</button>
+          <button class="btn" id="rf-add-btn" onclick="addInvoice()">Add</button>
           <button class="btn btn-secondary" onclick="document.getElementById('scan-input').click()">📷 Scan Invoice</button>
           <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceImage(this.files[0])">
         </div>
@@ -2156,14 +2157,26 @@ function addInvoice() {
 
   const month = date.slice(0, 7);
 
-  state.invoices.push({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-    storeId,
-    date,
-    month,
-    description,
-    amount
-  });
+  if (state.editingInvoiceId) {
+    const r = state.invoices.find(i => i.id === state.editingInvoiceId);
+    if (r) {
+      r.storeId      = storeId;
+      r.date         = date;
+      r.month        = month;
+      r.description  = description;
+      r.amount       = amount;
+    }
+    state.editingInvoiceId = null;
+  } else {
+    state.invoices.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      storeId,
+      date,
+      month,
+      description,
+      amount
+    });
+  }
 
   saveInvoices();
   renderInvoicesView();
@@ -2173,19 +2186,22 @@ function addInvoice() {
 function editInvoice(id) {
   const r = state.invoices.find(i => i.id === id);
   if (!r) return;
-  const newAmount = parseFloat(prompt('Edit amount (DKK):', r.amount));
-  if (isNaN(newAmount) || newAmount <= 0) return;
-  const newDesc = prompt('Edit supplier:', r.description);
-  if (!newDesc) return;
-  const newDate = prompt('Edit date (YYYY-MM-DD):', r.date);
-  if (!newDate) return;
-  r.amount = newAmount;
-  r.description = newDesc;
-  r.date = newDate;
-  r.month = newDate.slice(0, 7);
-  saveInvoices();
-  renderInvoicesView();
-  loadSidebar();
+  state.editingInvoiceId = id;
+
+  const storeEl = document.getElementById('rf-store');
+  const dateEl  = document.getElementById('rf-date');
+  const descEl  = document.getElementById('rf-desc');
+  const amtEl   = document.getElementById('rf-amount');
+  const addBtn  = document.getElementById('rf-add-btn');
+
+  if (storeEl) storeEl.value = r.storeId;
+  if (dateEl)  dateEl.value  = r.date;
+  if (descEl)  descEl.value  = r.description;
+  if (amtEl)   amtEl.value   = r.amount;
+  if (addBtn)  addBtn.textContent = 'Update';
+
+  const formEl = document.querySelector('.invoice-form');
+  if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function clearSupplierFilter() {
@@ -2204,12 +2220,9 @@ function deleteInvoice(id) {
 }
 
 // ── Invoice scanning ───────────────────────────────────────────────────────────
-const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY';
-
 async function handleInvoiceImage(file) {
   if (!file) return;
 
-  // Show thumbnail
   const preview = document.getElementById('scan-preview');
   const thumb   = document.getElementById('scan-thumb');
   const status  = document.getElementById('scan-status');
@@ -2220,6 +2233,7 @@ async function handleInvoiceImage(file) {
   preview.style.display = 'flex';
   preview.style.alignItems = 'center';
   status.textContent = 'Scanning…';
+  status.style.color = '';
 
   // Read as base64
   const base64 = await new Promise((resolve, reject) => {
@@ -2232,40 +2246,42 @@ async function handleInvoiceImage(file) {
   const mediaType = file.type || 'image/jpeg';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/scan-invoice', {
       method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 256,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Extract the invoice details and respond with ONLY a JSON object (no markdown) with these fields: supplier (string, the vendor/supplier name), amount (number, total amount excluding VAT in DKK, or the total if VAT unknown), date (string in YYYY-MM-DD format). If a field cannot be determined, use null.' }
-          ]
-        }]
-      })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ base64, mediaType })
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+      throw new Error(err.error || `HTTP ${res.status}`);
     }
 
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
-    const parsed = JSON.parse(text);
 
-    // Fill form fields
+    // Extract JSON robustly — handles markdown code blocks
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not read invoice — try a clearer photo');
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Fill supplier — match existing option or add a new one
     if (parsed.supplier) {
       const descEl = document.getElementById('rf-desc');
-      if (descEl) descEl.value = parsed.supplier;
+      if (descEl) {
+        const match = Array.from(descEl.options).find(o =>
+          o.value.toLowerCase() === parsed.supplier.toLowerCase()
+        );
+        if (match) {
+          descEl.value = match.value;
+        } else {
+          const opt = document.createElement('option');
+          opt.value = parsed.supplier;
+          opt.textContent = parsed.supplier;
+          opt.selected = true;
+          descEl.appendChild(opt);
+        }
+      }
     }
     if (parsed.amount != null) {
       const amtEl = document.getElementById('rf-amount');
@@ -2276,7 +2292,7 @@ async function handleInvoiceImage(file) {
       if (dateEl) dateEl.value = parsed.date;
     }
 
-    status.textContent = '✓ Fields filled';
+    status.textContent = '✓ Scanned — review fields before saving';
     status.style.color = 'var(--green, #22c55e)';
   } catch(e) {
     console.error('Invoice scan error:', e);

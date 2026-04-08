@@ -206,6 +206,39 @@ app.get('/api/sales/:storeId/:unixtime', async (req, res) => {
   }
 });
 
+// ── Invoice image scanning via Claude API ─────────────────────────────────────
+app.post('/api/scan-invoice', async (req, res) => {
+  const { base64, mediaType } = req.body;
+  if (!base64 || !mediaType) return res.status(400).json({ error: 'Missing base64 or mediaType' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
+
+  try {
+    const r = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: 'Extract the invoice details and respond with ONLY a JSON object (no markdown, no code blocks) with these exact fields: supplier (string, the vendor/supplier name), date (string in YYYY-MM-DD format), amount (number, total price excluding VAT / ex moms in DKK). Use null for any field you cannot determine.' }
+        ]
+      }]
+    }, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      timeout: 30000
+    });
+    res.json(r.data);
+  } catch (err) {
+    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+  }
+});
+
 // ── Planday: departments raw ───────────────────────────────────────────────────
 app.get('/api/planday/departments-raw', async (_req, res) => {
   try {
