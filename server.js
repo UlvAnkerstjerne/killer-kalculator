@@ -217,7 +217,7 @@ app.post('/api/scan-invoice', async (req, res) => {
 
   try {
     const r = await axios.post('https://api.anthropic.com/v1/messages', {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-6',
       max_tokens: 256,
       messages: [{
         role: 'user',
