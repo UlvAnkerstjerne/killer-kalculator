@@ -1069,6 +1069,7 @@ const state = {
   kateringRecipes: null,
   kateringTab: 'beregner',
   editingInvoiceId: null,
+  lemonadeToday: null,
 };
 
 const charts = {};
@@ -1604,6 +1605,20 @@ function renderProductMix(el, items) {
   el.innerHTML = html;
 }
 
+// ── Lemonade today cache helper ────────────────────────────────────────────────
+async function getLemonadeToday() {
+  if (state.lemonadeToday) return state.lemonadeToday;
+  try {
+    const r = await fetch('/api/lemonade/today');
+    state.lemonadeToday = await r.json();
+  } catch (e) {
+    state.lemonadeToday = null;
+  }
+  return state.lemonadeToday;
+}
+
+const PERIODS_WITH_TODAY = ['today', 'this-week', 'this-month', 'this-year'];
+
 // ── Chain view ─────────────────────────────────────────────────────────────────
 async function renderChainView() {
   const main = document.getElementById('main');
@@ -1689,6 +1704,19 @@ async function renderChainView() {
       ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
     </div>
   `;
+
+  if (PERIODS_WITH_TODAY.includes(state.period)) {
+    getLemonadeToday().then(d => {
+      const el = document.getElementById('chain-kpis');
+      if (!el || !d) return;
+      el.insertAdjacentHTML('beforeend', `
+        <div class="card">
+          <div class="card-title">Lemonade i dag</div>
+          <div class="metric-val">${d.total != null ? d.total : '—'}</div>
+          <div class="metric-sub">Chain total today</div>
+        </div>`);
+    });
+  }
 
   // Bar chart
   const labels  = STORES.map(s => s.name);
@@ -1882,6 +1910,20 @@ async function renderStoreView(storeId) {
       ${salaryP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,salaryP)}%"></div></div>` : ''}
     </div>
   `;
+
+  if (PERIODS_WITH_TODAY.includes(state.period)) {
+    getLemonadeToday().then(d => {
+      const el = document.getElementById('store-kpis');
+      if (!el || !d) return;
+      const cnt = (d.stores && d.stores[storeId] != null) ? d.stores[storeId] : '—';
+      el.insertAdjacentHTML('beforeend', `
+        <div class="card">
+          <div class="card-title">Lemonade i dag</div>
+          <div class="metric-val">${cnt}</div>
+          <div class="metric-sub">Sold today</div>
+        </div>`);
+    });
+  }
 
   // Detailed sales for items + heatmap
   const days = daysInRange(from, to);
