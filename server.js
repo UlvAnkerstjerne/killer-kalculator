@@ -236,6 +236,7 @@ app.post('/api/scan-invoice', async (req, res) => {
     });
     res.json(r.data);
   } catch (err) {
+    console.error('Scan error full:', JSON.stringify(err.response?.data));
     res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
   }
 });
