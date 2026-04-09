@@ -933,6 +933,101 @@ app.post('/api/katering-recipes', (req, res) => {
   }
 });
 
+// ── Lemonade tracking ─────────────────────────────────────────────────────────
+const LEMONADE_HISTORY_PATH = path.join(__dirname, 'data', 'lemonade-history.json');
+
+function cphDateStr() {
+  return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+}
+
+function cphMidnightTs() {
+  const s    = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+  const [y, mo, dy] = s.split('-').map(Number);
+  const noonUTC = Date.UTC(y, mo - 1, dy, 12, 0, 0);
+  const noonCPH = new Date(noonUTC).toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
+  const off     = parseInt(noonCPH.slice(11, 13), 10) - 12;
+  return (Date.UTC(y, mo - 1, dy) - off * 3600000) / 1000;
+}
+
+async function fetchLemonadeToday() {
+  const midnight = cphMidnightTs();
+  const results  = await Promise.allSettled(
+    Object.entries(STORES).map(async ([id, store]) => {
+      const r     = await posGet(`/exportSales/v20/${midnight}`, store);
+      const items = r.data.data || [];
+      const count = items.filter(i => (i.productname || '').toLowerCase().includes('lemonade')).length;
+      return { id, count };
+    })
+  );
+  const stores = {};
+  let total = 0;
+  for (const r of results) {
+    if (r.status === 'fulfilled') { stores[r.value.id] = r.value.count; total += r.value.count; }
+    else console.warn('[lemonade] fetch error:', r.reason?.message);
+  }
+  return { date: cphDateStr(), stores, total };
+}
+
+function loadLemonadeHistory() {
+  try {
+    if (fs.existsSync(LEMONADE_HISTORY_PATH))
+      return JSON.parse(fs.readFileSync(LEMONADE_HISTORY_PATH, 'utf8'));
+  } catch(e) { console.error('[lemonade] read error:', e.message); }
+  return [];
+}
+
+function saveLemonadeHistory(history) {
+  const dir = path.dirname(LEMONADE_HISTORY_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(LEMONADE_HISTORY_PATH, JSON.stringify(history, null, 2), 'utf8');
+}
+
+app.get('/api/lemonade/history', (_req, res) => {
+  res.json(loadLemonadeHistory());
+});
+
+app.post('/api/lemonade/history', (req, res) => {
+  try {
+    saveLemonadeHistory(req.body);
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/lemonade/today', async (_req, res) => {
+  try {
+    const data = await fetchLemonadeToday();
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Scheduled save at 22:00 Copenhagen time
+let lemonadeSavedDate = null;
+setInterval(() => {
+  const cph  = new Date().toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
+  const hour = parseInt(cph.slice(11, 13), 10);
+  const min  = parseInt(cph.slice(14, 16), 10);
+  const date = cph.slice(0, 10);
+  if (hour !== 22 || min !== 0) return;
+  if (lemonadeSavedDate === date) return;
+  lemonadeSavedDate = date;
+  (async () => {
+    try {
+      const data    = await fetchLemonadeToday();
+      const history = loadLemonadeHistory();
+      const idx     = history.findIndex(e => e.date === data.date);
+      if (idx >= 0) history[idx] = data; else history.push(data);
+      saveLemonadeHistory(history);
+      console.log('[lemonade] saved daily count:', data);
+    } catch(e) {
+      console.error('[lemonade] scheduled save error:', e.message);
+    }
+  })();
+}, 60000);
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(3000, () => {
   console.log('\n  🔪  KILLER KALCULATOR');
