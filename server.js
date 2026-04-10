@@ -1011,7 +1011,7 @@ setInterval(() => {
   const hour = parseInt(cph.slice(11, 13), 10);
   const min  = parseInt(cph.slice(14, 16), 10);
   const date = cph.slice(0, 10);
-  if (hour !== 22 || min !== 0) return;
+  if (hour < 22) return;
   if (lemonadeSavedDate === date) return;
   lemonadeSavedDate = date;
   (async () => {
