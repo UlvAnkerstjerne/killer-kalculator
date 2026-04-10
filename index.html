@@ -1443,6 +1443,18 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
   el.innerHTML = html;
 }
 
+// ── Channel KPIs (Wolt / Heaps) ───────────────────────────────────────────────
+function buildChannelKpis(items) {
+  let total = 0, wolt = 0, heaps = 0;
+  for (const item of items) {
+    const v = item.priceexclvat || 0;
+    total += v;
+    if (item.paymenttype === 'Wolt') wolt += v;
+    else if (item.paymenttype === 'Heaps online') heaps += v;
+  }
+  return { total, wolt, heaps };
+}
+
 // ── Top items ──────────────────────────────────────────────────────────────────
 function buildTopItems(items, limit = 10) {
   const agg = {};
@@ -1824,6 +1836,22 @@ async function renderChainView() {
   } else {
     const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat());
 
+    const chCh = buildChannelKpis(allItems);
+    const chWoltP  = chCh.total > 0 ? (chCh.wolt  / chCh.total * 100) : null;
+    const chHeapsP = chCh.total > 0 ? (chCh.heaps / chCh.total * 100) : null;
+    const chainKpisEl = document.getElementById('chain-kpis');
+    if (chainKpisEl) chainKpisEl.insertAdjacentHTML('beforeend', `
+      <div class="card">
+        <div class="card-title">Wolt %</div>
+        <div class="metric-val">${chWoltP !== null ? chWoltP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(chCh.wolt)} ex VAT</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Heaps online %</div>
+        <div class="metric-val">${chHeapsP !== null ? chHeapsP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(chCh.heaps)} ex VAT</div>
+      </div>`);
+
     document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(allItems));
 
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
@@ -1938,6 +1966,22 @@ async function renderStoreView(storeId) {
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
     const items = await apiSalesRange(storeId, from, to);
+
+    const stCh = buildChannelKpis(items);
+    const stWoltP  = stCh.total > 0 ? (stCh.wolt  / stCh.total * 100) : null;
+    const stHeapsP = stCh.total > 0 ? (stCh.heaps / stCh.total * 100) : null;
+    const storeKpisEl = document.getElementById('store-kpis');
+    if (storeKpisEl) storeKpisEl.insertAdjacentHTML('beforeend', `
+      <div class="card">
+        <div class="card-title">Wolt %</div>
+        <div class="metric-val">${stWoltP !== null ? stWoltP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(stCh.wolt)} ex VAT</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Heaps online %</div>
+        <div class="metric-val">${stHeapsP !== null ? stHeapsP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(stCh.heaps)} ex VAT</div>
+      </div>`);
 
     document.getElementById('store-top-card').innerHTML =
       '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(items));
