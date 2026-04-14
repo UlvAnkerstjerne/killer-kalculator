@@ -2119,7 +2119,8 @@ function renderInvoicesView() {
           <input type="number" id="rf-amount" placeholder="0" min="0" step="1">
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn" id="rf-add-btn" onclick="addInvoice()">Add</button>
+          <button class="btn" id="rf-add-btn" onclick="addInvoice()">Tilføj</button>
+          <button class="btn btn-secondary" id="rf-cancel-btn" style="display:none" onclick="cancelEditInvoice()">Annuller</button>
           <button class="btn btn-secondary" onclick="document.getElementById('scan-input').click()">📷 Scan Invoice</button>
           <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceImage(this.files[0])">
         </div>
@@ -2289,10 +2290,17 @@ function editInvoice(id) {
   if (dateEl)  dateEl.value  = r.date;
   if (descEl)  descEl.value  = r.description;
   if (amtEl)   amtEl.value   = r.amount;
-  if (addBtn)  addBtn.textContent = 'Update';
+  if (addBtn)  addBtn.textContent = 'Opdater';
+  const cancelBtn = document.getElementById('rf-cancel-btn');
+  if (cancelBtn) cancelBtn.style.display = '';
 
   const formEl = document.querySelector('.invoice-form');
   if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEditInvoice() {
+  state.editingInvoiceId = null;
+  renderInvoicesView();
 }
 
 function clearSupplierFilter() {
