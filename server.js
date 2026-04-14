@@ -893,7 +893,7 @@ app.get('/api/planday/salaries/:from/:to', async (req, res) => {
 
 // ── Katering recipes ──────────────────────────────────────────────────────────
 
-const KATERING_RECIPES_PATH = path.join(__dirname, 'data', 'katering-recipes.json');
+const KATERING_RECIPES_PATH = '/mnt/data/katering-recipes.json';
 
 const KATERING_RECIPES_DEFAULT = {
   hummus:    { name: 'Hummus',                  defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Hummus',             grams: 80   }] },
@@ -934,7 +934,7 @@ app.post('/api/katering-recipes', (req, res) => {
 });
 
 // ── Lemonade tracking ─────────────────────────────────────────────────────────
-const LEMONADE_HISTORY_PATH = path.join(__dirname, 'data', 'lemonade-history.json');
+const LEMONADE_HISTORY_PATH = '/mnt/data/lemonade-history.json';
 
 function cphDateStr() {
   return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
