@@ -1070,6 +1070,8 @@ const state = {
   kateringTab: 'beregner',
   editingInvoiceId: null,
   lemonadeToday: null,
+  invoiceSupFrom: null,
+  invoiceSupTo: null,
 };
 
 const charts = {};
@@ -2137,9 +2139,9 @@ function renderInvoicesView() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="section-title" style="margin-bottom:0">Spending by Supplier</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="date" id="sup-from" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="renderInvoicesView()">
+          <input type="date" id="sup-from" value="${state.invoiceSupFrom||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.invoiceSupFrom=this.value;renderInvoicesView()">
           <span style="color:var(--muted);font-size:12px">to</span>
-          <input type="date" id="sup-to" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="renderInvoicesView()">
+          <input type="date" id="sup-to" value="${state.invoiceSupTo||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.invoiceSupTo=this.value;renderInvoicesView()">
           <button class="btn" style="padding:4px 12px;font-size:12px;height:auto" onclick="clearSupplierFilter()">Clear</button>
         </div>
       </div>
@@ -2175,10 +2177,8 @@ function renderInvoicesView() {
     }
 
     // Spending by supplier (all stores, period invoices)
-    const supFromEl = document.getElementById('sup-from');
-    const supToEl   = document.getElementById('sup-to');
-    const supFrom   = supFromEl && supFromEl.value ? supFromEl.value : null;
-    const supTo     = supToEl   && supToEl.value   ? supToEl.value   : null;
+    const supFrom = state.invoiceSupFrom || null;
+    const supTo   = state.invoiceSupTo   || null;
 
     const supplierFiltered = state.invoices.filter(r => {
       if (supFrom && r.date < supFrom) return false;
@@ -2296,10 +2296,8 @@ function editInvoice(id) {
 }
 
 function clearSupplierFilter() {
-  const f = document.getElementById('sup-from');
-  const t = document.getElementById('sup-to');
-  if (f) f.value = '';
-  if (t) t.value = '';
+  state.invoiceSupFrom = null;
+  state.invoiceSupTo = null;
   renderInvoicesView();
 }
 
