@@ -641,6 +641,16 @@
     .mix-cat  { color: var(--text-muted); }
     .mix-pct  { font-weight: 700; }
     .mix-count { color: var(--text-muted); }
+    .meat-store-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 767px) {
+      .meat-store-grid { grid-template-columns: 1fr; }
+    }
+
     .meat-section-label {
       font-size: 11px;
       font-weight: 600;
@@ -2415,36 +2425,131 @@ async function handleInvoiceImage(file) {
 // ── Meat tracking view ─────────────────────────────────────────────────────────
 function renderMeatView() {
   if (!('meatStoreFilter' in state)) state.meatStoreFilter = 'all';
+  if (!('meatDateFrom'    in state)) state.meatDateFrom    = null;
+  if (!('meatDateTo'      in state)) state.meatDateTo      = null;
+  if (!('meatEditingId'   in state)) state.meatEditingId   = null;
 
   const today = new Date().toISOString().slice(0, 10);
-  const storeOpts = STORES.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
-  // Filter + sort history
-  const rows = [...state.meat]
-    .filter(e => state.meatStoreFilter === 'all' || e.storeId === state.meatStoreFilter)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  // ── Per-store entry cards ──────────────────────────────────────────────────
+  let cardsHtml = '<div class="meat-store-grid">';
+  for (const s of STORES) {
+    const sid = s.id;
 
-  const filterOpts = `<option value="all"${state.meatStoreFilter==='all'?' selected':''}>All stores</option>`
+    // Most recent entry for this store
+    const recent = [...state.meat]
+      .filter(e => e.storeId === sid)
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+    // Entry being edited for this store (if any)
+    const editEntry = state.meatEditingId
+      ? state.meat.find(e => e.id === state.meatEditingId && e.storeId === sid)
+      : null;
+    const isEditing = !!editEntry;
+    const v = editEntry || {};
+
+    const dateVal    = isEditing ? v.date         : today;
+    const lambAmVal  = isEditing && v.lambMorning  != null ? v.lambMorning  : '';
+    const lambPmVal  = isEditing && v.lambEvening  != null ? v.lambEvening  : '';
+    const chickAmVal = isEditing && v.chickMorning != null ? v.chickMorning : '';
+    const chickPmVal = isEditing && v.chickEvening != null ? v.chickEvening : '';
+    const lambSoChk  = isEditing && v.lambSellout  ? 'checked' : '';
+    const lambSoVal  = isEditing && v.lambSellout  ? v.lambSellout  : '';
+    const chickSoChk = isEditing && v.chickSellout ? 'checked' : '';
+    const chickSoVal = isEditing && v.chickSellout ? v.chickSellout : '';
+
+    let recentHtml = '';
+    if (recent) {
+      const lAm = recent.lambMorning  != null ? recent.lambMorning  + ' kg' : '?';
+      const lPm = recent.lambEvening  != null ? recent.lambEvening  + ' kg' : '?';
+      const cAm = recent.chickMorning != null ? recent.chickMorning + ' kg' : '?';
+      const cPm = recent.chickEvening != null ? recent.chickEvening + ' kg' : '?';
+      recentHtml = `<div style="font-size:11px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        Seneste: ${recent.date} — Lam: ${lAm} → ${lPm} | Kylling: ${cAm} → ${cPm}
+      </div>`;
+    }
+
+    cardsHtml += `
+      <div class="card" style="margin-bottom:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-weight:600;font-size:14px">${s.name}</div>
+          <input type="date" id="mt-date-${sid}" value="${dateVal}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div class="meat-section-label" style="margin-bottom:8px">Lam</div>
+            <div class="f-group">
+              <label>Morgen (kg)</label>
+              <input type="number" id="mt-${sid}-lamb-am" value="${lambAmVal}" placeholder="0.0" min="0" step="0.1">
+            </div>
+            <div class="f-group">
+              <label>Aften rest (kg)</label>
+              <input type="number" id="mt-${sid}-lamb-pm" value="${lambPmVal}" placeholder="0.0" min="0" step="0.1">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+              <input type="checkbox" id="mt-${sid}-lamb-so-chk" ${lambSoChk} onchange="document.getElementById('mt-${sid}-lamb-so').disabled=!this.checked" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
+              <label for="mt-${sid}-lamb-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Udsolgt</label>
+              <input type="time" id="mt-${sid}-lamb-so" value="${lambSoVal}" ${lambSoChk ? '' : 'disabled'} style="flex:1;min-width:0;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px">
+            </div>
+          </div>
+          <div>
+            <div class="meat-section-label" style="margin-bottom:8px">Kylling</div>
+            <div class="f-group">
+              <label>Morgen (kg)</label>
+              <input type="number" id="mt-${sid}-chick-am" value="${chickAmVal}" placeholder="0.0" min="0" step="0.1">
+            </div>
+            <div class="f-group">
+              <label>Aften rest (kg)</label>
+              <input type="number" id="mt-${sid}-chick-pm" value="${chickPmVal}" placeholder="0.0" min="0" step="0.1">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+              <input type="checkbox" id="mt-${sid}-chick-so-chk" ${chickSoChk} onchange="document.getElementById('mt-${sid}-chick-so').disabled=!this.checked" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
+              <label for="mt-${sid}-chick-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Udsolgt</label>
+              <input type="time" id="mt-${sid}-chick-so" value="${chickSoVal}" ${chickSoChk ? '' : 'disabled'} style="flex:1;min-width:0;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+          <button class="btn" style="padding:5px 14px;font-size:12px;height:auto" onclick="saveMeatCard('${sid}')">
+            ${isEditing ? 'Opdater' : 'Gem'}
+          </button>
+          ${isEditing ? `<button class="btn btn-secondary" style="padding:5px 14px;font-size:12px;height:auto" onclick="cancelMeatEdit()">Annuller</button>` : ''}
+        </div>
+        ${recentHtml}
+      </div>`;
+  }
+  cardsHtml += '</div>';
+
+  // ── History table ──────────────────────────────────────────────────────────
+  const filterOpts = `<option value="all"${state.meatStoreFilter==='all'?' selected':''}>Alle butikker</option>`
     + STORES.map(s => `<option value="${s.id}"${state.meatStoreFilter===s.id?' selected':''}>${s.name}</option>`).join('');
 
-  // History table
+  const rows = [...state.meat]
+    .filter(e => {
+      if (state.meatStoreFilter !== 'all' && e.storeId !== state.meatStoreFilter) return false;
+      if (state.meatDateFrom && e.date < state.meatDateFrom) return false;
+      if (state.meatDateTo   && e.date > state.meatDateTo)   return false;
+      return true;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+
   let historyHtml;
   if (!rows.length) {
-    historyHtml = `<div class="empty">No entries yet${state.meatStoreFilter !== 'all' ? ' for this store' : ''}</div>`;
+    historyHtml = `<div class="empty">Ingen registreringer${state.meatStoreFilter !== 'all' ? ' for denne butik' : ''}</div>`;
   } else {
-    historyHtml = `<table>
-      <thead><tr>
-        <th>Date</th>
-        <th>Store</th>
-        <th class="td-num">Lamb AM (kg)</th>
-        <th class="td-num">Lamb PM (kg)</th>
-        <th class="td-num">Lamb Waste (kg)</th>
-        <th class="td-num">Lamb Waste %</th>
-        <th class="td-num">Chicken AM (kg)</th>
-        <th class="td-num">Chicken PM (kg)</th>
-        <th class="td-num">Chicken Waste (kg)</th>
-        <th class="td-num">Chicken Waste %</th>
-        <th>Sell-outs</th>
+    historyHtml = `<table><thead><tr>
+        <th>Dato</th>
+        <th>Butik</th>
+        <th class="td-num">Lam morgen</th>
+        <th class="td-num">Lam aften</th>
+        <th class="td-num">Lam spild</th>
+        <th class="td-num">Lam spild %</th>
+        <th class="td-num">Kylling morgen</th>
+        <th class="td-num">Kylling aften</th>
+        <th class="td-num">Kylling spild</th>
+        <th class="td-num">Kylling spild %</th>
+        <th>Udsolgt</th>
+        <th></th>
         <th></th>
       </tr></thead><tbody>`;
 
@@ -2454,10 +2559,9 @@ function renderMeatView() {
       const chickWaste = e.chickMorning != null && e.chickEvening != null ? +(e.chickMorning - e.chickEvening).toFixed(2) : null;
       const lambWasteP  = (lambWaste  != null && e.lambMorning  > 0) ? (lambWaste  / e.lambMorning  * 100).toFixed(1) + '%' : '—';
       const chickWasteP = (chickWaste != null && e.chickMorning > 0) ? (chickWaste / e.chickMorning * 100).toFixed(1) + '%' : '—';
-
       const sellouts = [
-        e.lambSellout  ? `Lamb: ${e.lambSellout}`    : null,
-        e.chickSellout ? `Chicken: ${e.chickSellout}` : null,
+        e.lambSellout  ? `Lam: ${e.lambSellout}`      : null,
+        e.chickSellout ? `Kylling: ${e.chickSellout}` : null,
       ].filter(Boolean).join(' / ') || '—';
 
       historyHtml += `<tr>
@@ -2471,7 +2575,8 @@ function renderMeatView() {
         <td class="td-num">${e.chickEvening != null ? e.chickEvening : '—'}</td>
         <td class="td-num">${chickWaste != null ? chickWaste : '—'}</td>
         <td class="td-num ${chickWaste != null && e.chickMorning > 0 && (chickWaste/e.chickMorning*100) > 15 ? 'down' : ''}">${chickWasteP}</td>
-        <td style="font-size:12px;color:var(--text-muted)">${escHtml(sellouts)}</td>
+        <td style="font-size:12px">${escHtml(sellouts)}</td>
+        <td><button class="btn-danger" style="color:var(--muted)" onclick="editMeatEntry('${e.id}')">✎</button></td>
         <td><button class="btn-danger" onclick="deleteMeatEntry('${e.id}')">✕</button></td>
       </tr>`;
     }
@@ -2481,106 +2586,44 @@ function renderMeatView() {
   document.getElementById('main').innerHTML = `
     <div class="page-header">
       <div class="page-title">Meat Tracking</div>
-      <div class="page-sub">Log daily meat stock levels per store to track waste and sell-out times.</div>
+      <div class="page-sub">Registrer daglige kødbeholdninger per butik for at tracke spild og udsolgtstidspunkter.</div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title">Log Entry</div>
-      <div class="invoice-form">
-
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div class="f-group" style="flex:1;min-width:140px">
-            <label>Store</label>
-            <select id="mt-store">${storeOpts}</select>
-          </div>
-          <div class="f-group" style="flex:1;min-width:140px">
-            <label>Date</label>
-            <input type="date" id="mt-date" value="${today}">
-          </div>
-        </div>
-
-        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:4px">
-          <div style="flex:1;min-width:200px">
-            <div class="meat-section-label">Morning Stock</div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <div class="f-group" style="flex:1;min-width:120px">
-                <label>Lamb (kg)</label>
-                <input type="number" id="mt-lamb-am" placeholder="0.0" min="0" step="0.1">
-              </div>
-              <div class="f-group" style="flex:1;min-width:120px">
-                <label>Chicken (kg)</label>
-                <input type="number" id="mt-chick-am" placeholder="0.0" min="0" step="0.1">
-              </div>
-            </div>
-          </div>
-
-          <div style="flex:1;min-width:200px">
-            <div class="meat-section-label">Evening Stock (remaining)</div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <div class="f-group" style="flex:1;min-width:120px">
-                <label>Lamb remaining (kg)</label>
-                <input type="number" id="mt-lamb-pm" placeholder="0.0" min="0" step="0.1">
-              </div>
-              <div class="f-group" style="flex:1;min-width:120px">
-                <label>Chicken remaining (kg)</label>
-                <input type="number" id="mt-chick-pm" placeholder="0.0" min="0" step="0.1">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:4px">
-          <div class="meat-section-label">Sell-outs (optional)</div>
-          <div style="display:flex;gap:24px;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:8px">
-              <input type="checkbox" id="mt-lamb-so-chk" onchange="document.getElementById('mt-lamb-so').disabled=!this.checked" style="width:16px;height:16px;cursor:pointer">
-              <label for="mt-lamb-so-chk" style="margin:0;cursor:pointer">Lamb sell-out</label>
-              <input type="time" id="mt-lamb-so" disabled style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-family:var(--mono);font-size:13px">
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <input type="checkbox" id="mt-chick-so-chk" onchange="document.getElementById('mt-chick-so').disabled=!this.checked" style="width:16px;height:16px;cursor:pointer">
-              <label for="mt-chick-so-chk" style="margin:0;cursor:pointer">Chicken sell-out</label>
-              <input type="time" id="mt-chick-so" disabled style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);font-family:var(--mono);font-size:13px">
-            </div>
-          </div>
-        </div>
-
-        <button class="btn" style="margin-top:12px" onclick="saveMeatEntry()">Save Entry</button>
-      </div>
-    </div>
+    ${cardsHtml}
 
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div class="section-title" style="margin-bottom:0">History</div>
-        <select style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);cursor:pointer"
-          onchange="state.meatStoreFilter=this.value;renderMeatView()">
-          ${filterOpts}
-        </select>
+        <div class="section-title" style="margin-bottom:0">Historik</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" value="${state.meatDateFrom||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.meatDateFrom=this.value;renderMeatView()">
+          <span style="color:var(--muted);font-size:12px">til</span>
+          <input type="date" value="${state.meatDateTo||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.meatDateTo=this.value;renderMeatView()">
+          <button class="btn" style="padding:4px 12px;font-size:12px;height:auto" onclick="state.meatDateFrom=null;state.meatDateTo=null;renderMeatView()">Ryd</button>
+          <select style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer"
+            onchange="state.meatStoreFilter=this.value;renderMeatView()">
+            ${filterOpts}
+          </select>
+        </div>
       </div>
       ${historyHtml}
     </div>
   `;
 }
 
-function saveMeatEntry() {
-  const storeId    = document.getElementById('mt-store').value;
-  const date       = document.getElementById('mt-date').value;
-  const lambAm     = document.getElementById('mt-lamb-am').value;
-  const lambPm     = document.getElementById('mt-lamb-pm').value;
-  const chickAm    = document.getElementById('mt-chick-am').value;
-  const chickPm    = document.getElementById('mt-chick-pm').value;
-  const lambSoChk  = document.getElementById('mt-lamb-so-chk').checked;
-  const chickSoChk = document.getElementById('mt-chick-so-chk').checked;
-  const lambSo     = document.getElementById('mt-lamb-so').value;
-  const chickSo    = document.getElementById('mt-chick-so').value;
+function saveMeatCard(storeId) {
+  const date    = document.getElementById(`mt-date-${storeId}`).value;
+  const lambAm  = document.getElementById(`mt-${storeId}-lamb-am`).value;
+  const lambPm  = document.getElementById(`mt-${storeId}-lamb-pm`).value;
+  const chickAm = document.getElementById(`mt-${storeId}-chick-am`).value;
+  const chickPm = document.getElementById(`mt-${storeId}-chick-pm`).value;
+  const lambSoChk  = document.getElementById(`mt-${storeId}-lamb-so-chk`).checked;
+  const chickSoChk = document.getElementById(`mt-${storeId}-chick-so-chk`).checked;
+  const lambSo  = document.getElementById(`mt-${storeId}-lamb-so`).value;
+  const chickSo = document.getElementById(`mt-${storeId}-chick-so`).value;
 
-  if (!storeId || !date) {
-    alert('Please select a store and date.');
-    return;
-  }
+  if (!date) { alert('Vælg venligst en dato.'); return; }
 
-  const entry = {
-    id:           Date.now().toString(36) + Math.random().toString(36).slice(2),
+  const data = {
     storeId,
     date,
     lambMorning:  lambAm  !== '' ? parseFloat(lambAm)  : null,
@@ -2591,12 +2634,37 @@ function saveMeatEntry() {
     chickSellout: chickSoChk && chickSo ? chickSo : null,
   };
 
-  state.meat.push(entry);
+  if (state.meatEditingId) {
+    const idx = state.meat.findIndex(e => e.id === state.meatEditingId && e.storeId === storeId);
+    if (idx >= 0) {
+      state.meat[idx] = { ...state.meat[idx], ...data };
+      state.meatEditingId = null;
+    }
+  } else {
+    state.meat.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), ...data });
+  }
+
   saveMeat();
   renderMeatView();
 }
 
+function editMeatEntry(id) {
+  state.meatEditingId = id;
+  renderMeatView();
+  const entry = state.meat.find(e => e.id === id);
+  if (entry) {
+    const el = document.getElementById(`mt-date-${entry.storeId}`);
+    if (el) el.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function cancelMeatEdit() {
+  state.meatEditingId = null;
+  renderMeatView();
+}
+
 function deleteMeatEntry(id) {
+  if (!confirm('Slet denne registrering?')) return;
   state.meat = state.meat.filter(e => e.id !== id);
   saveMeat();
   renderMeatView();
