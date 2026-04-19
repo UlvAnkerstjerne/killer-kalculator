@@ -2743,7 +2743,7 @@ function renderGraphsView() {
         <div class="graph-ctrl-group">
           <div class="graph-ctrl-label">Metric</div>
           <div class="graph-btn-group">
-            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %']],'graphMetric','renderGraphsView()')}
+            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %'],['produktmix','Produktmix %']],'graphMetric','renderGraphsView()')}
           </div>
         </div>
 
@@ -2897,7 +2897,7 @@ async function loadGraphData() {
   const toTs   = Math.floor(new Date(state.graphTo   + 'T23:59:59').getTime() / 1000);
   const bucketKeys    = generateBuckets(state.graphFrom, state.graphTo, state.graphInterval);
   const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
-  const isPercent     = ['food-cost', 'salary', 'rolls'].includes(state.graphMetric);
+  const isPercent     = ['food-cost', 'salary', 'rolls', 'produktmix'].includes(state.graphMetric);
 
   // ── Revenue: one safeApiRevenue call per bucket per store, all in parallel ──
   const revByStore = {}; // storeId → { bucketKey: number }
@@ -2911,7 +2911,7 @@ async function loadGraphData() {
 
   // ── Rolls %: fetch whole period items, bucket by item.datetime ─────────────
   const allItems = {};
-  if (state.graphMetric === 'rolls') {
+  if (state.graphMetric === 'rolls' || state.graphMetric === 'produktmix') {
     await Promise.all(selectedStores.map(async id => {
       try { allItems[id] = await apiSalesRange(id, fromTs, toTs); }
       catch(e) { allItems[id] = []; }
@@ -2931,65 +2931,27 @@ async function loadGraphData() {
   if (state.view !== 'graphs') return; // navigated away while fetching
 
   // ── Build Chart.js datasets ─────────────────────────────────────────────────
-  const datasets = selectedStores.map(storeId => {
-    const store  = STORES.find(s => s.id === storeId);
-    const color  = GRAPH_STORE_COLORS[storeId] || '#888';
-    const revMap = revByStore[storeId]; // bucketKey → revenue
+  const isLine = state.graphType === 'line';
+  let datasets;
 
-    let data;
-
-    if (state.graphMetric === 'revenue') {
-      data = bucketKeys.map(k => revMap[k] || null);
-
-    } else if (state.graphMetric === 'food-cost') {
-      // Invoices have month-level granularity; map each invoice to the nearest bucket key
-      const costMap = {};
-      for (const inv of state.invoices) {
-        if (inv.storeId !== storeId) continue;
-        let bk;
-        if (state.graphInterval === 'monthly') {
-          bk = inv.month;
-        } else {
-          // weekly: Monday of the first day of this invoice's month
-          const d = new Date(inv.month + '-01T12:00:00');
-          const wd = d.getDay();
-          d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
-          bk = d.toISOString().slice(0, 10);
-        }
-        costMap[bk] = (costMap[bk] || 0) + inv.amount;
-      }
-      data = bucketKeys.map(k => {
-        const cost = costMap[k] || 0, rev = revMap[k] || 0;
-        return rev > 0 && cost > 0 ? cost / rev * 100 : null;
-      });
-
-    } else if (state.graphMetric === 'salary') {
-      data = bucketKeys.map(k => {
-        const sal = (bucketSalaries[k] || {})[storeId] || 0;
-        const rev = revMap[k] || 0;
-        return rev > 0 && sal > 0 ? sal / rev * 100 : null;
-      });
-
-    } else if (state.graphMetric === 'rolls') {
-      const bucketMap = {};
+  if (state.graphMetric === 'produktmix') {
+    const bucketMap = {};
+    for (const storeId of selectedStores) {
       for (const item of (allItems[storeId] || [])) {
         const key = itemBucket(item.datetime, state.graphInterval);
         if (!key) continue;
         (bucketMap[key] = bucketMap[key] || []).push(item);
       }
-      data = bucketKeys.map(k => {
+    }
+    const mkDs = (label, color, getter) => ({
+      label,
+      data: bucketKeys.map(k => {
         const its = bucketMap[k];
         if (!its || !its.length) return null;
         const c = categorizeItems(its);
-        const tot = c.rolls + c.kombos;
-        return tot > 0 ? c.rolls / tot * 100 : null;
-      });
-    }
-
-    const isLine = state.graphType === 'line';
-    return {
-      label: store.name,
-      data,
+        const tot = c.kebab + c.falafel + c.chicken;
+        return tot > 0 ? getter(c) / tot * 100 : null;
+      }),
       borderColor: color,
       backgroundColor: isLine ? color + '28' : color + 'bb',
       borderWidth: isLine ? 2 : 0,
@@ -2999,8 +2961,83 @@ async function loadGraphData() {
       pointHoverRadius: 5,
       fill: false,
       spanGaps: true,
-    };
-  });
+    });
+    datasets = [
+      mkDs('Lam',     '#b30000', c => c.kebab),
+      mkDs('Falafel', '#4ecca3', c => c.falafel),
+      mkDs('Kylling', '#f0a020', c => c.chicken),
+    ];
+  } else {
+    datasets = selectedStores.map(storeId => {
+      const store  = STORES.find(s => s.id === storeId);
+      const color  = GRAPH_STORE_COLORS[storeId] || '#888';
+      const revMap = revByStore[storeId]; // bucketKey → revenue
+
+      let data;
+
+      if (state.graphMetric === 'revenue') {
+        data = bucketKeys.map(k => revMap[k] || null);
+
+      } else if (state.graphMetric === 'food-cost') {
+        // Invoices have month-level granularity; map each invoice to the nearest bucket key
+        const costMap = {};
+        for (const inv of state.invoices) {
+          if (inv.storeId !== storeId) continue;
+          let bk;
+          if (state.graphInterval === 'monthly') {
+            bk = inv.month;
+          } else {
+            // weekly: Monday of the first day of this invoice's month
+            const d = new Date(inv.month + '-01T12:00:00');
+            const wd = d.getDay();
+            d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
+            bk = d.toISOString().slice(0, 10);
+          }
+          costMap[bk] = (costMap[bk] || 0) + inv.amount;
+        }
+        data = bucketKeys.map(k => {
+          const cost = costMap[k] || 0, rev = revMap[k] || 0;
+          return rev > 0 && cost > 0 ? cost / rev * 100 : null;
+        });
+
+      } else if (state.graphMetric === 'salary') {
+        data = bucketKeys.map(k => {
+          const sal = (bucketSalaries[k] || {})[storeId] || 0;
+          const rev = revMap[k] || 0;
+          return rev > 0 && sal > 0 ? sal / rev * 100 : null;
+        });
+
+      } else if (state.graphMetric === 'rolls') {
+        const bucketMap = {};
+        for (const item of (allItems[storeId] || [])) {
+          const key = itemBucket(item.datetime, state.graphInterval);
+          if (!key) continue;
+          (bucketMap[key] = bucketMap[key] || []).push(item);
+        }
+        data = bucketKeys.map(k => {
+          const its = bucketMap[k];
+          if (!its || !its.length) return null;
+          const c = categorizeItems(its);
+          const tot = c.rolls + c.kombos;
+          return tot > 0 ? c.rolls / tot * 100 : null;
+        });
+      }
+
+      return {
+        label: store.name,
+        data,
+        borderColor: color,
+        backgroundColor: isLine ? color + '28' : color + 'bb',
+        borderWidth: isLine ? 2 : 0,
+        borderRadius: isLine ? 0 : 4,
+        tension: 0.35,
+        pointRadius: bucketKeys.length > 45 ? 0 : 3,
+        pointHoverRadius: 5,
+        fill: false,
+        spanGaps: true,
+      };
+    });
+  }
 
   card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
 
