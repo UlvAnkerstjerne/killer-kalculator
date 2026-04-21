@@ -933,6 +933,32 @@ app.post('/api/katering-recipes', (req, res) => {
   }
 });
 
+// ── Meat tracking ─────────────────────────────────────────────────────────────
+const MEAT_PATH = '/mnt/data/meat-tracking.json';
+
+function loadMeat() {
+  try {
+    if (fs.existsSync(MEAT_PATH)) return JSON.parse(fs.readFileSync(MEAT_PATH, 'utf8'));
+  } catch(e) { console.error('[meat] read error:', e.message); }
+  return [];
+}
+function saveMeat(data) {
+  try {
+    fs.mkdirSync('/mnt/data', { recursive: true });
+    fs.writeFileSync(MEAT_PATH, JSON.stringify(data));
+  } catch(e) { console.error('[meat] write error:', e.message); }
+}
+
+app.get('/api/meat', (_req, res) => {
+  res.json(loadMeat());
+});
+
+app.post('/api/meat', (req, res) => {
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Expected array' });
+  saveMeat(req.body);
+  res.json({ ok: true });
+});
+
 // ── Lemonade tracking ─────────────────────────────────────────────────────────
 const LEMONADE_HISTORY_PATH = '/mnt/data/lemonade-history.json';
 

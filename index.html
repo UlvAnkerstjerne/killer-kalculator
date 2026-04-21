@@ -1095,12 +1095,40 @@ function loadInvoices() {
 function saveInvoices() {
   localStorage.setItem('kk_invoices', JSON.stringify(state.invoices));
 }
-function loadMeat() {
-  try { state.meat = JSON.parse(localStorage.getItem('kk_meat_tracking') || '[]'); }
-  catch(e) { state.meat = []; }
+async function loadMeat() {
+  try {
+    const res = await fetch('/api/meat');
+    const data = await res.json();
+    if (Array.isArray(data) && data.length === 0) {
+      // Migrate from localStorage if server has no entries yet
+      const local = localStorage.getItem('kk_meat_tracking');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          await saveMeat(parsed);
+          state.meat = parsed;
+          localStorage.removeItem('kk_meat_tracking');
+          return;
+        }
+      }
+    }
+    state.meat = Array.isArray(data) ? data : [];
+  } catch(e) {
+    console.warn('loadMeat error:', e.message);
+    state.meat = [];
+  }
 }
-function saveMeat() {
-  localStorage.setItem('kk_meat_tracking', JSON.stringify(state.meat));
+async function saveMeat(entries) {
+  const data = entries !== undefined ? entries : state.meat;
+  try {
+    await fetch('/api/meat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) {
+    console.warn('saveMeat error:', e.message);
+  }
 }
 
 // ── Date utilities ─────────────────────────────────────────────────────────────
@@ -3666,9 +3694,9 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Boot ────────────────────────────────────────────────────────────────────────
-function boot() {
+async function boot() {
   loadInvoices();
-  loadMeat();
+  await loadMeat();
 
   // Set active period button
   document.querySelectorAll('.pb').forEach(btn => {
