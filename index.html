@@ -879,9 +879,10 @@
     .kat-results-table th { text-align: left; padding: 6px 8px; color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
     .kat-results-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
     .kat-results-table tr:last-child td { border-bottom: none; }
-    .kat-results-table .kat-group-header td { background: var(--bg); font-weight: 600; font-size: .8rem; color: var(--muted); padding: 8px 8px 4px; }
-    .kat-results-table .kat-indent td:first-child { padding-left: 20px; }
-    .kat-qty-col          { text-align: right; font-variant-numeric: tabular-nums; }
+    .kat-qty-col          { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .kat-unit-col         { text-align: left; color: var(--muted); font-size: .82rem; padding-left: 4px !important; white-space: nowrap; }
+    .kat-result-section   { margin-bottom: 20px; }
+    .kat-result-dish      { font-weight: 700; font-size: .9rem; padding: 6px 0 4px; border-bottom: 2px solid var(--border2); margin-bottom: 2px; }
 
     /* ── Katering tabs ──────────────────────────────────────────────── */
     .kat-tabs             { display: flex; gap: 4px; margin-bottom: 16px; }
@@ -3226,10 +3227,16 @@ function beregnKatering() {
 
   const portionSizes = saveKateringPortions(recipes);
 
-  const ing = {};
-  function add(name, grams) { ing[name] = (ing[name] || 0) + grams; }
+  function roundQty(g) {
+    if (g >= 100) return Math.ceil(g / 10) * 10;
+    return Math.ceil(g);
+  }
+  function fmtAmt(g) {
+    if (g >= 1000) return { value: (g / 1000).toFixed(2).replace(/\.?0+$/, ''), unit: 'kg' };
+    return { value: roundQty(g), unit: 'g' };
+  }
 
-  let flatbreadStk = 0;
+  const sections = [];
 
   for (const id of KAT_ORDER) {
     const recipe = recipes[id];
@@ -3239,54 +3246,48 @@ function beregnKatering() {
     if (id === 'lemonade' && !withLemonade) continue;
 
     const portion = portionSizes[id] != null ? portionSizes[id] : recipe.defaultPortion;
+    const rows = [];
 
     if (id === 'flatbread') {
-      flatbreadStk = Math.ceil(portion * guests);
-      continue;
-    }
-
-    if (id === 'lemonade') {
+      rows.push({ name: 'Flatbread', value: Math.ceil(portion * guests), unit: 'pcs' });
+    } else if (id === 'lemonade') {
       const bottles = Math.ceil(portion * guests);
       for (const item of recipe.ingredients) {
-        add(item.name, (item.grams / recipe.batchSize) * bottles);
+        const { value, unit } = fmtAmt((item.grams / recipe.batchSize) * bottles);
+        rows.push({ name: item.name, value, unit });
       }
-      continue;
+    } else {
+      const totalG = portion * guests;
+      for (const item of recipe.ingredients) {
+        const { value, unit } = fmtAmt((item.grams / recipe.batchSize) * totalG);
+        rows.push({ name: item.name, value, unit });
+      }
+      if (id === 'falafel') {
+        const { value, unit } = fmtAmt(50 * guests);
+        rows.push({ name: 'Frying oil', value, unit });
+      }
     }
 
-    const totalG = portion * guests;
-    for (const item of recipe.ingredients) {
-      add(item.name, (item.grams / recipe.batchSize) * totalG);
-    }
-
-    if (id === 'falafel') add('Frying oil', 50 * guests);
+    sections.push({ name: recipe.name, rows });
   }
 
-  function roundQty(g) {
-    if (g >= 100) return Math.ceil(g / 10) * 10;
-    return Math.ceil(g);
-  }
-  function fmtG(g) {
-    if (g >= 1000) return (g / 1000).toFixed(2).replace(/\.?0+$/, '') + ' kg';
-    return roundQty(g) + ' g';
-  }
-
-  const ingRows = Object.keys(ing).sort((a, b) => a.localeCompare(b, 'da')).map(name =>
-    `<tr class="kat-indent"><td>${name}</td><td class="kat-qty-col">${fmtG(ing[name])}</td></tr>`
-  ).join('');
+  const sectionsHtml = sections.map(s => `
+    <div class="kat-result-section">
+      <div class="kat-result-dish">${s.name}</div>
+      <table class="kat-results-table">
+        <thead><tr><th>Ingredient</th><th class="kat-qty-col">Amount</th><th class="kat-unit-col">Unit</th></tr></thead>
+        <tbody>
+          ${s.rows.map(r => `<tr><td>${r.name}</td><td class="kat-qty-col">${r.value}</td><td class="kat-unit-col">${r.unit}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
 
   const html = `
     <div id="kat-print-area">
-      <div style="margin-bottom:10px; font-size:.85rem; color:var(--muted);">
+      <div style="margin-bottom:16px; font-size:.85rem; color:var(--muted);">
         Calculated for <strong>${guests} guests</strong>${withLam ? ' · Lamb' : ''}${withKylling ? ' · Chicken' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
       </div>
-      <table class="kat-results-table">
-        <thead><tr><th>Ingredient</th><th class="kat-qty-col">Amount</th></tr></thead>
-        <tbody>
-          ${ingRows}
-          ${flatbreadStk ? '<tr class="kat-group-header"><td colspan="2">Bread</td></tr>' +
-            '<tr class="kat-indent"><td>Flatbread</td><td class="kat-qty-col">' + flatbreadStk + ' pcs</td></tr>' : ''}
-        </tbody>
-      </table>
+      ${sectionsHtml}
     </div>`;
 
   document.getElementById('kat-results').innerHTML = html;
