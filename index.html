@@ -1029,7 +1029,7 @@
         </button>
         <button class="nav-btn" data-view="katering" onclick="setView('katering')">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
-          Killer Katering
+          Killer Catering
         </button>
         <button class="nav-btn" data-view="lemonade" onclick="setView('lemonade')">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 2h8l1 6H7L8 2z"/><path d="M7 8c0 8 10 8 10 0"/><line x1="12" y1="8" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
@@ -1763,7 +1763,7 @@ async function renderChainView() {
       if (!el || !d) return;
       el.insertAdjacentHTML('beforeend', `
         <div class="card">
-          <div class="card-title">Lemonade i dag</div>
+          <div class="card-title">Lemonade today</div>
           <div class="metric-val">${d.total != null ? d.total : '—'}</div>
           <div class="metric-sub">Chain total today</div>
         </div>`);
@@ -1986,7 +1986,7 @@ async function renderStoreView(storeId) {
       const cnt = (d.stores && d.stores[storeId] != null) ? d.stores[storeId] : '—';
       el.insertAdjacentHTML('beforeend', `
         <div class="card">
-          <div class="card-title">Lemonade i dag</div>
+          <div class="card-title">Lemonade today</div>
           <div class="metric-val">${cnt}</div>
           <div class="metric-sub">Sold today</div>
         </div>`);
@@ -2157,8 +2157,8 @@ function renderInvoicesView() {
           <input type="number" id="rf-amount" placeholder="0" min="0" step="1">
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn" id="rf-add-btn" onclick="addInvoice()">Tilføj</button>
-          <button class="btn btn-secondary" id="rf-cancel-btn" style="display:none" onclick="cancelEditInvoice()">Annuller</button>
+          <button class="btn" id="rf-add-btn" onclick="addInvoice()">Add</button>
+          <button class="btn btn-secondary" id="rf-cancel-btn" style="display:none" onclick="cancelEditInvoice()">Cancel</button>
           <button class="btn btn-secondary" onclick="document.getElementById('scan-input').click()">📷 Scan Invoice</button>
           <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceImage(this.files[0])">
         </div>
@@ -2328,7 +2328,7 @@ function editInvoice(id) {
   if (dateEl)  dateEl.value  = r.date;
   if (descEl)  descEl.value  = r.description;
   if (amtEl)   amtEl.value   = r.amount;
-  if (addBtn)  addBtn.textContent = 'Opdater';
+  if (addBtn)  addBtn.textContent = 'Update';
   const cancelBtn = document.getElementById('rf-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = '';
 
@@ -2493,7 +2493,7 @@ function renderMeatView() {
       const cAm = recent.chickMorning != null ? recent.chickMorning + ' kg' : '?';
       const cPm = recent.chickEvening != null ? recent.chickEvening + ' kg' : '?';
       recentHtml = `<div style="font-size:11px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        Seneste: ${recent.date} — Lam: ${lAm} → ${lPm} | Kylling: ${cAm} → ${cPm}
+        Latest: ${recent.date} — Lamb: ${lAm} → ${lPm} | Chicken: ${cAm} → ${cPm}
       </div>`;
     }
 
@@ -2505,43 +2505,43 @@ function renderMeatView() {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
-            <div class="meat-section-label" style="margin-bottom:8px">Lam</div>
+            <div class="meat-section-label" style="margin-bottom:8px">Lamb</div>
             <div class="f-group">
-              <label>Morgen (kg)</label>
+              <label>Morning (kg)</label>
               <input type="number" id="mt-${sid}-lamb-am" value="${lambAmVal}" placeholder="0.0" min="0" step="0.1">
             </div>
             <div class="f-group">
-              <label>Aften rest (kg)</label>
+              <label>Evening remaining (kg)</label>
               <input type="number" id="mt-${sid}-lamb-pm" value="${lambPmVal}" placeholder="0.0" min="0" step="0.1">
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
               <input type="checkbox" id="mt-${sid}-lamb-so-chk" ${lambSoChk} onchange="document.getElementById('mt-${sid}-lamb-so').disabled=!this.checked" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
-              <label for="mt-${sid}-lamb-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Udsolgt</label>
+              <label for="mt-${sid}-lamb-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Sell-out</label>
               <input type="time" id="mt-${sid}-lamb-so" value="${lambSoVal}" ${lambSoChk ? '' : 'disabled'} style="flex:1;min-width:0;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px">
             </div>
           </div>
           <div>
-            <div class="meat-section-label" style="margin-bottom:8px">Kylling</div>
+            <div class="meat-section-label" style="margin-bottom:8px">Chicken</div>
             <div class="f-group">
-              <label>Morgen (kg)</label>
+              <label>Morning (kg)</label>
               <input type="number" id="mt-${sid}-chick-am" value="${chickAmVal}" placeholder="0.0" min="0" step="0.1">
             </div>
             <div class="f-group">
-              <label>Aften rest (kg)</label>
+              <label>Evening remaining (kg)</label>
               <input type="number" id="mt-${sid}-chick-pm" value="${chickPmVal}" placeholder="0.0" min="0" step="0.1">
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
               <input type="checkbox" id="mt-${sid}-chick-so-chk" ${chickSoChk} onchange="document.getElementById('mt-${sid}-chick-so').disabled=!this.checked" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
-              <label for="mt-${sid}-chick-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Udsolgt</label>
+              <label for="mt-${sid}-chick-so-chk" style="margin:0;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap">Sell-out</label>
               <input type="time" id="mt-${sid}-chick-so" value="${chickSoVal}" ${chickSoChk ? '' : 'disabled'} style="flex:1;min-width:0;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px">
             </div>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
           <button class="btn" style="padding:5px 14px;font-size:12px;height:auto" onclick="saveMeatCard('${sid}')">
-            ${isEditing ? 'Opdater' : 'Gem'}
+            ${isEditing ? 'Update' : 'Save'}
           </button>
-          ${isEditing ? `<button class="btn btn-secondary" style="padding:5px 14px;font-size:12px;height:auto" onclick="cancelMeatEdit()">Annuller</button>` : ''}
+          ${isEditing ? `<button class="btn btn-secondary" style="padding:5px 14px;font-size:12px;height:auto" onclick="cancelMeatEdit()">Cancel</button>` : ''}
         </div>
         ${recentHtml}
       </div>`;
@@ -2549,7 +2549,7 @@ function renderMeatView() {
   cardsHtml += '</div>';
 
   // ── History table ──────────────────────────────────────────────────────────
-  const filterOpts = `<option value="all"${state.meatStoreFilter==='all'?' selected':''}>Alle butikker</option>`
+  const filterOpts = `<option value="all"${state.meatStoreFilter==='all'?' selected':''}>All stores</option>`
     + STORES.map(s => `<option value="${s.id}"${state.meatStoreFilter===s.id?' selected':''}>${s.name}</option>`).join('');
 
   const rows = [...state.meat]
@@ -2563,20 +2563,20 @@ function renderMeatView() {
 
   let historyHtml;
   if (!rows.length) {
-    historyHtml = `<div class="empty">Ingen registreringer${state.meatStoreFilter !== 'all' ? ' for denne butik' : ''}</div>`;
+    historyHtml = `<div class="empty">No entries${state.meatStoreFilter !== 'all' ? ' for this store' : ''}</div>`;
   } else {
     historyHtml = `<table><thead><tr>
-        <th>Dato</th>
-        <th>Butik</th>
-        <th class="td-num">Lam morgen</th>
-        <th class="td-num">Lam aften</th>
-        <th class="td-num">Lam spild</th>
-        <th class="td-num">Lam spild %</th>
-        <th class="td-num">Kylling morgen</th>
-        <th class="td-num">Kylling aften</th>
-        <th class="td-num">Kylling spild</th>
-        <th class="td-num">Kylling spild %</th>
-        <th>Udsolgt</th>
+        <th>Date</th>
+        <th>Store</th>
+        <th class="td-num">Lamb AM</th>
+        <th class="td-num">Lamb PM</th>
+        <th class="td-num">Lamb waste</th>
+        <th class="td-num">Lamb waste %</th>
+        <th class="td-num">Chicken AM</th>
+        <th class="td-num">Chicken PM</th>
+        <th class="td-num">Chicken waste</th>
+        <th class="td-num">Chicken waste %</th>
+        <th>Sell-out</th>
         <th></th>
         <th></th>
       </tr></thead><tbody>`;
@@ -2588,8 +2588,8 @@ function renderMeatView() {
       const lambWasteP  = (lambWaste  != null && e.lambMorning  > 0) ? (lambWaste  / e.lambMorning  * 100).toFixed(1) + '%' : '—';
       const chickWasteP = (chickWaste != null && e.chickMorning > 0) ? (chickWaste / e.chickMorning * 100).toFixed(1) + '%' : '—';
       const sellouts = [
-        e.lambSellout  ? `Lam: ${e.lambSellout}`      : null,
-        e.chickSellout ? `Kylling: ${e.chickSellout}` : null,
+        e.lambSellout  ? `Lamb: ${e.lambSellout}`    : null,
+        e.chickSellout ? `Chicken: ${e.chickSellout}` : null,
       ].filter(Boolean).join(' / ') || '—';
 
       historyHtml += `<tr>
@@ -2614,19 +2614,19 @@ function renderMeatView() {
   document.getElementById('main').innerHTML = `
     <div class="page-header">
       <div class="page-title">Meat Tracking</div>
-      <div class="page-sub">Registrer daglige kødbeholdninger per butik for at tracke spild og udsolgtstidspunkter.</div>
+      <div class="page-sub">Log daily meat stock levels per store to track waste and sell-out times.</div>
     </div>
 
     ${cardsHtml}
 
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div class="section-title" style="margin-bottom:0">Historik</div>
+        <div class="section-title" style="margin-bottom:0">History</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="date" value="${state.meatDateFrom||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.meatDateFrom=this.value;renderMeatView()">
-          <span style="color:var(--muted);font-size:12px">til</span>
+          <span style="color:var(--muted);font-size:12px">to</span>
           <input type="date" value="${state.meatDateTo||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none" onchange="state.meatDateTo=this.value;renderMeatView()">
-          <button class="btn" style="padding:4px 12px;font-size:12px;height:auto" onclick="state.meatDateFrom=null;state.meatDateTo=null;renderMeatView()">Ryd</button>
+          <button class="btn" style="padding:4px 12px;font-size:12px;height:auto" onclick="state.meatDateFrom=null;state.meatDateTo=null;renderMeatView()">Clear</button>
           <select style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer"
             onchange="state.meatStoreFilter=this.value;renderMeatView()">
             ${filterOpts}
@@ -2649,7 +2649,7 @@ function saveMeatCard(storeId) {
   const lambSo  = document.getElementById(`mt-${storeId}-lamb-so`).value;
   const chickSo = document.getElementById(`mt-${storeId}-chick-so`).value;
 
-  if (!date) { alert('Vælg venligst en dato.'); return; }
+  if (!date) { alert('Please select a date.'); return; }
 
   const data = {
     storeId,
@@ -2692,7 +2692,7 @@ function cancelMeatEdit() {
 }
 
 function deleteMeatEntry(id) {
-  if (!confirm('Slet denne registrering?')) return;
+  if (!confirm('Delete this entry?')) return;
   state.meat = state.meat.filter(e => e.id !== id);
   saveMeat();
   renderMeatView();
@@ -2991,9 +2991,9 @@ async function loadGraphData() {
       spanGaps: true,
     });
     datasets = [
-      mkDs('Lam',     '#b30000', c => c.kebab),
+      mkDs('Lamb',    '#b30000', c => c.kebab),
       mkDs('Falafel', '#4ecca3', c => c.falafel),
-      mkDs('Kylling', '#f0a020', c => c.chicken),
+      mkDs('Chicken', '#f0a020', c => c.chicken),
     ];
   } else {
     datasets = selectedStores.map(storeId => {
@@ -3210,15 +3210,15 @@ function toggleKateringPortions() {
   const body = document.getElementById('kat-portions-body');
   const lbl  = document.getElementById('kat-portions-lbl');
   const open = body.classList.toggle('open');
-  lbl.textContent = open ? '▲ Skjul portionsstørrelser' : '▼ Rediger portionsstørrelser';
+  lbl.textContent = open ? '▲ Hide portion sizes' : '▼ Edit portion sizes';
 }
 
 function beregnKatering() {
   const recipes = state.kateringRecipes;
-  if (!recipes) { alert('Opskrifter ikke indlæst.'); return; }
+  if (!recipes) { alert('Recipes not loaded.'); return; }
 
   const guests = parseInt(document.getElementById('kat-guests').value) || 0;
-  if (guests <= 0) { alert('Angiv antal gæster.'); return; }
+  if (guests <= 0) { alert('Enter number of guests.'); return; }
 
   const withLam      = document.getElementById('kat-lam').checked;
   const withKylling  = document.getElementById('kat-kylling').checked;
@@ -3277,13 +3277,13 @@ function beregnKatering() {
   const html = `
     <div id="kat-print-area">
       <div style="margin-bottom:10px; font-size:.85rem; color:var(--muted);">
-        Beregnet for <strong>${guests} gæster</strong>${withLam ? ' · Lammekød' : ''}${withKylling ? ' · Kyllingekød' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
+        Calculated for <strong>${guests} guests</strong>${withLam ? ' · Lamb' : ''}${withKylling ? ' · Chicken' : ''}${withLemonade ? ' · Killer Lemonade' : ''}
       </div>
       <table class="kat-results-table">
-        <thead><tr><th>Ingrediens</th><th class="kat-qty-col">Mængde</th></tr></thead>
+        <thead><tr><th>Ingredient</th><th class="kat-qty-col">Amount</th></tr></thead>
         <tbody>
           ${ingRows}
-          ${flatbreadStk ? '<tr class="kat-group-header"><td colspan="2">Brød</td></tr>' +
+          ${flatbreadStk ? '<tr class="kat-group-header"><td colspan="2">Bread</td></tr>' +
             '<tr class="kat-indent"><td>Fladbrød</td><td class="kat-qty-col">' + flatbreadStk + ' stk</td></tr>' : ''}
         </tbody>
       </table>
@@ -3305,25 +3305,25 @@ function renderKateringBeregnerTab() {
   const recipes    = state.kateringRecipes;
   const portionSizes = getKateringPortions(recipes);
 
-  const portionUnit = id => id === 'flatbread' ? 'stk/pers' : id === 'lemonade' ? 'fl./pers' : 'g/pers';
+  const portionUnit = id => id === 'flatbread' ? 'pcs/person' : id === 'lemonade' ? 'btl/person' : 'g/person';
   const portionFields = KAT_ORDER.filter(id => recipes[id]).map(id =>
     [id, recipes[id].name, portionSizes[id], portionUnit(id)]
   );
 
   document.getElementById('kat-content').innerHTML = `
     <div class="katering-section">
-      <h3>Gæster &amp; Tilvalg</h3>
+      <h3>Guests &amp; Add-ons</h3>
       <div class="katering-field">
-        <label>Antal gæster</label>
+        <label>Number of guests</label>
         <input type="number" id="kat-guests" min="1" value="${state.kateringGuests || ''}" placeholder="0">
       </div>
       <label class="katering-check">
         <input type="checkbox" id="kat-lam" ${state.kateringLam ? 'checked' : ''}>
-        Lammekød
+        Lamb
       </label>
       <label class="katering-check">
         <input type="checkbox" id="kat-kylling" ${state.kateringKylling ? 'checked' : ''}>
-        Kyllingekød
+        Chicken
       </label>
       <label class="katering-check">
         <input type="checkbox" id="kat-lemonade" ${state.kateringLemonade ? 'checked' : ''}>
@@ -3332,9 +3332,9 @@ function renderKateringBeregnerTab() {
     </div>
 
     <div class="katering-section">
-      <h3>Portionsstørrelser</h3>
+      <h3>Portion Sizes</h3>
       <button class="katering-portions-toggle" onclick="toggleKateringPortions()">
-        <span id="kat-portions-lbl">▼ Rediger portionsstørrelser</span>
+        <span id="kat-portions-lbl">▼ Edit portion sizes</span>
       </button>
       <div id="kat-portions-body" class="katering-portions-body">
         <div class="portions-grid">
@@ -3344,7 +3344,7 @@ function renderKateringBeregnerTab() {
               <input type="number" id="kp-${id}" value="${val}" step="any">
             </div>`).join('')}
         </div>
-        <div style="margin-top:10px; font-size:.8rem; color:var(--muted);">Portionsstørrelser gemmes automatisk ved beregning.</div>
+        <div style="margin-top:10px; font-size:.8rem; color:var(--muted);">Portion sizes are saved automatically when calculating.</div>
       </div>
     </div>
 
@@ -3356,10 +3356,10 @@ function renderKateringBeregnerTab() {
         state.kateringLemonade = document.getElementById('kat-lemonade').checked;
         beregnKatering();
         state.kateringResultsHtml = document.getElementById('kat-results').innerHTML;">
-        Beregn
+        Calculate
       </button>
       <button class="katering-btn secondary" id="kat-print-btn" style="display:none;" onclick="window.print()">
-        Udskriv
+        Print
       </button>
     </div>
 
@@ -3377,7 +3377,7 @@ function addKateringIngredient(recipeId) {
   const tbody = card.querySelector('tbody');
   const tr    = document.createElement('tr');
   tr.innerHTML = `
-    <td><input type="text" class="kat-ing-name" placeholder="Ingrediens"></td>
+    <td><input type="text" class="kat-ing-name" placeholder="Ingredient"></td>
     <td><input type="number" class="kat-ing-grams" value="0" step="any"></td>
     <td><button class="kat-del-ing-btn" onclick="this.closest('tr').remove()">×</button></td>`;
   tbody.appendChild(tr);
@@ -3386,7 +3386,7 @@ function addKateringIngredient(recipeId) {
 
 function deleteKateringRecipe(id) {
   const r = state.kateringRecipes[id];
-  if (!confirm('Slet opskriften "' + (r ? r.name : id) + '"?')) return;
+  if (!confirm('Delete recipe "' + (r ? r.name : id) + '"?')) return;
   delete state.kateringRecipes[id];
   renderKateringOpskrifterTab();
 }
@@ -3410,7 +3410,7 @@ async function gemKateringOpskrifter() {
   });
 
   btn.disabled    = true;
-  btn.textContent = 'Gemmer…';
+  btn.textContent = 'Saving…';
   if (msg) msg.textContent = '';
   try {
     await fetch('/api/katering-recipes', {
@@ -3420,14 +3420,14 @@ async function gemKateringOpskrifter() {
     });
     state.kateringRecipes = recipes;
     if (msg) {
-      msg.textContent = 'Gemt ✓';
+      msg.textContent = 'Saved ✓';
       setTimeout(() => { if (msg) msg.textContent = ''; }, 2500);
     }
   } catch (e) {
-    if (msg) msg.textContent = 'Fejl – prøv igen';
+    if (msg) msg.textContent = 'Error – please try again';
   }
   btn.disabled    = false;
-  btn.textContent = 'Gem alle ændringer';
+  btn.textContent = 'Save all changes';
 }
 
 function renderKateringOpskrifterTab() {
@@ -3441,30 +3441,30 @@ function renderKateringOpskrifterTab() {
       <tr>
         <td><input type="text"   class="kat-ing-name"  value="${ing.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"></td>
         <td><input type="number" class="kat-ing-grams" value="${ing.grams}" step="any"></td>
-        <td><button class="kat-del-ing-btn" onclick="this.closest('tr').remove()" title="Slet">×</button></td>
+        <td><button class="kat-del-ing-btn" onclick="this.closest('tr').remove()" title="Delete">×</button></td>
       </tr>`).join('');
     return `
       <div class="kat-recipe-card" data-id="${id}">
         <div class="kat-recipe-header">
           <input class="kat-recipe-name" type="text" value="${r.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">
-          ${numRecipes > 1 ? `<button class="kat-del-recipe-btn" onclick="deleteKateringRecipe('${id}')">Slet opskrift</button>` : ''}
+          ${numRecipes > 1 ? `<button class="kat-del-recipe-btn" onclick="deleteKateringRecipe('${id}')">Delete recipe</button>` : ''}
         </div>
         <div class="kat-recipe-meta">
-          <div><label>Portion pr. person (g)</label><input type="number" class="kat-recipe-portion" value="${r.defaultPortion}" step="any"></div>
-          <div><label>Samlet batch (g)</label><input type="number" class="kat-recipe-batch" value="${r.batchSize}" step="any"></div>
+          <div><label>Portion per person (g)</label><input type="number" class="kat-recipe-portion" value="${r.defaultPortion}" step="any"></div>
+          <div><label>Total batch (g)</label><input type="number" class="kat-recipe-batch" value="${r.batchSize}" step="any"></div>
         </div>
         <table class="kat-ing-table">
-          <thead><tr><th>Ingrediens</th><th>Gram i batch</th><th></th></tr></thead>
+          <thead><tr><th>Ingredient</th><th>Grams per batch</th><th></th></tr></thead>
           <tbody>${ingRows}</tbody>
         </table>
-        <button class="kat-add-ing-btn" onclick="addKateringIngredient('${id}')">+ Tilføj ingrediens</button>
+        <button class="kat-add-ing-btn" onclick="addKateringIngredient('${id}')">+ Add ingredient</button>
       </div>`;
   }).join('');
 
   document.getElementById('kat-content').innerHTML = `
     ${cardsHtml}
     <div class="kat-gem-bar">
-      <button id="kat-gem-btn" onclick="gemKateringOpskrifter()">Gem alle ændringer</button>
+      <button id="kat-gem-btn" onclick="gemKateringOpskrifter()">Save all changes</button>
       <span class="kat-gem-msg" id="kat-gem-msg"></span>
     </div>`;
 }
@@ -3473,25 +3473,25 @@ async function renderKateringView() {
   const main = document.getElementById('main');
 
   if (!state.kateringRecipes) {
-    main.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div> Indlæser opskrifter…</div>`;
+    main.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div> Loading recipes…</div>`;
     try {
       const r = await fetch('/api/katering-recipes');
       state.kateringRecipes = await r.json();
     } catch (e) {
-      main.innerHTML = `<div class="view-header"><h2>Killer Katering</h2></div>
-        <p style="color:#e05555;padding:20px">Kunne ikke indlæse opskrifter fra serveren.</p>`;
+      main.innerHTML = `<div class="view-header"><h2>Killer Catering</h2></div>
+        <p style="color:#e05555;padding:20px">Failed to load recipes from server.</p>`;
       return;
     }
   }
 
   main.innerHTML = `
     <div class="view-header">
-      <h2>Killer Katering</h2>
+      <h2>Killer Catering</h2>
     </div>
     <div class="katering-wrap">
       <div class="kat-tabs">
-        <button class="kat-tab-btn ${state.kateringTab === 'beregner'   ? 'active' : ''}" data-tab="beregner"   onclick="switchKateringTab('beregner')">Beregner</button>
-        <button class="kat-tab-btn ${state.kateringTab === 'opskrifter' ? 'active' : ''}" data-tab="opskrifter" onclick="switchKateringTab('opskrifter')">Opskrifter</button>
+        <button class="kat-tab-btn ${state.kateringTab === 'beregner'   ? 'active' : ''}" data-tab="beregner"   onclick="switchKateringTab('beregner')">Calculator</button>
+        <button class="kat-tab-btn ${state.kateringTab === 'opskrifter' ? 'active' : ''}" data-tab="opskrifter" onclick="switchKateringTab('opskrifter')">Recipes</button>
       </div>
       <div id="kat-content"></div>
     </div>`;
@@ -3510,16 +3510,16 @@ async function renderLemonadeView() {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:12px">Live i dag</div>
+      <div class="section-title" style="margin-bottom:12px">Live Today</div>
       <div id="lemonade-today-wrap">
-        <div class="spinner-wrap"><div class="spinner"></div> Henter data…</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="section-title" style="margin-bottom:12px">Historik</div>
+      <div class="section-title" style="margin-bottom:12px">History</div>
       <div id="lemonade-history-wrap">
-        <div class="spinner-wrap"><div class="spinner"></div> Henter historik…</div>
+        <div class="spinner-wrap"><div class="spinner"></div> Loading history…</div>
       </div>
     </div>`;
 
@@ -3538,7 +3538,7 @@ async function renderLemonadeView() {
       html += '</div>';
       wrap.innerHTML = html;
     } catch (e) {
-      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Kunne ikke hente data: ${e.message}</div>`;
+      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Failed to load data: ${e.message}</div>`;
     }
   }
 
@@ -3550,7 +3550,7 @@ async function renderLemonadeView() {
       const history = await r.json();
 
       if (!history.length) {
-        wrap.innerHTML = '<div style="color:var(--muted)">Ingen historik endnu.</div>';
+        wrap.innerHTML = '<div style="color:var(--muted)">No history yet.</div>';
         return;
       }
 
@@ -3559,7 +3559,7 @@ async function renderLemonadeView() {
 
       let tableHtml = `<div style="overflow-x:auto;margin-bottom:24px"><table class="inv-table" style="width:100%">
         <thead><tr>
-          <th>Dato</th>
+          <th>Date</th>
           ${storeNames.map(n => `<th style="text-align:right">${n}</th>`).join('')}
           <th style="text-align:right">Total</th>
         </tr></thead>
@@ -3619,7 +3619,7 @@ async function renderLemonadeView() {
         }
       });
     } catch (e) {
-      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Kunne ikke hente historik: ${e.message}</div>`;
+      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Failed to load history: ${e.message}</div>`;
     }
   }
 
