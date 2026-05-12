@@ -897,17 +897,85 @@ const KATERING_RECIPES_PATH = '/mnt/data/katering-recipes.json';
 
 const KATERING_RECIPES_DEFAULT = {
   hummus:    { name: 'Hummus',                  defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Hummus',             grams: 80   }] },
-  couscous:  { name: 'Perle Cous Cous Salat',   defaultPortion: 150, batchSize: 3075,  ingredients: [{ name: 'Perle-couscous',     grams: 400  }, { name: 'Aubergine',     grams: 1200 }, { name: 'Bagte pebre',    grams: 500  }, { name: 'Persille',      grams: 40   }, { name: 'Olivenolie',    grams: 130  }, { name: 'Zaatar',        grams: 100  }, { name: 'Hvidløg',       grams: 8    }, { name: 'Honning',       grams: 6    }, { name: 'Salt',          grams: 5    }] },
-  koleslaw:  { name: 'Killer Koleslaw',          defaultPortion: 100, batchSize: 1310,  ingredients: [{ name: 'Kål',               grams: 1000 }, { name: 'Æble',          grams: 260  }, { name: 'Persille',      grams: 50   }] },
-  rodbeder:  { name: 'Bagte Rødbeder',           defaultPortion: 50,  batchSize: 2165,  ingredients: [{ name: 'Rødbede',           grams: 1000 }, { name: 'Olivenolie',    grams: 30   }, { name: 'Dild, frost',   grams: 100  }, { name: 'Salt',          grams: 1000 }, { name: 'Spidskommen',   grams: 5    }, { name: 'Citronsaft',    grams: 30   }] },
-  labneh:    { name: 'Beetroot Labneh',          defaultPortion: 75,  batchSize: 1950,  ingredients: [{ name: 'Labneh',            grams: 1000 }, { name: 'Rødbede',       grams: 500  }, { name: 'Salt',          grams: 400  }, { name: 'Spidskommen',   grams: 50   }] },
-  falafel:   { name: 'Falafel',                  defaultPortion: 100, batchSize: 8930,  ingredients: [{ name: 'Kikærter',          grams: 6000 }, { name: 'Løg',           grams: 1000 }, { name: 'Salt',          grams: 140  }, { name: 'Citronsaft',    grams: 200  }, { name: 'Persille',      grams: 1400 }, { name: 'Koriander stødt', grams: 50 }, { name: 'Cumin',         grams: 50   }, { name: 'Chili flager',  grams: 50   }, { name: 'Sodium bicarbonate', grams: 40 }] },
-  harissa:   { name: 'Harissa Chili Sauce',      defaultPortion: 30,  batchSize: 10020, ingredients: [{ name: 'Flåede tomater',    grams: 5000 }, { name: 'Tomatkoncentrat', grams: 1760 }, { name: 'Olivenolie',  grams: 1600 }, { name: 'Friske chili',  grams: 1000 }, { name: 'Garam masala',  grams: 100  }, { name: 'Tørret chili',  grams: 500  }, { name: 'Salt',          grams: 60   }] },
-  flatbread: { name: 'Fladbrød',                 defaultPortion: 1,   batchSize: 1,     ingredients: [{ name: 'Fladbrød',          grams: 1    }] },
-  lam:       { name: 'Lammekød (tilvalg)',        defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Lammebov',          grams: 80   }] },
-  kylling:   { name: 'Kyllingekød (tilvalg)',     defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Kyllingelår',       grams: 80   }] },
-  lemonade:  { name: 'Killer Lemonade (tilvalg)', defaultPortion: 1,   batchSize: 36,    ingredients: [{ name: 'Citronjuice',       grams: 1000 }, { name: 'Limejuice',     grams: 1000 }, { name: 'Sukker',        grams: 1550 }, { name: 'Citron til skal', grams: 3000 }] }
+  couscous:  { name: 'Pearl Couscous Salad',    defaultPortion: 150, batchSize: 3075,  ingredients: [{ name: 'Pearl couscous',     grams: 400  }, { name: 'Aubergine',     grams: 1200 }, { name: 'Roasted peppers', grams: 500  }, { name: 'Parsley',       grams: 40   }, { name: 'Olive oil',     grams: 130  }, { name: "Za'atar",       grams: 100  }, { name: 'Garlic',        grams: 8    }, { name: 'Honey',         grams: 6    }, { name: 'Salt',          grams: 5    }] },
+  koleslaw:  { name: 'Killer Coleslaw',         defaultPortion: 100, batchSize: 1310,  ingredients: [{ name: 'Cabbage',           grams: 1000 }, { name: 'Apple',         grams: 260  }, { name: 'Parsley',       grams: 50   }] },
+  rodbeder:  { name: 'Roasted Beetroot',        defaultPortion: 50,  batchSize: 2165,  ingredients: [{ name: 'Beetroot',          grams: 1000 }, { name: 'Olive oil',     grams: 30   }, { name: 'Dill, frozen',  grams: 100  }, { name: 'Salt',          grams: 1000 }, { name: 'Cumin',         grams: 5    }, { name: 'Lemon juice',   grams: 30   }] },
+  labneh:    { name: 'Beetroot Labneh',         defaultPortion: 75,  batchSize: 1950,  ingredients: [{ name: 'Labneh',            grams: 1000 }, { name: 'Beetroot',      grams: 500  }, { name: 'Salt',          grams: 400  }, { name: 'Cumin',         grams: 50   }] },
+  falafel:   { name: 'Falafel',                 defaultPortion: 100, batchSize: 8930,  ingredients: [{ name: 'Chickpeas',         grams: 6000 }, { name: 'Onion',         grams: 1000 }, { name: 'Salt',          grams: 140  }, { name: 'Lemon juice',   grams: 200  }, { name: 'Parsley',       grams: 1400 }, { name: 'Ground coriander', grams: 50 }, { name: 'Cumin',         grams: 50   }, { name: 'Chili flakes',  grams: 50   }, { name: 'Baking soda',   grams: 40   }] },
+  harissa:   { name: 'Harissa Chili Sauce',     defaultPortion: 30,  batchSize: 10020, ingredients: [{ name: 'Peeled tomatoes',  grams: 5000 }, { name: 'Tomato paste',  grams: 1760 }, { name: 'Olive oil',     grams: 1600 }, { name: 'Fresh chili',   grams: 1000 }, { name: 'Garam masala',  grams: 100  }, { name: 'Dried chili',   grams: 500  }, { name: 'Salt',          grams: 60   }] },
+  flatbread: { name: 'Flatbread',               defaultPortion: 1,   batchSize: 1,     ingredients: [{ name: 'Flatbread',         grams: 1    }] },
+  lam:       { name: 'Lam',                     defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Lamb shoulder',     grams: 80   }] },
+  kylling:   { name: 'Kyllingekød (tilvalg)',   defaultPortion: 80,  batchSize: 80,    ingredients: [{ name: 'Chicken thighs',   grams: 80   }] },
+  lemonade:  { name: 'Killer Lemonade (tilvalg)', defaultPortion: 1, batchSize: 36,    ingredients: [{ name: 'Lemon juice',      grams: 1000 }, { name: 'Lime juice',    grams: 1000 }, { name: 'Sugar',         grams: 1550 }, { name: 'Lemon zest',    grams: 3000 }] }
 };
+
+const KATERING_DISH_RENAMES = {
+  'Perle Cous Cous Salat': 'Pearl Couscous Salad',
+  'Killer Koleslaw':        'Killer Coleslaw',
+  'Bagte Rødbeder':         'Roasted Beetroot',
+  'Fladbrød':               'Flatbread',
+  'Lammekød (tilvalg)':     'Lam',
+};
+
+const KATERING_INGREDIENT_RENAMES = {
+  'Perle-couscous':       'Pearl couscous',
+  'Bagte pebre':          'Roasted peppers',
+  'Persille':             'Parsley',
+  'Olivenolie':           'Olive oil',
+  'Zaatar':               "Za'atar",
+  'Hvidløg':              'Garlic',
+  'Honning':              'Honey',
+  'Kål':                  'Cabbage',
+  'Æble':                 'Apple',
+  'Rødbede':              'Beetroot',
+  'Dild, frost':          'Dill, frozen',
+  'Spidskommen':          'Cumin',
+  'Citronsaft':           'Lemon juice',
+  'Kikærter':             'Chickpeas',
+  'Løg':                  'Onion',
+  'Koriander stødt':      'Ground coriander',
+  'Chili flager':         'Chili flakes',
+  'Sodium bicarbonate':   'Baking soda',
+  'Fritureolie':          'Frying oil',
+  'Flåede tomater':       'Peeled tomatoes',
+  'Tomatkoncentrat':      'Tomato paste',
+  'Friske chili':         'Fresh chili',
+  'Tørret chili':         'Dried chili',
+  'Fladbrød':             'Flatbread',
+  'Lammebov':             'Lamb shoulder',
+  'Kyllingelår':          'Chicken thighs',
+  'Citronjuice':          'Lemon juice',
+  'Limejuice':            'Lime juice',
+  'Sukker':               'Sugar',
+  'Citron til skal':      'Lemon zest',
+};
+
+function migrateKateringRecipes() {
+  if (!fs.existsSync(KATERING_RECIPES_PATH)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(KATERING_RECIPES_PATH, 'utf8'));
+    let changed = false;
+    for (const recipe of Object.values(data)) {
+      if (KATERING_DISH_RENAMES[recipe.name]) {
+        recipe.name = KATERING_DISH_RENAMES[recipe.name];
+        changed = true;
+      }
+      for (const ing of recipe.ingredients || []) {
+        if (KATERING_INGREDIENT_RENAMES[ing.name]) {
+          ing.name = KATERING_INGREDIENT_RENAMES[ing.name];
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      fs.writeFileSync(KATERING_RECIPES_PATH, JSON.stringify(data, null, 2), 'utf8');
+      console.log('[katering-recipes] migrated names to English');
+    }
+  } catch (e) {
+    console.error('[katering-recipes] migration error:', e.message);
+  }
+}
+migrateKateringRecipes();
 
 app.get('/api/katering-recipes', (_req, res) => {
   try {

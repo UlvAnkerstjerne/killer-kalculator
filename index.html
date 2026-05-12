@@ -3258,7 +3258,7 @@ function beregnKatering() {
       add(item.name, (item.grams / recipe.batchSize) * totalG);
     }
 
-    if (id === 'falafel') add('Fritureolie', 50 * guests);
+    if (id === 'falafel') add('Frying oil', 50 * guests);
   }
 
   function roundQty(g) {
@@ -3284,7 +3284,7 @@ function beregnKatering() {
         <tbody>
           ${ingRows}
           ${flatbreadStk ? '<tr class="kat-group-header"><td colspan="2">Bread</td></tr>' +
-            '<tr class="kat-indent"><td>Fladbrød</td><td class="kat-qty-col">' + flatbreadStk + ' stk</td></tr>' : ''}
+            '<tr class="kat-indent"><td>Flatbread</td><td class="kat-qty-col">' + flatbreadStk + ' pcs</td></tr>' : ''}
         </tbody>
       </table>
     </div>`;
