@@ -2719,7 +2719,9 @@ function initGraphState() {
     state.graphStores = new Set(STORES.map(s => s.id));
     state.graphMetric = 'revenue';
     state.graphType   = 'line';
+    state.graphTrend  = false;
   }
+  if (!('graphTrend' in state)) state.graphTrend = false;
   // Remove daily if it was previously stored
   if (!state.graphInterval || state.graphInterval === 'daily') state.graphInterval = 'weekly';
 }
@@ -2780,6 +2782,8 @@ function renderGraphsView() {
           <div class="graph-ctrl-label">Chart Type</div>
           <div class="graph-btn-group">
             ${btnGroup([['line','Line'],['bar','Bar']],'graphType','renderGraphsView()')}
+            <button class="graph-btn${state.graphTrend?' active':''}"
+              onclick="state.graphTrend=!state.graphTrend;renderGraphsView()">Trend</button>
           </div>
         </div>
 
@@ -3068,10 +3072,20 @@ async function loadGraphData() {
     });
   }
 
+  if (state.graphTrend) {
+    function movingAvg(data) {
+      return data.map((v, i, arr) => {
+        const pts = [arr[i - 1], v, arr[i + 1]].filter(x => x != null);
+        return pts.length ? pts.reduce((s, x) => s + x, 0) / pts.length : null;
+      });
+    }
+    datasets = datasets.map(ds => ({ ...ds, data: movingAvg(ds.data) }));
+  }
+
   card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
 
   makeChart('graph-canvas', {
-    type: state.graphType,
+    type: state.graphTrend ? 'line' : state.graphType,
     data: { labels, datasets },
     options: {
       responsive: true,
