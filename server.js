@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname)));
 
 // ── Planday credentials ───────────────────────────────────────────────────────
 const PLANDAY_APP_ID        = 'e12eff3b-b440-4883-aef5-9c28c943df8d';
-const PLANDAY_REFRESH_TOKEN = 'ff_hUqlGjg0SKE1nxdgP-PQ';
+const PLANDAY_REFRESH_TOKEN = 'f_hUqlGjg0SKE1nxdgP-PQ';
 
 // In-memory token cache — refreshed automatically when expired
 let plandayToken = null; // { accessToken, expiresAt }
