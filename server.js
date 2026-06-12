@@ -855,6 +855,10 @@ app.get('/api/planday/payroll-raw/:from/:to', async (req, res) => {
 // ── Planday: scheduled salary costs grouped by department ─────────────────────
 // :from and :to are YYYY-MM-DD strings
 app.get('/api/planday/salaries/:from/:to', async (req, res) => {
+  // STUBBED — real implementation commented out below while Planday is broken
+  return res.json({});
+
+  /* --- REAL IMPLEMENTATION (restore when Planday is fixed) ---
   const { from, to } = req.params;
   const token = await getPlandayToken();
 
@@ -889,6 +893,7 @@ app.get('/api/planday/salaries/:from/:to', async (req, res) => {
       upstream: err.response?.data
     });
   }
+  --- END REAL IMPLEMENTATION --- */
 });
 
 // ── Katering recipes ──────────────────────────────────────────────────────────
