@@ -1362,6 +1362,9 @@ async function apiPlandaySalaries(from, to) {
     return state.cache[key];
   }
   try {
+    // PLANDAY DISABLED — remove these two lines to re-enable
+    state.cache[key] = {};
+    return state.cache[key];
     const fromStr = unixToDateStr(from);
     const toStr   = unixToDateStr(to);
     const url = `/api/planday/salaries/${fromStr}/${toStr}`;
