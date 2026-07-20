@@ -1487,18 +1487,17 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
   el.innerHTML = html;
 }
 
-// ── Channel KPIs (Wolt / Heaps) ───────────────────────────────────────────────
+// ── Channel KPIs (Wolt / Uber Eats / Heaps) ──────────────────────────────────
 function buildChannelKpis(items) {
-  const uniquePaymentTypes = [...new Set((items || []).map(i => i.paymenttype).filter(Boolean))];
-  console.log('Payment types:', uniquePaymentTypes);
-  let total = 0, wolt = 0, heaps = 0;
+  let total = 0, wolt = 0, uberEats = 0, heaps = 0;
   for (const item of items) {
     const v = item.priceexclvat || 0;
     total += v;
     if (item.paymenttype === 'Wolt') wolt += v;
+    else if (item.paymenttype === 'Online External 3') uberEats += v;
     else if (item.paymenttype === 'Heaps online') heaps += v;
   }
-  return { total, wolt, heaps };
+  return { total, wolt, uberEats, heaps };
 }
 
 // ── Top items ──────────────────────────────────────────────────────────────────
@@ -1883,14 +1882,20 @@ async function renderChainView() {
     const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat());
 
     const chCh = buildChannelKpis(allItems);
-    const chWoltP  = chCh.total > 0 ? (chCh.wolt  / chCh.total * 100) : null;
-    const chHeapsP = chCh.total > 0 ? (chCh.heaps / chCh.total * 100) : null;
+    const chWoltP     = chCh.total > 0 ? (chCh.wolt     / chCh.total * 100) : null;
+    const chUberEatsP = chCh.total > 0 ? (chCh.uberEats / chCh.total * 100) : null;
+    const chHeapsP    = chCh.total > 0 ? (chCh.heaps    / chCh.total * 100) : null;
     const chainKpisEl = document.getElementById('chain-kpis');
     if (chainKpisEl) chainKpisEl.insertAdjacentHTML('beforeend', `
       <div class="card">
         <div class="card-title">Wolt %</div>
         <div class="metric-val">${chWoltP !== null ? chWoltP.toFixed(1) + '%' : '—'}</div>
         <div class="metric-sub">${kr(chCh.wolt)} ex VAT</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Uber Eats %</div>
+        <div class="metric-val">${chUberEatsP !== null ? chUberEatsP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(chCh.uberEats)} ex VAT</div>
       </div>
       <div class="card">
         <div class="card-title">Heaps online %</div>
@@ -2014,14 +2019,20 @@ async function renderStoreView(storeId) {
     const items = await apiSalesRange(storeId, from, to);
 
     const stCh = buildChannelKpis(items);
-    const stWoltP  = stCh.total > 0 ? (stCh.wolt  / stCh.total * 100) : null;
-    const stHeapsP = stCh.total > 0 ? (stCh.heaps / stCh.total * 100) : null;
+    const stWoltP     = stCh.total > 0 ? (stCh.wolt     / stCh.total * 100) : null;
+    const stUberEatsP = stCh.total > 0 ? (stCh.uberEats / stCh.total * 100) : null;
+    const stHeapsP    = stCh.total > 0 ? (stCh.heaps    / stCh.total * 100) : null;
     const storeKpisEl = document.getElementById('store-kpis');
     if (storeKpisEl) storeKpisEl.insertAdjacentHTML('beforeend', `
       <div class="card">
         <div class="card-title">Wolt %</div>
         <div class="metric-val">${stWoltP !== null ? stWoltP.toFixed(1) + '%' : '—'}</div>
         <div class="metric-sub">${kr(stCh.wolt)} ex VAT</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Uber Eats %</div>
+        <div class="metric-val">${stUberEatsP !== null ? stUberEatsP.toFixed(1) + '%' : '—'}</div>
+        <div class="metric-sub">${kr(stCh.uberEats)} ex VAT</div>
       </div>
       <div class="card">
         <div class="card-title">Heaps online %</div>
