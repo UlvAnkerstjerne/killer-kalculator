@@ -1489,6 +1489,8 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
 
 // ── Channel KPIs (Wolt / Heaps) ───────────────────────────────────────────────
 function buildChannelKpis(items) {
+  const uniquePaymentTypes = [...new Set((items || []).map(i => i.paymenttype).filter(Boolean))];
+  console.log('Payment types:', uniquePaymentTypes);
   let total = 0, wolt = 0, heaps = 0;
   for (const item of items) {
     const v = item.priceexclvat || 0;
