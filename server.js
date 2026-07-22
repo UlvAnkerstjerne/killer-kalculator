@@ -11,7 +11,6 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static(path.join(__dirname)));
 
-/* ── PLANDAY DISABLED — uncomment to restore ─────────────────────────────────
 // ── Planday credentials ───────────────────────────────────────────────────────
 const PLANDAY_APP_ID        = 'e12eff3b-b440-4883-aef5-9c28c943df8d';
 const PLANDAY_REFRESH_TOKEN = 'f_hUqlGjg0SKE1nxdgP-PQ';
@@ -102,7 +101,6 @@ const DEPT_TO_STORE = {
 };
 
 const HOURLY_RATE = 160; // DKK/hr fixed rate for all employees
-── END PLANDAY DISABLED ── */
 
 // ── Store configuration ───────────────────────────────────────────────────────
 const STORES = {
@@ -245,8 +243,6 @@ app.post('/api/scan-invoice', async (req, res) => {
 
 // ── Planday: departments raw ───────────────────────────────────────────────────
 app.get('/api/planday/departments-raw', async (_req, res) => {
-  return res.json({ count: 0, departments: [] }); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   try {
     const token = await getPlandayToken();
     const depts = await plandayGetAll('/hr/v1/departments', token);
@@ -256,13 +252,11 @@ app.get('/api/planday/departments-raw', async (_req, res) => {
     console.error('[Planday] departments-raw error:', err.response?.status, err.response?.data);
     res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
   }
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: departments list (tries multiple endpoints) ───────────────────────
 app.get('/api/planday/departments-list', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -283,13 +277,11 @@ app.get('/api/planday/departments-list', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: pay test ─────────────────────────────────────────────────────────
 app.get('/api/planday/pay-test', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -318,13 +310,11 @@ app.get('/api/planday/pay-test', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: time and cost debug ───────────────────────────────────────────────
 app.get('/api/planday/timeandcost', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   const date = '2026-03-25';
   try {
@@ -347,13 +337,11 @@ app.get('/api/planday/timeandcost', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: tac-test ─────────────────────────────────────────────────────────
 app.get('/api/planday/tac-test', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   const date   = '2026-03-25';
   const deptId = 149668;
@@ -377,13 +365,11 @@ app.get('/api/planday/tac-test', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: payrates by group/employee ───────────────────────────────────────
 app.get('/api/planday/payrates-by-group', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -405,13 +391,11 @@ app.get('/api/planday/payrates-by-group', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: individual pay rates ─────────────────────────────────────────────
 app.get('/api/planday/individual-rates', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -432,13 +416,11 @@ app.get('/api/planday/individual-rates', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: pay access test (new credentials) ────────────────────────────────
 app.get('/api/planday/pay-access', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -459,13 +441,11 @@ app.get('/api/planday/pay-access', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: payrates debug ────────────────────────────────────────────────────
 app.get('/api/planday/payrates-debug', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -488,13 +468,11 @@ app.get('/api/planday/payrates-debug', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: payrates raw ──────────────────────────────────────────────────────
 app.get('/api/planday/payrates-raw', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   try {
     const token = await getPlandayToken();
@@ -516,13 +494,11 @@ app.get('/api/planday/payrates-raw', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: employees raw ─────────────────────────────────────────────────────
 app.get('/api/planday/employees-raw', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   try {
     const token = await getPlandayToken();
     const r = await plandayGet('/hr/v1/employees', token, { limit: 5, offset: 0 });
@@ -539,13 +515,11 @@ app.get('/api/planday/employees-raw', async (_req, res) => {
   } catch (err) {
     res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
   }
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: raw shifts debug ──────────────────────────────────────────────────
 app.get('/api/planday/shifts-raw', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const out = {};
   const date = '2026-03-25';
   try {
@@ -579,13 +553,11 @@ app.get('/api/planday/shifts-raw', async (_req, res) => {
     out.token_error = { error: err.message, body: err.response?.data };
   }
   res.json(out);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: debug route ───────────────────────────────────────────────────────
 app.get('/api/planday/debug', async (_req, res) => {
-  return res.json({ disabled: true }); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
   const results = {};
   try {
     const token = await getPlandayToken();
@@ -607,13 +579,11 @@ app.get('/api/planday/debug', async (_req, res) => {
     results.token = { ok: false, error: err.message, body: err.response?.data };
   }
   res.json(results);
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: salary debug ──────────────────────────────────────────────────────
-app.get('/api/planday/salary-debug/:from/:to', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
+app.get('/api/planday/salary-debug/:from/:to', async (req, res) => {
   try {
     const token = await getPlandayToken();
     const shifts = await plandayGetAll('/scheduling/v1/shifts', token, { from: req.params.from, to: req.params.to });
@@ -641,10 +611,9 @@ app.get('/api/planday/salary-debug/:from/:to', async (_req, res) => {
   } catch (err) {
     res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
   }
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
-/* ── PLANDAY DISABLED — uncomment to restore ─────────────────────────────────
 // All 6 department IDs as a comma-separated string for the payroll endpoint
 const ALL_DEPT_IDS = Object.keys(DEPT_TO_STORE).join(',');
 
@@ -719,12 +688,9 @@ async function fetchPayrollByStore(from, to, token) {
   console.log('[Planday] byStore:', JSON.stringify(byStore));
   return { byStore, payrollRows, shifts };
 }
-── END PLANDAY DISABLED ── */
 
 // ── Planday: payroll raw debug ─────────────────────────────────────────────────
-app.get('/api/planday/payroll-raw/:from/:to', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED
-  /* --- PLANDAY IMPLEMENTATION ---
+app.get('/api/planday/payroll-raw/:from/:to', async (req, res) => {
   const { from, to } = req.params;
   try {
     const token = await getPlandayToken();
@@ -749,14 +715,12 @@ app.get('/api/planday/payroll-raw/:from/:to', async (_req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Planday: scheduled salary costs grouped by department ─────────────────────
 // :from and :to are YYYY-MM-DD strings
-app.get('/api/planday/salaries/:from/:to', async (_req, res) => {
-  return res.json({}); // PLANDAY DISABLED — frontend treats {} as "no salary data", shows '—'
-  /* --- PLANDAY IMPLEMENTATION ---
+app.get('/api/planday/salaries/:from/:to', async (req, res) => {
   const { from, to } = req.params;
   const token = await getPlandayToken();
   // Primary: payroll endpoint cross-referenced with shifts for department mapping
@@ -786,7 +750,7 @@ app.get('/api/planday/salaries/:from/:to', async (_req, res) => {
     console.error('[Planday] salaries fallback also failed:', err.response?.status, err.message);
     return res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
   }
-  --- END PLANDAY IMPLEMENTATION --- */
+
 });
 
 // ── Katering recipes ──────────────────────────────────────────────────────────
