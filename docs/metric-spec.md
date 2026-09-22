@@ -6,6 +6,94 @@ Timezone: Europe/Copenhagen
 
 ---
 
+## Product ID classification table
+
+All classification is by explicit product ID. Display names are recorded for
+reference only — they must never be used for classification logic.
+
+| Product ID | Display name (2026-09-20)      | Category         | Price filter | Notes |
+|------------|-------------------------------|-----------------|-------------|-------|
+| 27242208   | Kombo - Lamb                  | kombo           | ≠ 0         | Header line represents the roll; no separate roll component |
+| 27242204   | Kombo - Falafel               | kombo           | ≠ 0         | Same as above |
+| 27242336   | Killer Kebab                  | standalone roll | ≠ 0         | Includes rolls in mixed orders |
+| 27242332   | Killer Falafel                | standalone roll | ≠ 0         | Includes rolls in mixed orders |
+| 27242080   | + Lemonade                    | lemonade-addon  | none        | Kombo addon; price varies (0, 10, 35 seen in fixture) |
+| 27242148   | + Killer Lemonade (+10 kr)    | lemonade-upgrade| none        | Kombo upgrade; count=2 line observed |
+| 27242164   | Killer Lemonade (35 kr)       | lemonade-standalone | none    | Standalone purchase |
+
+**Price filter semantics for kombos and rolls:**
+- `price = 0` → staff meal or fully-comped order → **excluded**
+- `price ≠ 0` → paid sale (`price > 0`) or refund (`price < 0`) → **included**
+- Refunds have `price < 0` and `count < 0`; signed count subtracts from the total
+
+**Bowl products:** No bowl product IDs have been identified in the Nørrebro reference
+dataset. `BOWL_IDS` in `lib/product-metrics.js` is currently empty. IDs must be added
+explicitly when confirmed from OnlinePOS catalogue or other store data.
+
+### Observed product IDs not yet classified
+
+These IDs appear in the Nørrebro 2026-09-20 fixture but are not counted in any metric:
+
+| Product ID | Display name                 | Prices seen | Notes |
+|------------|------------------------------|------------|-------|
+| 27242028   | + Dip                        | 0          | Modifier |
+| 27242032   | Harissa Chili Dip            | 10, 12     | Side |
+| 27242036   | Killer Ketchup               | 10         | Side |
+| 27242040   | Harissa Mayo                 | 10         | Side |
+| 27242044   | Truffle Mayo                 | 10, 12     | Side |
+| 27242048   | + Truffle Mayo               | 0          | Modifier |
+| 27242052   | + Harissa mayo               | 0          | Modifier |
+| 27242056   | + Ketchup                    | 0          | Modifier |
+| 27242060   | + Harissa OTS                | 0          | Modifier |
+| 27242068   | + Harissa                    | 0          | Modifier |
+| 27242072   | + Harissa, a little          | 0          | Modifier |
+| 27242076   | + Killer Fries               | 0          | Modifier |
+| 27242084   | + Pale Ale                   | 45         | Beverage |
+| 27242096   | + Faxe Kondi (+0kr)          | 0, 25      | Beverage |
+| 27242100   | + Pepsi Max (+0kr)           | 0, 25      | Beverage |
+| 27242108   | + Water, still (+0kr)        | 0          | Beverage modifier |
+| 27242112   | Faxe Kondi (25kr)            | 0, 25      | Beverage |
+| 27242120   | Water, still (25kr)          | 0, 25      | Beverage |
+| 27242124   | Water, sparkling (25kr)      | 0          | Beverage |
+| 27242136   | Extra Hummus (10 kr)         | 10         | Side |
+| 27242144   | Pepsi Max (25 kr)            | 0, 25      | Beverage |
+| 27242152   | + Killer Pale Ale (+20kr)    | 20         | Beverage modifier |
+| 27242156   | + SOFT DRINK (+0kr)          | 0          | Beverage modifier |
+| 27242168   | Killer Pale Ale (45 kr)      | 45         | Beverage |
+| 27242176   | SOFT DRINK (25kr)            | 0          | Beverage |
+| 27242232   | EAT NOW                      | 0          | Instruction/modifier |
+| 27242260   | Hummus in flatbread          | 0          | Instruction/modifier (not a bowl) |
+| 27242272   | No Onion                     | 0          | Customisation modifier |
+| 27242276   | No yogurt                    | 0          | Customisation modifier |
+| 27242284   | No Mayo                      | 0          | Customisation modifier |
+| 27242292   | No Parsley                   | 0          | Customisation modifier |
+| 27242308   | Split in Half                | 0          | Instruction/modifier |
+| 27242316   | No Dukkah                    | 0          | Customisation modifier |
+| 27242328   | TO GO                        | 0          | Instruction/modifier |
+| 27242340   | 1 x Falafel Ball             | 0, 15      | Side |
+| 27242344   | 3 x Falafel Balls/Mayo       | 39         | Side |
+| 27242356   | Hummus TO-GO (35 kr)         | 20         | Side (pricing note: listed 35 kr but charged 20 in fixture) |
+| 27242364   | Killer Fries (35 kr)         | 35         | Side |
+| 27339842   | Legally required bag fee     | 4          | Fee |
+| 28715716   | + BEER (+20kr)               | 0          | Beverage modifier |
+| 28715731   | + Blå Thor (+20kr)           | 20         | Beverage modifier |
+| 28715758   | Pilsner (45kr)               | 45         | Beverage |
+| 28715788   | Heineken 0,0% (45kr)         | 45         | Beverage |
+| 28717057   | BEER (45kr)                  | 0          | Beverage |
+| 29569042   | Unknown external product     | 4          | Unidentified — appears once in TXN_068 (Wolt) |
+| 29838736   | Lover                        | 35         | Unidentified — possibly a new drink/dessert |
+| 29843293   | + Lover (+10 kr)             | 10         | Kombo addon for "Lover" — possibly lemonade variant; needs confirmation |
+
+### Unresolved IDs requiring classification decision
+
+| Product ID | Display name    | Concern |
+|------------|-----------------|---------|
+| 29838736   | Lover           | May be a new kombo-eligible lemonade or dessert item; confirm with ops |
+| 29843293   | + Lover (+10 kr)| If "Lover" is a lemonade variant, this should be added to LEM_IDS |
+| 29569042   | Unknown external product | Single occurrence on Wolt at 4 DKK; likely a fee or third-party line |
+
+---
+
 ## Data source
 
 Endpoint: `GET /exportSales/v20/{unixtime}` (OnlinePOS)
