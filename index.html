@@ -1381,20 +1381,38 @@ async function apiAllRevenue(start, end) {
   return out;
 }
 
+// In-flight map: concurrent calls with the same key share one Promise.
+// Entries are removed after settlement so a failed request can be retried.
+const _salesInFlight = new Map();
+
 async function apiSalesRange(storeId, start, endExcl) {
   const key = `srange:${storeId}:${start}:${endExcl}`;
   if (key in state.cache) return state.cache[key];
 
-  const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
-  if (!res) return []; // session expired — page will reload
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'API error');
-  if (!data.meta || !data.meta.complete) {
-    console.warn(`[apiSalesRange] incomplete data for ${storeId} ${start}→${endExcl}`, data.meta);
-    throw new Error('Incomplete sales data from server');
-  }
-  state.cache[key] = data.lines;
-  return state.cache[key];
+  // Coalesce: if a request for this key is already in-flight, share its Promise.
+  if (_salesInFlight.has(key)) return _salesInFlight.get(key);
+
+  const promise = (async () => {
+    try {
+      const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
+      if (!res) return []; // session expired — page will reload
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API error');
+      if (!data.meta || !data.meta.complete) {
+        console.warn(`[apiSalesRange] incomplete data for ${storeId} ${start}→${endExcl}`, data.meta);
+        throw new Error('Incomplete sales data from server');
+      }
+      // Only cache successful, complete results.
+      state.cache[key] = data.lines;
+      return state.cache[key];
+    } finally {
+      // Remove in-flight entry after settlement so failures can be retried.
+      _salesInFlight.delete(key);
+    }
+  })();
+
+  _salesInFlight.set(key, promise);
+  return promise;
 }
 
 // ── Planday helpers ────────────────────────────────────────────────────────────
@@ -3292,6 +3310,7 @@ function setView(view) {
 function setPeriod(period) {
   state.period = period;
   state.cache  = {}; // Clear cache on period change
+  _salesInFlight.clear(); // Drop any in-flight requests for the old period
 
   // Update period buttons
   document.querySelectorAll('.pb').forEach(btn => {
@@ -3836,6 +3855,7 @@ function onSessionExpired(message) {
   sessionActive = false;
   csrfToken = null;
   state.cache = {};
+  _salesInFlight.clear(); // Abandon all in-flight requests
   if (lemonadeRefreshInterval) {
     clearInterval(lemonadeRefreshInterval);
     lemonadeRefreshInterval = null;

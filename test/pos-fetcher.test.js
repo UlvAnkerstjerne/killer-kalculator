@@ -613,3 +613,197 @@ describe('fetchSalesRange — metadata shape', () => {
     assert.equal(meta.end,   D21);
   });
 });
+
+// ── fetchSalesRange: pagination early-exit ────────────────────────────────────
+//
+// Ordering contract (verified live 2026-09-22 against norrebro LY data):
+//   The minimum valid CPH date on a page is monotonically non-decreasing across
+//   consecutive pages.  Once min(page) >= end, all subsequent pages have zero
+//   in-range lines, so we stop requesting them.  Max date and last-element date
+//   are NOT safe for this check: retroactive entries mean max can exceed end while
+//   a later page still starts from the range start date.
+//
+// Fail-closed: if any page's min date regresses below the running global minimum
+//   seen so far, earlyExitSafe is set to false for the remainder of the fetch.
+describe('fetchSalesRange — pagination early-exit', () => {
+  // LY range: range is Sep23→Sep24, simulates the "last-year today" scenario.
+  // Page 1 has in-range lines (min=Sep23 < end Sep24) → continue.
+  // Page 2 has only post-end lines (min=Oct15 >= end Sep24) → early exit.
+  // Page 3 should never be requested.
+  test('LY one-day range: stops after the page whose min-date crosses end', async () => {
+    const inRange  = mkLine({ orderlineid: 1, timestamp_pay: '2025-09-23 14:00:00' });
+    const postEnd1 = mkLine({ orderlineid: 2, timestamp_pay: '2025-10-15 10:00:00' });
+    const postEnd2 = mkLine({ orderlineid: 3, timestamp_pay: '2025-11-01 10:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([inRange],  P2,   1),
+      mkPage([postEnd1], P3,   2),  // min=Oct15 >= end Sep24 → exit after this page
+      mkPage([postEnd2], null, 3),  // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({
+      store: STORE, start: '2025-09-23', end: '2025-09-24', httpGet,
+    });
+
+    assert.equal(calls.length, 2, 'must stop after page 2, not fetch page 3');
+    assert.equal(meta.pages, 2);
+    assert.equal(lines.length, 1, 'only the in-range line is returned');
+    assert.equal(meta.processedLineCount, 1);
+    assert.equal(meta.outOfRange, 1);  // postEnd1 was fetched but filtered
+  });
+
+  test('exact exclusive-end boundary: page with min = end triggers exit', async () => {
+    // end = D21 = '2026-09-21'; a page where all lines have that exact date
+    const boundaryLine = mkLine({ orderlineid: 1, timestamp_pay: '2026-09-21 00:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([boundaryLine], P2,   1),  // min='2026-09-21' >= end='2026-09-21' → exit
+      mkPage([],             null, 2),  // must NOT be fetched
+      mkPage([],             null, 3),  // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 1, 'exit after page 1 (its min date equals end)');
+    assert.equal(lines.length, 0, 'boundary line is exclusive-end, filtered out');
+    assert.equal(meta.outOfRange, 1);
+  });
+
+  test('boundary in the middle of a page: keep whole page, stop requesting next', async () => {
+    // Page 1 has both in-range and post-end lines (min=Sep20 < end=Sep21) → continue.
+    // Page 2 has only post-end lines (min=Sep22 >= end=Sep21) → early exit.
+    const inRange  = mkLine({ orderlineid: 1, timestamp_pay: '2026-09-20 12:00:00' });
+    const postEnd  = mkLine({ orderlineid: 2, timestamp_pay: '2026-09-21 08:00:00' });
+    const postEnd2 = mkLine({ orderlineid: 3, timestamp_pay: '2026-09-22 10:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([inRange, postEnd], P2,   1),   // mixed: min=Sep20 < end → continue
+      mkPage([postEnd2],         P3,   2),   // min=Sep22 >= end=Sep21 → exit
+      mkPage([],                 null, 3),   // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 2, 'exactly two pages fetched');
+    assert.equal(lines.length, 1, 'only inRange line survives filter');
+    // postEnd from page 1 + postEnd2 from page 2 both out of range
+    assert.equal(meta.outOfRange, 2);
+    assert.equal(meta.rawLineCount, 3);
+  });
+
+  test('DST spring-forward date: 2026-03-29 range uses correct CPH midnight, early exit works', async () => {
+    // Spring-forward day: range 2026-03-29 → 2026-03-30
+    const inRange = mkLine({ orderlineid: 1, timestamp_pay: '2026-03-29 14:00:00' });
+    const postEnd = mkLine({ orderlineid: 2, timestamp_pay: '2026-03-31 10:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([inRange], P2,   1),  // min=Mar29 < end=Mar30 → continue
+      mkPage([postEnd], P3,   2),  // min=Mar31 >= end=Mar30 → exit
+      mkPage([],        null, 3),  // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({
+      store: STORE, start: '2026-03-29', end: '2026-03-30', httpGet,
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(lines.length, 1, 'spring-forward in-range line must be kept');
+    assert.equal(meta.outOfRange, 1);
+  });
+
+  test('pagination continues when pages still have min-date before end', async () => {
+    // Three in-range pages (all min < end), early exit only on page 4.
+    const mkL = (id, ts) => mkLine({ orderlineid: id, timestamp_pay: ts });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const P4 = `${BASE_NEXT}?page=4`;
+    const P5 = `${BASE_NEXT}?page=5`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([mkL(1,'2026-09-20 10:00:00'), mkL(2,'2026-09-20 11:00:00')], P2, 1),  // min=Sep20
+      mkPage([mkL(3,'2026-09-20 14:00:00'), mkL(4,'2026-09-20 18:00:00')], P3, 2),  // min=Sep20
+      mkPage([mkL(5,'2026-09-20 20:00:00'), mkL(6,'2026-09-20 23:00:00')], P4, 3),  // min=Sep20
+      mkPage([mkL(7,'2026-09-22 08:00:00')],                               P5, 4),  // min=Sep22 >= end=Sep21 → exit
+      mkPage([],                                                          null, 5),  // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 4, 'pages 1-4 fetched; page 5 not requested');
+    assert.equal(lines.length, 6, 'all 6 in-range lines returned');
+    assert.equal(meta.pages, 4);
+  });
+
+  test('malformed timestamps do not cause premature exit', async () => {
+    // Page 1: all lines have invalid timestamp_pay → no valid min-date → skip early exit check
+    // Page 2: valid in-range lines
+    // Page 3: valid post-end lines → early exit here
+    const badLine  = mkLine({ orderlineid: 1, timestamp_pay: 'not-a-date' });
+    const goodLine = mkLine({ orderlineid: 2, timestamp_pay: '2026-09-20 14:00:00' });
+    const postEnd  = mkLine({ orderlineid: 3, timestamp_pay: '2026-09-22 10:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const P4 = `${BASE_NEXT}?page=4`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([badLine],  P2,   1),   // no valid min-date → no early exit
+      mkPage([goodLine], P3,   2),   // min=Sep20 < end=Sep21 → continue
+      mkPage([postEnd],  P4,   3),   // min=Sep22 >= end=Sep21 → exit
+      mkPage([],         null, 4),   // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 3, 'pages 1-3 fetched; malformed timestamps do not skip pages');
+    assert.equal(lines.length, 1, 'only valid in-range line returned');
+    assert.equal(meta.invalidCount, 1, 'malformed timestamp counted as invalid');
+  });
+
+  test('non-monotonic data fails closed: in-range lines on later pages are not lost', async () => {
+    // Page 1: Sep20 in range (min=Sep20, globalMin=Sep20)
+    // Page 2: Sep18 — REGRESSION (Sep18 < globalMin=Sep20) → earlyExitSafe=false
+    // Page 3: Sep22 post-end (min=Sep22 >= end=Sep21, but earlyExitSafe=false → no exit)
+    // Page 4: Sep20 in-range lines — these must be included
+    // Page 5: no more data
+    const mkL = (id, ts) => mkLine({ orderlineid: id, timestamp_pay: ts });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const P4 = `${BASE_NEXT}?page=4`;
+    const P5 = `${BASE_NEXT}?page=5`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([mkL(1,'2026-09-20 10:00:00')], P2,   1),  // in-range; globalMin=Sep20
+      mkPage([mkL(2,'2026-09-18 10:00:00')], P3,   2),  // REGRESSION Sep18 → earlyExitSafe=false
+      mkPage([mkL(3,'2026-09-22 10:00:00')], P4,   3),  // post-end, but earlyExitSafe=false → no exit
+      mkPage([mkL(4,'2026-09-20 20:00:00')], P5,   4),  // in-range — would be missed without fail-closed
+      mkPage([],                           null,   5),
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 5, 'all 5 pages fetched due to fail-closed');
+    // In-range lines: Sep20 from pages 1 and 4 (Sep18 and Sep22 are out-of-range)
+    assert.equal(lines.length, 2, 'in-range lines from pages 1 and 4 both returned');
+    assert.equal(meta.outOfRange, 2);  // Sep18 (before start) + Sep22 (after end)
+  });
+
+  test('empty pages with valid next_page_url do not trigger early exit', async () => {
+    const inRange = mkLine({ orderlineid: 1, timestamp_pay: '2026-09-20 14:00:00' });
+    const postEnd = mkLine({ orderlineid: 2, timestamp_pay: '2026-09-22 10:00:00' });
+    const P2 = `${BASE_NEXT}?page=2`;
+    const P3 = `${BASE_NEXT}?page=3`;
+    const P4 = `${BASE_NEXT}?page=4`;
+    const { httpGet, calls } = mockHttp([
+      mkPage([],        P2,   1),   // empty → no min-date → no early exit
+      mkPage([inRange], P3,   2),   // min=Sep20 < end=Sep21 → continue
+      mkPage([postEnd], P4,   3),   // min=Sep22 >= end=Sep21 → exit
+      mkPage([],        null, 4),   // must NOT be fetched
+    ]);
+
+    const { lines, meta } = await fetchSalesRange({ store: STORE, start: D20, end: D21, httpGet });
+
+    assert.equal(calls.length, 3, 'empty page 1 passed through without triggering exit');
+    assert.equal(lines.length, 1);
+  });
+});

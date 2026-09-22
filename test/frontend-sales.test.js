@@ -167,18 +167,30 @@ function categorizeItems(items) {
   return out;
 }
 
-// Testable apiSalesRange: injectable fetch + shared cache object
-async function apiSalesRange(storeId, start, endExcl, mockFetch, cache) {
+// Testable apiSalesRange: injectable fetch + shared cache + optional in-flight map.
+// Pass a Map as inFlight to enable request coalescing (concurrent calls share one Promise).
+async function apiSalesRange(storeId, start, endExcl, mockFetch, cache, inFlight = null) {
   const key = `srange:${storeId}:${start}:${endExcl}`;
   if (key in cache) return cache[key];
 
-  const res = await mockFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
-  if (!res) return [];
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'API error');
-  if (!data.meta || !data.meta.complete) throw new Error('Incomplete sales data from server');
-  cache[key] = data.lines;
-  return cache[key];
+  if (inFlight && inFlight.has(key)) return inFlight.get(key);
+
+  const promise = (async () => {
+    try {
+      const res = await mockFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
+      if (!res) return [];
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API error');
+      if (!data.meta || !data.meta.complete) throw new Error('Incomplete sales data from server');
+      cache[key] = data.lines;
+      return cache[key];
+    } finally {
+      if (inFlight) inFlight.delete(key);
+    }
+  })();
+
+  if (inFlight) inFlight.set(key, promise);
+  return promise;
 }
 
 // Helper: build a complete valid mock response
@@ -993,5 +1005,122 @@ describe('no extra requests — buildChannelKpis and lineChannel are synchronous
     const ch    = buildChannelKpis(lines, 'norrebro');
     assert.equal(calls, 1, 'only 1 request should have been made');
     assert.ok(Math.abs(ch.wolt - 100) < 0.001);
+  });
+});
+
+// ── apiSalesRange — in-flight request coalescing ──────────────────────────────
+describe('apiSalesRange — in-flight coalescing', () => {
+  test('two concurrent identical calls make exactly one HTTP request', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    const [a, b] = await Promise.all([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'two concurrent callers share one HTTP request');
+    assert.deepEqual(a, b, 'both callers receive identical result');
+  });
+
+  test('three concurrent callers for the same key make exactly one request', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    const results = await Promise.all([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'three concurrent callers share one HTTP request');
+    assert.deepEqual(results[0], results[1]);
+    assert.deepEqual(results[0], results[2]);
+  });
+
+  test('different stores remain independent: two stores make two requests', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    await Promise.all([
+      apiSalesRange('norrebro',  '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('indre-by',  '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 2, 'different stores always get independent requests');
+  });
+
+  test('in-flight entry is removed after success so a resolved cache is used next', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight);
+
+    assert.equal(inFlight.size, 0, 'in-flight entry removed after settlement');
+    // Subsequent call hits cache, not inFlight
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight);
+    assert.equal(calls, 1, 'second call served from resolved cache');
+  });
+
+  test('failure is shared: concurrent callers all reject', async () => {
+    let calls = 0;
+    const fetch = async () => {
+      calls++;
+      return { ok: false, json: async () => ({ error: 'upstream error' }) };
+    };
+    const cache = {};
+    const inFlight = new Map();
+
+    const [r1, r2] = await Promise.allSettled([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'one shared request made');
+    assert.equal(r1.status, 'rejected', 'first caller rejects');
+    assert.equal(r2.status, 'rejected', 'second caller also rejects');
+  });
+
+  test('failure is not cached: retry after failure makes a new request', async () => {
+    let calls = 0;
+    const fetchFail = async () => ({
+      ok: false, json: async () => ({ error: 'server error' }),
+    });
+    const fetchOk = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    // First attempt fails
+    await assert.rejects(
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetchFail, cache, inFlight),
+    );
+    assert.equal(inFlight.size, 0, 'in-flight cleared after failure');
+    assert.ok(!('srange:norrebro:2026-09-20:2026-09-21' in cache), 'failure not cached');
+
+    // Second attempt succeeds
+    const lines = await apiSalesRange(
+      'norrebro', '2026-09-20', '2026-09-21', fetchOk, cache, inFlight,
+    );
+    assert.equal(calls, 1, 'retry made exactly one new request');
+    assert.ok(Array.isArray(lines), 'successful retry returns lines');
+  });
+
+  test('without inFlight map, sequential behaviour is unchanged', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+
+    // Two sequential calls (not concurrent) without inFlight — second uses cache
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache);
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache);
+    assert.equal(calls, 1, 'cache still works without inFlight map');
   });
 });
