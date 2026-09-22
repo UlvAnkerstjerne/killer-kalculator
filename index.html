@@ -9,8 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chelsea+Market&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <!-- Canonical product-metrics engine: classifies by product ID, no fuzzy name matching -->
-  <script src="/js/product-metrics.js"></script>
   <style>
     :root {
       --bg:        #0d0d0d;
@@ -1213,99 +1211,41 @@ function getDateRange(period) {
   };
 }
 
-// Offset a "YYYY-MM-DD" date by N calendar days (negative = backwards).
-// Uses UTC arithmetic — DST-safe; never involves time-of-day.
-function cphDateOffset(dateStr, days) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+function lyRange(period) {
+  const { from, to } = getDateRange(period);
+  const offset = 364 * 86400; // 52 weeks
+  return { from: from - offset, to: to - offset };
 }
 
-// CPH date range for the same-period-last-year (364 days = 52 weeks back).
-function lyDateRange(period) {
-  const { start, end } = getCphDateRange(period);
-  return { start: cphDateOffset(start, -364), end: cphDateOffset(end, -364) };
+// Returns the Unix timestamp for midnight in Copenhagen time (Europe/Copenhagen)
+// for the calendar date that contains the given Unix timestamp.
+// Uses the 'sv' (Swedish) locale which reliably formats dates as 'YYYY-MM-DD HH:MM:SS'
+// across all browsers, avoiding hour12/formatToParts inconsistencies.
+function copenhagenMidnight(unixTs) {
+  const d = new Date(unixTs * 1000);
+
+  // 'sv' locale → 'YYYY-MM-DD' — reliable in all browsers
+  const dateStr = d.toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+  const [y, mo, dy] = dateStr.split('-').map(Number);
+
+  // Get Copenhagen's UTC offset by comparing noon UTC vs noon Copenhagen.
+  // Using noon avoids ambiguity around DST transition hours.
+  const noonUTC    = Date.UTC(y, mo - 1, dy, 12, 0, 0);
+  const noonCPHStr = new Date(noonUTC).toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
+  // noonCPHStr = 'YYYY-MM-DD 13:00:00' (CET, UTC+1) or 'YYYY-MM-DD 14:00:00' (CEST, UTC+2)
+  const offsetHours = parseInt(noonCPHStr.slice(11, 13), 10) - 12;
+
+  return (Date.UTC(y, mo - 1, dy) - offsetHours * 3600000) / 1000;
 }
 
-// ── Copenhagen date helpers ────────────────────────────────────────────────────
-
-// Return the next calendar day as "YYYY-MM-DD".
-function cphDateNextDay(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-}
-
-// Number of calendar days spanned by [start, endExcl).
-function cphDaySpan(start, endExcl) {
-  return Math.round((new Date(endExcl + 'T12:00:00Z') - new Date(start + 'T12:00:00Z')) / 86400000);
-}
-
-// Convert a Unix timestamp to a Copenhagen calendar date "YYYY-MM-DD".
-// Uses Intl.DateTimeFormat — timezone-safe regardless of browser locale.
-function unixToCphDate(unixTs) {
-  return new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date(unixTs * 1000));
-}
-
-// Copenhagen calendar date range for a named period.
-// Returns {start, end} as "YYYY-MM-DD" strings where end is exclusive.
-function getCphDateRange(period) {
-  const todayCph = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date());
-
-  switch (period) {
-    case 'today':
-      return { start: todayCph, end: cphDateNextDay(todayCph) };
-
-    case 'yesterday': {
-      const [y, m, d] = todayCph.split('-').map(Number);
-      const yest = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
-      return { start: yest, end: todayCph };
-    }
-
-    case 'this-week': {
-      const d = new Date(todayCph + 'T12:00:00Z');
-      const wd = d.getUTCDay();
-      const mon = new Date(d);
-      mon.setUTCDate(d.getUTCDate() - (wd === 0 ? 6 : wd - 1));
-      return { start: mon.toISOString().slice(0, 10), end: cphDateNextDay(todayCph) };
-    }
-
-    case 'last-week': {
-      const d = new Date(todayCph + 'T12:00:00Z');
-      const wd = d.getUTCDay();
-      const mon = new Date(d);
-      mon.setUTCDate(d.getUTCDate() - (wd === 0 ? 6 : wd - 1) - 7);
-      const monday = mon.toISOString().slice(0, 10);
-      const sun = new Date(mon);
-      sun.setUTCDate(mon.getUTCDate() + 7);
-      return { start: monday, end: sun.toISOString().slice(0, 10) };
-    }
-
-    case 'this-month':
-      return { start: todayCph.slice(0, 7) + '-01', end: cphDateNextDay(todayCph) };
-
-    case 'last-month': {
-      const [y, m] = todayCph.split('-').map(Number);
-      const firstThis = todayCph.slice(0, 7) + '-01';
-      const firstLast = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
-      return { start: firstLast, end: firstThis };
-    }
-
-    case 'this-year':
-      return { start: todayCph.slice(0, 4) + '-01-01', end: cphDateNextDay(todayCph) };
-
-    case 'last-year': {
-      const y = Number(todayCph.slice(0, 4));
-      return { start: `${y - 1}-01-01`, end: `${y}-01-01` };
-    }
-
-    case 'custom':
-      if (state.customFrom && state.customTo) {
-        return { start: state.customFrom, end: cphDateNextDay(state.customTo) };
-      }
-      return { start: todayCph, end: cphDateNextDay(todayCph) };
-
-    default:
-      return { start: todayCph, end: cphDateNextDay(todayCph) };
+function daysInRange(from, to) {
+  const days = [];
+  let d = copenhagenMidnight(from);
+  while (d < to) {
+    days.push(d);
+    d += 86400; // the datetime filter in apiSalesRange handles any DST edge
   }
+  return days;
 }
 
 function periodLabel(period) {
@@ -1347,54 +1287,70 @@ function badge(n) {
 }
 
 // ── API ────────────────────────────────────────────────────────────────────────
-// Sum priceexclvat directly from safe sales-range lines — no VAT division.
-// Reuses the apiSalesRange cache: one HTTP request per store+range.
-// Returns null when the fetch is incomplete or fails.
-async function apiRevenue(storeId, start, end) {
-  try {
-    const lines = await apiSalesRange(storeId, start, end);
-    return lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
-  } catch(e) {
-    console.warn(`[apiRevenue] ${storeId} ${start}→${end}:`, e.message);
-    return null;
-  }
-}
-
-// Fetch revenue for all stores in parallel.
-// Each store delegates to apiSalesRange — shares its cache with sales metrics.
-// Throws if any store fails — callers must handle the error (fail closed).
-// Never substitutes 0 for a failed store; genuine zero is { id, rev:0 }.
-async function apiAllRevenue(start, end) {
-  const results = await Promise.allSettled(
-    STORES.map(async s => {
-      const lines = await apiSalesRange(s.id, start, end);
-      return { id: s.id, rev: lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0) };
-    })
-  );
-  const failed = results.filter(r => r.status === 'rejected');
-  if (failed.length > 0) {
-    throw new Error(`Revenue unavailable: ${failed.length} store(s) failed — ` +
-      failed.map(r => r.reason?.message || 'unknown').join('; '));
-  }
-  const out = {};
-  for (const r of results) out[r.value.id] = r.value.rev;
-  return out;
-}
-
-async function apiSalesRange(storeId, start, endExcl) {
-  const key = `srange:${storeId}:${start}:${endExcl}`;
+async function apiRevenue(storeId, from, to) {
+  const key = `rev:${storeId}:${from}:${to}`;
   if (key in state.cache) return state.cache[key];
 
-  const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
-  if (!res) return []; // session expired — page will reload
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'API error');
-  if (!data.meta || !data.meta.complete) {
-    console.warn(`[apiSalesRange] incomplete data for ${storeId} ${start}→${endExcl}`, data.meta);
-    throw new Error('Incomplete sales data from server');
+  try {
+    const res  = await apiFetch(`/api/revenue/${storeId}/${from}/${to}`);
+    if (!res) { state.cache[key] = null; return null; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'API error');
+    const total = (data.location || []).reduce((s, l) => s + (l.amount || 0), 0);
+    state.cache[key] = total / 1.25;
+  } catch(e) {
+    console.warn(`Revenue error [${storeId}]:`, e.message);
+    state.cache[key] = null;
   }
-  state.cache[key] = data.lines;
   return state.cache[key];
+}
+
+async function apiAllRevenue(from, to) {
+  const key = `allrev:${from}:${to}`;
+  if (key in state.cache) return state.cache[key];
+
+  try {
+    const res  = await apiFetch(`/api/all-revenue/${from}/${to}`);
+    if (!res) { state.cache[key] = {}; return {}; }
+    const data = await res.json();
+    const out  = {};
+    for (const [id, d] of Object.entries(data)) {
+      const total = (d.location || []).reduce((s, l) => s + (l.amount || 0), 0);
+      out[id] = total / 1.25;
+    }
+    state.cache[key] = out;
+  } catch(e) {
+    console.warn('All-revenue error:', e.message);
+    state.cache[key] = {};
+  }
+  return state.cache[key];
+}
+
+async function apiSalesDay(storeId, dayUnix) {
+  const key = `sales:${storeId}:${dayUnix}`;
+  if (key in state.cache) return state.cache[key];
+
+  try {
+    const res  = await apiFetch(`/api/sales/${storeId}/${dayUnix}`);
+    if (!res) { state.cache[key] = []; return []; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'API error');
+    state.cache[key] = data.data || [];
+  } catch(e) {
+    console.warn(`Sales error [${storeId} day ${dayUnix}]:`, e.message);
+    state.cache[key] = [];
+  }
+  return state.cache[key];
+}
+
+async function apiSalesRange(storeId, from, to) {
+  const days    = daysInRange(from, to);
+  const results = await Promise.all(days.map(d => apiSalesDay(storeId, d)));
+  return results.flat().filter(item => {
+    if (!item.datetime) return false;
+    const ts = new Date(item.datetime).getTime() / 1000;
+    return ts >= from && ts <= to;
+  });
 }
 
 // ── Planday helpers ────────────────────────────────────────────────────────────
@@ -1488,12 +1444,13 @@ function heatColor(val, max) {
 
 function buildHourlyMap(items) {
   // Returns { 'YYYY-MM-DD': Float32Array(24) }
-  // Uses item.date (YYYY-MM-DD CPH) and item.hour (0–23 CPH local) from the safe endpoint.
   const map = {};
   for (const item of items) {
-    const day  = item.date;
-    const hour = item.hour;
-    if (!day || hour == null || hour < 0 || hour > 23) continue;
+    if (!item.datetime) continue;
+    const dt = new Date(item.datetime);
+    if (isNaN(dt)) continue;
+    const day  = dt.toISOString().slice(0, 10);
+    const hour = dt.getHours();
     if (!map[day]) map[day] = new Float32Array(24);
     map[day][hour] += (item.priceexclvat || 0);
   }
@@ -1546,40 +1503,14 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
 }
 
 // ── Channel KPIs (Wolt / Uber Eats / Heaps) ──────────────────────────────────
-//
-// WOLT_VIA_HEAPS: stores that route Wolt orders through their Heaps connection.
-// Each such store surfaces Wolt as a distinct paymenttype value rather than the
-// standard 'Wolt' string.  Add a new entry ONLY after verifying the mapping in
-// production data for that specific store.
-// See docs/metric-spec.md — "Store-aware Wolt classification".
-const WOLT_VIA_HEAPS = {
-  'indre-by': 'Online External 2',   // verified from 2026-09-21 onward
-};
-
-// Single source of truth for per-line channel classification.
-// Returns 'wolt' | 'uberEats' | 'heaps' | null.
-// storeId is required so Wolt-via-Heaps mappings apply correctly per store.
-function lineChannel(paymenttype, storeId) {
-  if (paymenttype === 'Wolt') return 'wolt';
-  if (WOLT_VIA_HEAPS[storeId] === paymenttype) return 'wolt';
-  if (paymenttype === 'Online External 3') return 'uberEats';
-  if (paymenttype === 'Heaps online') return 'heaps';
-  return null;
-}
-
-// Compute channel KPIs for one store's lines.
-// storeId must be passed so Wolt-via-Heaps rules apply correctly.
-// Monetary values use priceexclvat directly — never multiplied by count.
-// Refunds (negative priceexclvat) subtract from their original channel.
-function buildChannelKpis(items, storeId) {
+function buildChannelKpis(items) {
   let total = 0, wolt = 0, uberEats = 0, heaps = 0;
   for (const item of items) {
-    const v  = item.priceexclvat || 0;
-    const ch = lineChannel(item.paymenttype, storeId);
+    const v = item.priceexclvat || 0;
     total += v;
-    if      (ch === 'wolt')     wolt     += v;
-    else if (ch === 'uberEats') uberEats += v;
-    else if (ch === 'heaps')    heaps    += v;
+    if (item.paymenttype === 'Wolt') wolt += v;
+    else if (item.paymenttype === 'Online External 3') uberEats += v;
+    else if (item.paymenttype === 'Heaps online') heaps += v;
   }
   return { total, wolt, uberEats, heaps };
 }
@@ -1639,14 +1570,13 @@ function renderSidebarSkeleton() {
 
 async function loadSidebar() {
   const { from, to } = getDateRange(state.period);
-  const { start, end } = getCphDateRange(state.period);
-  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
 
   // Kick off all fetches in parallel (revenue + planday)
   const [results, salaries] = await Promise.all([
     Promise.all(STORES.map(s => Promise.all([
-      apiRevenue(s.id, start, end),
-      apiRevenue(s.id, lyStart, lyEnd)
+      apiRevenue(s.id, from, to),
+      apiRevenue(s.id, lyFrom, lyTo)
     ]))),
     apiPlandaySalaries(from, to)
   ]);
@@ -1678,20 +1608,22 @@ async function loadSidebar() {
 }
 
 // ── Product mix helpers ────────────────────────────────────────────────────────
-// computeMetrics is the canonical classifier — loaded from /js/product-metrics.js.
-// Field mapping from breakdown to the mix bar categories:
-//   rolls   = m.rollUnits                                  (rollKebab + rollFalafel)
-//   kombos  = m.komboUnits                                 (komboLamb + komboFalafel)
-//   kebab   = m.breakdown.komboLamb + m.breakdown.rollKebab
-//   falafel = m.breakdown.komboFalafel + m.breakdown.rollFalafel
-function computeItemCategories(items) {
-  const m = window.ProductMetrics.computeMetrics(items);
-  return {
-    rolls:   m.rollUnits,
-    kombos:  m.komboUnits,
-    kebab:   m.breakdown.komboLamb    + m.breakdown.rollKebab,
-    falafel: m.breakdown.komboFalafel + m.breakdown.rollFalafel,
-  };
+function categorizeItems(items) {
+  const out = { rolls: 0, kombos: 0, kebab: 0, falafel: 0, chicken: 0 };
+  for (const item of items) {
+    const n = (item.name || item.productname || '').toLowerCase().trim();
+    const qty = parseInt(item.count || 1);
+    if (qty <= 0) continue;
+    const isKombo      = /kombo|combo/.test(n);
+    const isProtein    = /kebab|falafel|kylling|chicken|lamb/.test(n);
+    const isKillerRoll = n.startsWith('killer') && isProtein;
+    if (!isKombo && !isKillerRoll) continue;
+    if (isKombo) out.kombos += qty; else out.rolls += qty;
+    if (n.includes('lamb') || n.includes('kebab')) out.kebab += qty;
+    else if (n.includes('falafel')) out.falafel += qty;
+    else if (n.includes('chicken') || n.includes('kylling')) out.chicken += qty;
+  }
+  return out;
 }
 
 function makeMixBar(segments) {
@@ -1710,13 +1642,13 @@ function makeMixBar(segments) {
 }
 
 function renderProductMix(el, items) {
-  const c = computeItemCategories(items);
+  const c = categorizeItems(items);
 
   // Bar 1: Rolls vs Kombos
   const rkTotal = c.rolls + c.kombos;
 
-  // Bar 2: Protein mix (kebab and falafel — no chicken product IDs defined)
-  const protTotal = c.kebab + c.falafel;
+  // Bar 2: Protein mix (kebab + falafel + chicken across both rolls & kombos)
+  const protTotal = c.kebab + c.falafel + c.chicken;
 
   if (!rkTotal && !protTotal) {
     el.innerHTML = '<div class="empty">No categorized items in this period</div>';
@@ -1737,6 +1669,7 @@ function renderProductMix(el, items) {
     const seg = [
       { label: 'Kebab',   count: c.kebab,   color: '#b30000', pct: c.kebab   / protTotal * 100 },
       { label: 'Falafel', count: c.falafel, color: '#4ecca3', pct: c.falafel / protTotal * 100 },
+      { label: 'Chicken', count: c.chicken, color: '#f0a020', pct: c.chicken / protTotal * 100 },
     ].filter(s => s.count > 0);
     html += `<div class="mix-section-label" style="margin-top:18px">Protein Mix</div>${makeMixBar(seg)}`;
   }
@@ -1760,10 +1693,6 @@ async function getLemonadeToday() {
 const PERIODS_WITH_TODAY = ['today', 'this-week', 'this-month', 'this-year'];
 
 // ── Chain view ─────────────────────────────────────────────────────────────────
-// Preserved across render attempts so a failed re-render can restore the last
-// good state rather than leaving the user with a blank skeleton.
-let _chainLastRender = null;
-
 async function renderChainView() {
   const main = document.getElementById('main');
   main.innerHTML = `
@@ -1799,29 +1728,14 @@ async function renderChainView() {
   `;
 
   const { from, to } = getDateRange(state.period);
-  const { start, end } = getCphDateRange(state.period);
-  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
 
-  // Fetch revenue for current + LY + Planday salaries in parallel.
-  // apiAllRevenue throws if any store fails — catch and preserve last valid render.
-  let curData, lyData, salaries;
-  try {
-    [curData, lyData, salaries] = await Promise.all([
-      apiAllRevenue(start, end),
-      apiAllRevenue(lyStart, lyEnd),
-      apiPlandaySalaries(from, to)
-    ]);
-  } catch(err) {
-    console.error('[renderChainView] revenue fetch failed:', err.message);
-    if (_chainLastRender) main.innerHTML = _chainLastRender;
-    main.insertAdjacentHTML('afterbegin',
-      `<div style="background:rgba(179,0,0,0.12);border:1px solid #b30000;color:#b30000;` +
-      `padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:12px">` +
-      `<strong>Revenue data unavailable</strong> — ${err.message} &nbsp;` +
-      `<button onclick="renderChainView()" style="padding:4px 12px;cursor:pointer;border-radius:4px;` +
-      `border:1px solid #b30000;background:transparent;color:#b30000;font-size:13px">Retry</button></div>`);
-    return;
-  }
+  // Fetch revenue for current + LY + Planday salaries in parallel
+  const [curData, lyData, salaries] = await Promise.all([
+    apiAllRevenue(from, to),
+    apiAllRevenue(lyFrom, lyTo),
+    apiPlandaySalaries(from, to)
+  ]);
 
   const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
   const totalLY     = STORES.reduce((s, st) => s + (lyData[st.id]  || 0), 0);
@@ -1863,9 +1777,6 @@ async function renderChainView() {
       ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
     </div>
   `;
-
-  // Snapshot the successfully-rendered KPI state so future failed renders can restore it.
-  _chainLastRender = main.innerHTML;
 
   if (PERIODS_WITH_TODAY.includes(state.period)) {
     getLemonadeToday().then(d => {
@@ -1977,22 +1888,16 @@ async function renderChainView() {
     '<div class="section-title">Store Breakdown</div>' + breakdownHtml;
 
   // Product mix — only for ≤14 day ranges
-  const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
+  const days = daysInRange(from, to);
   const mixCard = document.getElementById('chain-mix-card');
 
-  if (cphDaySpan(salesStart, salesEnd) > 14) {
+  if (days.length > 14) {
     document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div><div class="empty">Select ≤14 days to view top items.</div>';
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
-    // Fetch per-store lines preserving store identity for Wolt-via-Heaps classification.
-    // allItems is still built (flat) for top-items and product-mix which need no store context.
-    const storeLines = await Promise.all(STORES.map(async s => ({ id: s.id, lines: await apiSalesRange(s.id, salesStart, salesEnd) })));
-    const allItems   = storeLines.flatMap(s => s.lines);
-    const chCh       = storeLines.reduce((acc, s) => {
-      const kpis = buildChannelKpis(s.lines, s.id);
-      return { total: acc.total + kpis.total, wolt: acc.wolt + kpis.wolt,
-               uberEats: acc.uberEats + kpis.uberEats, heaps: acc.heaps + kpis.heaps };
-    }, { total: 0, wolt: 0, uberEats: 0, heaps: 0 });
+    const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, from, to))).then(r => r.flat());
+
+    const chCh = buildChannelKpis(allItems);
     const chWoltP     = chCh.total > 0 ? (chCh.wolt     / chCh.total * 100) : null;
     const chUberEatsP = chCh.total > 0 ? (chCh.uberEats / chCh.total * 100) : null;
     const chHeapsP    = chCh.total > 0 ? (chCh.heaps    / chCh.total * 100) : null;
@@ -2055,26 +1960,13 @@ async function renderStoreView(storeId) {
   `;
 
   const { from, to } = getDateRange(state.period);
-  const { start, end } = getCphDateRange(state.period);
-  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
+  const { from: lyFrom, to: lyTo } = lyRange(state.period);
 
   const [rev, lyRev, salaries] = await Promise.all([
-    apiRevenue(storeId, start, end),
-    apiRevenue(storeId, lyStart, lyEnd),
+    apiRevenue(storeId, from, to),
+    apiRevenue(storeId, lyFrom, lyTo),
     apiPlandaySalaries(from, to)
   ]);
-
-  // rev === null means the fetch failed (incomplete data). Show a retryable error
-  // rather than rendering '—' silently in a KPI card.
-  if (rev === null) {
-    document.getElementById('store-kpis').innerHTML =
-      `<div style="background:rgba(179,0,0,0.12);border:1px solid #b30000;color:#b30000;` +
-      `padding:12px 16px;border-radius:8px;display:flex;align-items:center;gap:12px">` +
-      `<strong>Revenue data unavailable</strong> — sales data incomplete or unavailable &nbsp;` +
-      `<button onclick="renderStoreView('${storeId}')" style="padding:4px 12px;cursor:pointer;` +
-      `border-radius:4px;border:1px solid #b30000;background:transparent;color:#b30000;font-size:13px">Retry</button></div>`;
-    return;
-  }
 
   const budget   = lyRev ? lyRev * 1.10 : null;
   const vsLY     = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
@@ -2129,10 +2021,10 @@ async function renderStoreView(storeId) {
   }
 
   // Detailed sales for items + heatmap
-  const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
+  const days = daysInRange(from, to);
   const maxDays = 31;
 
-  if (cphDaySpan(salesStart, salesEnd) > maxDays) {
+  if (days.length > maxDays) {
     document.getElementById('store-top-card').innerHTML =
       '<div class="section-title">Top Items</div><div class="empty">Period too long. Select ≤31 days.</div>';
     document.getElementById('store-mix-card').innerHTML =
@@ -2140,9 +2032,9 @@ async function renderStoreView(storeId) {
     document.getElementById('store-heatmap').innerHTML =
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
-    const items = await apiSalesRange(storeId, salesStart, salesEnd);
+    const items = await apiSalesRange(storeId, from, to);
 
-    const stCh = buildChannelKpis(items, storeId);
+    const stCh = buildChannelKpis(items);
     const stWoltP     = stCh.total > 0 ? (stCh.wolt     / stCh.total * 100) : null;
     const stUberEatsP = stCh.total > 0 ? (stCh.uberEats / stCh.total * 100) : null;
     const stHeapsP    = stCh.total > 0 ? (stCh.heaps    / stCh.total * 100) : null;
@@ -2340,19 +2232,10 @@ function renderInvoicesView() {
     </div>
   `;
 
-  // Async: fetch revenue, fill summaries + supplier breakdown.
-  // apiAllRevenue throws if any store fails — catch and degrade gracefully.
+  // Async: fetch revenue, fill summaries + supplier breakdown
   (async () => {
-    const { start: revStart, end: revEnd } = getCphDateRange(state.period);
-    let revMap, totalRev;
-    try {
-      revMap   = await apiAllRevenue(revStart, revEnd);
-      totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
-    } catch(err) {
-      console.warn('[invoices] revenue unavailable:', err.message);
-      revMap = {};
-      totalRev = 0;
-    }
+    const revMap   = await apiAllRevenue(from, to);
+    const totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
 
     // Fill cost summary by store
     for (const s of STORES) {
@@ -2410,10 +2293,11 @@ function renderInvoicesView() {
     for (const r of sorted) {
       const el = document.getElementById(`cst-${r.id}`);
       if (!el) continue;
-      const [mYr, mMo] = r.month.split('-').map(Number);
-      const mStart = r.month + '-01';
-      const mEnd   = new Date(Date.UTC(mYr, mMo, 1)).toISOString().slice(0, 10);
-      const rev    = await apiRevenue(r.storeId, mStart, mEnd);
+      const monthTs  = new Date(r.month + '-01T12:00:00');
+      const monthEnd = new Date(monthTs.getFullYear(), monthTs.getMonth() + 1, 0, 23, 59, 59);
+      const mFrom    = Math.floor(monthTs.getTime()  / 1000);
+      const mTo      = Math.floor(monthEnd.getTime() / 1000);
+      const rev = await apiRevenue(r.storeId, mFrom, mTo);
       if (rev && rev > 0) {
         el.textContent = (r.amount / rev * 100).toFixed(1) + '%';
       } else {
@@ -2989,16 +2873,14 @@ function generateBuckets(fromStr, toStr, interval) {
   return labels;
 }
 
-function itemBucket(dateStr, interval) {
-  if (!dateStr) return null;
-  if (interval === 'daily')   return dateStr;
-  if (interval === 'monthly') return dateStr.slice(0, 7);
-  // weekly: find Monday (ISO week start) using UTC noon to avoid DST boundary issues
-  const d = new Date(dateStr + 'T12:00:00Z');
+function itemBucket(datetimeStr, interval) {
+  const d = new Date(datetimeStr);
   if (isNaN(d)) return null;
-  const wd = d.getUTCDay();
+  if (interval === 'daily')   return d.toISOString().slice(0, 10);
+  if (interval === 'monthly') return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const wd = d.getDay();
   const mon = new Date(d);
-  mon.setUTCDate(d.getUTCDate() - (wd === 0 ? 6 : wd - 1));
+  mon.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
   return mon.toISOString().slice(0, 10);
 }
 
@@ -3047,6 +2929,19 @@ function formatBucketLabel(key, interval) {
   return new Date(yr, mo - 1, 1).toLocaleDateString('da-DK', { month: 'short', year: 'numeric' });
 }
 
+// apiRevenue with 30 s timeout and 0-on-failure fallback
+async function safeApiRevenue(storeId, from, to) {
+  try {
+    const result = await Promise.race([
+      apiRevenue(storeId, from, to),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000)),
+    ]);
+    return result || 0;
+  } catch (e) {
+    console.warn(`[graphs] revenue fetch failed for ${storeId}:`, e.message);
+    return 0;
+  }
+}
 
 async function loadGraphData() {
   const card = document.getElementById('graph-chart-card');
@@ -3065,28 +2960,21 @@ async function loadGraphData() {
   const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
   const isPercent     = ['food-cost', 'salary', 'rolls', 'produktmix'].includes(state.graphMetric);
 
-  // ── Revenue: one apiSalesRange call per store; group priceexclvat by bucket ──
-  // Six stores → six requests total, regardless of bucket count.
-  const revByStore = {}; // storeId → { bucketKey: DKK ex VAT }
+  // ── Revenue: one safeApiRevenue call per bucket per store, all in parallel ──
+  const revByStore = {}; // storeId → { bucketKey: number }
   await Promise.all(selectedStores.map(async storeId => {
     revByStore[storeId] = {};
-    try {
-      const lines = await apiSalesRange(storeId, state.graphFrom, cphDateNextDay(state.graphTo));
-      for (const line of lines) {
-        const key = itemBucket(line.date, state.graphInterval);
-        if (!key) continue;
-        revByStore[storeId][key] = (revByStore[storeId][key] || 0) + (line.priceexclvat || 0);
-      }
-    } catch(e) {
-      console.warn('[graphs] revenue fetch failed for', storeId, ':', e.message);
-    }
+    await Promise.all(bucketKeys.map(async key => {
+      const { from: bkF, to: bkT } = bucketTimestamps(key, state.graphInterval);
+      revByStore[storeId][key] = await safeApiRevenue(storeId, bkF, bkT);
+    }));
   }));
 
-  // ── Rolls %: fetch whole period items, bucket by item.date ─────────────────
+  // ── Rolls %: fetch whole period items, bucket by item.datetime ─────────────
   const allItems = {};
   if (state.graphMetric === 'rolls' || state.graphMetric === 'produktmix') {
     await Promise.all(selectedStores.map(async id => {
-      try { allItems[id] = await apiSalesRange(id, state.graphFrom, cphDateNextDay(state.graphTo)); }
+      try { allItems[id] = await apiSalesRange(id, fromTs, toTs); }
       catch(e) { allItems[id] = []; }
     }));
   }
@@ -3111,7 +2999,7 @@ async function loadGraphData() {
     const bucketMap = {};
     for (const storeId of selectedStores) {
       for (const item of (allItems[storeId] || [])) {
-        const key = itemBucket(item.date, state.graphInterval);
+        const key = itemBucket(item.datetime, state.graphInterval);
         if (!key) continue;
         (bucketMap[key] = bucketMap[key] || []).push(item);
       }
@@ -3121,8 +3009,8 @@ async function loadGraphData() {
       data: bucketKeys.map(k => {
         const its = bucketMap[k];
         if (!its || !its.length) return null;
-        const c = computeItemCategories(its);
-        const tot = c.kebab + c.falafel;
+        const c = categorizeItems(its);
+        const tot = c.kebab + c.falafel + c.chicken;
         return tot > 0 ? getter(c) / tot * 100 : null;
       }),
       borderColor: color,
@@ -3138,6 +3026,7 @@ async function loadGraphData() {
     datasets = [
       mkDs('Lamb',    '#b30000', c => c.kebab),
       mkDs('Falafel', '#4ecca3', c => c.falafel),
+      mkDs('Chicken', '#f0a020', c => c.chicken),
     ];
   } else {
     datasets = selectedStores.map(storeId => {
@@ -3182,14 +3071,14 @@ async function loadGraphData() {
       } else if (state.graphMetric === 'rolls') {
         const bucketMap = {};
         for (const item of (allItems[storeId] || [])) {
-          const key = itemBucket(item.date, state.graphInterval);
+          const key = itemBucket(item.datetime, state.graphInterval);
           if (!key) continue;
           (bucketMap[key] = bucketMap[key] || []).push(item);
         }
         data = bucketKeys.map(k => {
           const its = bucketMap[k];
           if (!its || !its.length) return null;
-          const c = computeItemCategories(its);
+          const c = categorizeItems(its);
           const tot = c.rolls + c.kombos;
           return tot > 0 ? c.rolls / tot * 100 : null;
         });
