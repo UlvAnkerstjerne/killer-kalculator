@@ -676,10 +676,10 @@ app.get('/api/lemonade/today', requireAuth, async (_req, res) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log('\n  🔪  KILLER KALCULATOR');
     console.log('  ──────────────────────────────');
-    console.log('  http://localhost:' + PORT + '\n');
+    console.log('  http://0.0.0.0:' + PORT + '\n');
   });
 
   // Scheduled lemonade save at 22:00 Copenhagen time.

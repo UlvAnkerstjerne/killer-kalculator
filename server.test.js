@@ -552,8 +552,9 @@ describe('Provider config startup validation', () => {
 
   for (const varName of providerVars) {
     test(`server exits when ${varName} is missing`, () => {
+      const spawnEnv = { ...envWithout(varName), NODE_PATH: process.env.NODE_PATH || '' };
       const result = spawnSync(process.execPath, ['server.js'], {
-        cwd: __dirname, env: envWithout(varName), timeout: 5000, encoding: 'utf8'
+        cwd: __dirname, env: spawnEnv, timeout: 5000, encoding: 'utf8'
       });
       assert.equal(result.status, 1, `Expected exit code 1 when ${varName} is absent`);
       assert.ok(result.stderr.includes(varName),
