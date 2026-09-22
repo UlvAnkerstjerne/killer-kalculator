@@ -1,3 +1,5 @@
 node_modules/
+.deps/
 .DS_Store
 .env
+.playwright-mcp/profile/

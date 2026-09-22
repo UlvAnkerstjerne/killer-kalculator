@@ -1,19 +1,168 @@
 'use strict';
-// Run:  npm install express axios   then   node server.js
+// Run:  npm install   then   node server.js
 
-const express = require('express');
-const axios   = require('axios');
-const path    = require('path');
-const fs      = require('fs');
+const express   = require('express');
+const axios     = require('axios');
+const path      = require('path');
+const fs        = require('fs');
+const crypto    = require('crypto');
 
+const session   = require('express-session');
+const MemStore  = require('memorystore')(session);
+const bcrypt    = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
+
+// ── Fail-closed configuration check ──────────────────────────────────────────
+// Require all three auth env vars.  In the test environment they are set
+// programmatically before the module is loaded; in production they must come
+// from Railway environment variables.
+const REQUIRED_ENV = [
+  'KK_SESSION_SECRET', 'KK_USERNAME', 'KK_PASSWORD_HASH',
+  'PLANDAY_APP_ID', 'PLANDAY_REFRESH_TOKEN',
+  'ONLINEPOS_TOKEN_INDRE_BY', 'ONLINEPOS_TOKEN_VESTERBRO',
+  'ONLINEPOS_TOKEN_CHRISTIANSHAVN', 'ONLINEPOS_TOKEN_FISKETORVET',
+  'ONLINEPOS_TOKEN_FREDERIKSBERG', 'ONLINEPOS_TOKEN_NORREBRO'
+];
+const missingEnv = REQUIRED_ENV.filter(k => !process.env[k]);
+
+if (missingEnv.length && process.env.NODE_ENV !== 'test') {
+  console.error('[auth] Missing required environment variables:', missingEnv.join(', '));
+  console.error('[auth] Set them before starting the server.  See README for setup instructions.');
+  process.exit(1);
+}
+
+// ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
+
+// Trust the first proxy hop (Railway reverse-proxy) so rate-limiter and
+// secure-cookie logic see the real client IP and the correct protocol.
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
-app.use(express.static(path.join(__dirname)));
 
-// ── Planday credentials ───────────────────────────────────────────────────────
-const PLANDAY_APP_ID        = 'e12eff3b-b440-4883-aef5-9c28c943df8d';
-const PLANDAY_REFRESH_TOKEN = 'f_hUqlGjg0SKE1nxdgP-PQ';
+// ── Session middleware ────────────────────────────────────────────────────────
+// memorystore prunes expired sessions automatically and does not leak memory
+// (unlike the default MemoryStore).  Appropriate for a single-instance
+// internal tool.  Migrate to connect-redis if Railway ever runs >1 instance.
+const SESSION_MAX_AGE = 8 * 60 * 60 * 1000; // 8 hours
+
+app.use(session({
+  secret:            process.env.KK_SESSION_SECRET || 'dev-placeholder-not-used-in-production',
+  name:              'kk_sid',
+  resave:            false,
+  saveUninitialized: false,
+  rolling:           true,       // extend session on each request
+  store: new MemStore({ checkPeriod: SESSION_MAX_AGE }),
+  cookie: {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge:   SESSION_MAX_AGE
+  }
+}));
+
+// ── Auth / CSRF middleware ────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// Verify CSRF token for all state-changing requests.
+// The token is generated on login and returned to the client; the client
+// includes it as X-CSRF-Token on every POST/PUT/DELETE.
+function requireCsrf(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+  const headerToken  = req.headers['x-csrf-token'];
+  const sessionToken = req.session?.csrfToken;
+  if (!headerToken || !sessionToken || headerToken !== sessionToken) {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
+  next();
+}
+
+// Login throttle: max 5 attempts per 15 minutes per IP.
+const loginLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,
+  max:              5,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: 'Too many login attempts, please try again later.' },
+  skipSuccessfulRequests: true
+});
+
+// ── Frontend ──────────────────────────────────────────────────────────────────
+// Serve only the single-page frontend — never the repository root.
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// ── Auth routes ───────────────────────────────────────────────────────────────
+
+// POST /api/auth/login — verify credentials, create session
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  const expectedUser = process.env.KK_USERNAME;
+  const expectedHash = process.env.KK_PASSWORD_HASH;
+
+  // If env vars are absent (should have been caught at startup but guard here
+  // for belt-and-braces) — fail closed rather than allowing anonymous access.
+  if (!expectedUser || !expectedHash) {
+    console.error('[auth] Auth configuration missing at login time — rejecting.');
+    return res.status(503).json({ error: 'Authentication not configured.' });
+  }
+
+  const usernameMatch  = username === expectedUser;
+  const passwordMatch  = usernameMatch && await bcrypt.compare(password, expectedHash);
+
+  if (!usernameMatch || !passwordMatch) {
+    // Identical response for both wrong-username and wrong-password to prevent
+    // username enumeration.
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+
+  // Rotate session ID on login to prevent session fixation.
+  await new Promise((resolve, reject) =>
+    req.session.regenerate(err => err ? reject(err) : resolve())
+  );
+
+  req.session.userId   = expectedUser;
+  req.session.csrfToken = crypto.randomBytes(24).toString('hex');
+
+  console.log('[auth] Login:', expectedUser);
+  return res.json({ ok: true, csrfToken: req.session.csrfToken });
+});
+
+// POST /api/auth/logout — destroy session
+app.post('/api/auth/logout', requireAuth, requireCsrf, (req, res) => {
+  const user = req.session.userId;
+  req.session.destroy(err => {
+    if (err) console.error('[auth] Session destroy error:', err.message);
+    res.clearCookie('kk_sid');
+    console.log('[auth] Logout:', user);
+    res.json({ ok: true });
+  });
+});
+
+// GET /api/auth/session — check whether session is active; returns CSRF token
+app.get('/api/auth/session', requireAuth, (req, res) => {
+  res.json({ ok: true, csrfToken: req.session.csrfToken });
+});
+
+// ── Health (unprotected — used by uptime monitors) ───────────────────────────
+app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
+// ── Planday credentials (from environment) ────────────────────────────────────
+const PLANDAY_APP_ID        = process.env.PLANDAY_APP_ID;
+const PLANDAY_REFRESH_TOKEN = process.env.PLANDAY_REFRESH_TOKEN;
 
 // In-memory token cache — refreshed automatically when expired
 let plandayToken = null; // { accessToken, expiresAt }
@@ -29,8 +178,7 @@ async function getPlandayToken() {
     client_id:     PLANDAY_APP_ID
   });
 
-  console.log('[Planday] Token request to https://id.planday.com/connect/token');
-  console.log('[Planday] Request body:', body.toString());
+  console.log('[Planday] Requesting token from https://id.planday.com/connect/token');
 
   let res;
   try {
@@ -39,15 +187,11 @@ async function getPlandayToken() {
       timeout: 10000
     });
   } catch (err) {
-    console.error('[Planday] Token request FAILED');
-    console.error('[Planday] Status:', err.response?.status);
-    console.error('[Planday] Response body:', JSON.stringify(err.response?.data, null, 2));
-    console.error('[Planday] Headers sent:', err.config?.headers);
+    console.error('[Planday] Token request failed, HTTP', err.response?.status ?? '(no response)');
     throw err;
   }
 
   console.log('[Planday] Token response status:', res.status);
-  console.log('[Planday] Token response body:', JSON.stringify(res.data, null, 2));
 
   plandayToken = {
     accessToken: res.data.access_token,
@@ -102,14 +246,14 @@ const DEPT_TO_STORE = {
 
 const HOURLY_RATE = 160; // DKK/hr fixed rate for all employees
 
-// ── Store configuration ───────────────────────────────────────────────────────
+// ── Store configuration (tokens from environment) ─────────────────────────────
 const STORES = {
-  'indre-by':       { name: 'Indre By',       firmaid: 15143, token: '8201cf3d8b644334350130d8a9f7c731df4f3b730bc45ecd67f8e5fb7f2efa3f' },
-  'vesterbro':      { name: 'Vesterbro',      firmaid: 13205, token: 'aa8e5bc66fdec5068e5d3c719715203bcbc6c7531fce401d199891e3838d69db' },
-  'christianshavn': { name: 'Christianshavn', firmaid: 21331, token: 'a9c1940396b28a4fa273ec6337c5a7c519631e356b953a8fc9208a363642d79b' },
-  'fisketorvet':    { name: 'Fisketorvet',    firmaid: 18926, token: '46cdfedfe2409ee5912327b789fac83efc45eac1c9e3480010cba7b16dfce3e6' },
-  'frederiksberg':  { name: 'Frederiksberg',  firmaid: 18924, token: 'd3c3259d8cc26bdeae4560992b15459d3d8f36fd0053f2b659f7c3facf44f62a' },
-  'norrebro':       { name: 'Nørrebro',       firmaid: 18095, token: 'a646914ecb1aee1ead6d3eb32a61b90f5c81d534e223047f95cd574d00f676c5' }
+  'indre-by':       { name: 'Indre By',       firmaid: 15143, token: process.env.ONLINEPOS_TOKEN_INDRE_BY },
+  'vesterbro':      { name: 'Vesterbro',      firmaid: 13205, token: process.env.ONLINEPOS_TOKEN_VESTERBRO },
+  'christianshavn': { name: 'Christianshavn', firmaid: 21331, token: process.env.ONLINEPOS_TOKEN_CHRISTIANSHAVN },
+  'fisketorvet':    { name: 'Fisketorvet',    firmaid: 18926, token: process.env.ONLINEPOS_TOKEN_FISKETORVET },
+  'frederiksberg':  { name: 'Frederiksberg',  firmaid: 18924, token: process.env.ONLINEPOS_TOKEN_FREDERIKSBERG },
+  'norrebro':       { name: 'Nørrebro',       firmaid: 18095, token: process.env.ONLINEPOS_TOKEN_NORREBRO }
 };
 
 const API_BASE = 'https://api.onlinepos.dk/api';
@@ -136,38 +280,10 @@ function posGet(endpoint, store) {
   });
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-
-app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
-
-// Diagnostic route — raw OnlinePOS response for Nørrebro today
-app.get('/api/test-norrebro', async (_req, res) => {
-  const now   = Math.floor(Date.now() / 1000);
-  const today = now - (now % 86400);
-  try {
-    const r = await axios.get(`${API_BASE}/getByUnixTimeSales/${today}/${now}`, {
-      headers: {
-        'token':   'a646914ecb1aee1ead6d3eb32a61b90f5c81d534e223047f95cd574d00f676c5',
-        'firmaid': '18095',
-        'Accept':  'application/json'
-      },
-      timeout: 20000
-    });
-    res.json({ status: r.status, from: today, to: now, data: r.data });
-  } catch (err) {
-    res.status(err.response?.status || 500).json({
-      error: err.message, from: today, to: now,
-      upstream: err.response?.data, headers: err.response?.headers
-    });
-  }
-});
-
-app.get('/api/stores', (_req, res) => {
-  res.json(Object.entries(STORES).map(([id, s]) => ({ id, name: s.name })));
-});
+// ── Business routes (all require authentication) ──────────────────────────────
 
 // Revenue for one store over a unix time range
-app.get('/api/revenue/:storeId/:from/:to', async (req, res) => {
+app.get('/api/revenue/:storeId/:from/:to', requireAuth, async (req, res) => {
   const store = findStore(req.params.storeId);
   if (!store) return res.status(404).json({ error: 'Unknown store' });
   try {
@@ -179,7 +295,7 @@ app.get('/api/revenue/:storeId/:from/:to', async (req, res) => {
 });
 
 // Revenue for ALL 6 stores in parallel
-app.get('/api/all-revenue/:from/:to', async (req, res) => {
+app.get('/api/all-revenue/:from/:to', requireAuth, async (req, res) => {
   const { from, to } = req.params;
   const settled = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
@@ -196,7 +312,7 @@ app.get('/api/all-revenue/:from/:to', async (req, res) => {
 });
 
 // Detailed item-level sales for one store on one day
-app.get('/api/sales/:storeId/:unixtime', async (req, res) => {
+app.get('/api/sales/:storeId/:unixtime', requireAuth, async (req, res) => {
   const store = findStore(req.params.storeId);
   if (!store) return res.status(404).json({ error: 'Unknown store' });
   try {
@@ -208,7 +324,7 @@ app.get('/api/sales/:storeId/:unixtime', async (req, res) => {
 });
 
 // ── Invoice image scanning via Claude API ─────────────────────────────────────
-app.post('/api/scan-invoice', async (req, res) => {
+app.post('/api/scan-invoice', requireAuth, requireCsrf, async (req, res) => {
   const { base64, mediaType } = req.body;
   if (!base64 || !mediaType) return res.status(400).json({ error: 'Missing base64 or mediaType' });
 
@@ -236,382 +352,9 @@ app.post('/api/scan-invoice', async (req, res) => {
     });
     res.json(r.data);
   } catch (err) {
-    console.error('Scan error full:', JSON.stringify(err.response?.data));
+    console.error('[scan-invoice] Error:', err.response?.status ?? err.message);
     res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
   }
-});
-
-// ── Planday: departments raw ───────────────────────────────────────────────────
-app.get('/api/planday/departments-raw', async (_req, res) => {
-  try {
-    const token = await getPlandayToken();
-    const depts = await plandayGetAll('/hr/v1/departments', token);
-    console.log('[Planday] departments:', JSON.stringify(depts, null, 2));
-    res.json({ count: depts.length, departments: depts });
-  } catch (err) {
-    console.error('[Planday] departments-raw error:', err.response?.status, err.response?.data);
-    res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
-  }
-
-});
-
-// ── Planday: departments list (tries multiple endpoints) ───────────────────────
-app.get('/api/planday/departments-list', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    const endpoints = [
-      { key: 'hr_v1_departments',           path: '/hr/v1/departments',           params: { limit: 50, offset: 0 } },
-      { key: 'scheduling_v1_departments',   path: '/scheduling/v1/departments',   params: { limit: 50, offset: 0 } },
-      { key: 'hr_v1_departments_nolimit',   path: '/hr/v1/departments',           params: {} },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        out[key] = { status: r.status, params, body: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, params, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: pay test ─────────────────────────────────────────────────────────
-app.get('/api/planday/pay-test', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    out.app_id        = PLANDAY_APP_ID;
-    const endpoints = [
-      { key: 'pay_v1_payrates',      path: '/pay/v1/payrates',      params: { limit: 50, offset: 0 } },
-      { key: 'pay_v1_employeerates', path: '/pay/v1/employeerates', params: { limit: 50, offset: 0 } },
-      { key: 'pay_v1_salaryrates',   path: '/pay/v1/salaryrates',   params: { limit: 50, offset: 0 } },
-      { key: 'shifts_with_cost',     path: '/scheduling/v1/shifts', params: { from: '2026-03-25', to: '2026-03-25', limit: 50, offset: 0 } },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        let costFields = null;
-        if (key === 'shifts_with_cost' && Array.isArray(r.data.data) && r.data.data.length) {
-          const keys = Object.keys(r.data.data[0]);
-          costFields = keys.filter(k => /cost|salary|wage|rate|pay|amount/i.test(k));
-        }
-        out[key] = { status: r.status, paging: r.data.paging, data: r.data.data, costFields };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: time and cost debug ───────────────────────────────────────────────
-app.get('/api/planday/timeandcost', async (_req, res) => {
-  const out = {};
-  const date = '2026-03-25';
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    const endpoints = [
-      { key: 'timeandcost_v1',   path: '/timeandcost/v1/timeandcost', params: { from: date, to: date, departmentIds: ALL_DEPT_IDS } },
-      { key: 'scheduling_tac',   path: '/scheduling/v1/timeandcost',  params: { from: date, to: date } },
-      { key: 'hr_tac',           path: '/hr/v1/timeandcost',          params: { from: date, to: date } },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        out[key] = { status: r.status, body: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: tac-test ─────────────────────────────────────────────────────────
-app.get('/api/planday/tac-test', async (_req, res) => {
-  const out = {};
-  const date   = '2026-03-25';
-  const deptId = 149668;
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    const endpoints = [
-      { key: 'shifts_timeandcost',     path: '/scheduling/v1/shifts/timeandcost', params: { departmentId: deptId, from: date, to: date } },
-      { key: 'scheduling_timeandcost', path: '/scheduling/v1/timeandcost',        params: { departmentId: deptId, from: date, to: date } },
-      { key: 'shifts_includecost',     path: '/scheduling/v1/shifts',             params: { departmentId: deptId, from: date, to: date, includeCost: true, limit: 10, offset: 0 } },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        out[key] = { status: r.status, body: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: payrates by group/employee ───────────────────────────────────────
-app.get('/api/planday/payrates-by-group', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    const endpoints = [
-      { key: 'employeegroup_payrates',     path: '/pay/v1/employeegroups/252005/payrates'   },
-      { key: 'employee_payrates',          path: '/pay/v1/employees/1220291/payrates'        },
-      { key: 'employee_payrates_by_group', path: '/pay/v1/employees/1220291/payrates/252005' },
-    ];
-    for (const { key, path } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, {});
-        out[key] = { status: r.status, body: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: individual pay rates ─────────────────────────────────────────────
-app.get('/api/planday/individual-rates', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    out.app_id        = PLANDAY_APP_ID;
-    out.token_first10 = token.slice(0, 10);
-    for (const { key, path } of [
-      { key: 'pay_v1_payrates', path: '/pay/v1/payrates' },
-      { key: 'pay_v1_salaries', path: '/pay/v1/salaries' },
-    ]) {
-      try {
-        const r = await plandayGet(path, token, { limit: 200, offset: 0 });
-        out[key] = { status: r.status, paging: r.data.paging, data: r.data.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: pay access test (new credentials) ────────────────────────────────
-app.get('/api/planday/pay-access', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    out.app_id        = PLANDAY_APP_ID;
-    for (const { key, path } of [
-      { key: 'pay_v1_payrates',      path: '/pay/v1/payrates'      },
-      { key: 'pay_v1_employeetypes', path: '/pay/v1/employeetypes' },
-    ]) {
-      try {
-        const r = await plandayGet(path, token, { limit: 50, offset: 0 });
-        out[key] = { status: r.status, paging: r.data.paging, data: r.data.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: payrates debug ────────────────────────────────────────────────────
-app.get('/api/planday/payrates-debug', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    out.token_first10 = token.slice(0, 10);
-    out.app_id        = PLANDAY_APP_ID;
-    const endpoints = [
-      { key: 'pay_v1_payrates',  path: '/pay/v1/payrates',  params: { limit: 200, offset: 0 } },
-      { key: 'pay_v1_employees', path: '/pay/v1/employees', params: { limit: 200, offset: 0 } },
-      { key: 'hr_v1_employees',  path: '/hr/v1/employees',  params: { limit: 200, offset: 0 } },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        out[key] = { status: r.status, paging: r.data.paging, data: r.data.data, raw: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: payrates raw ──────────────────────────────────────────────────────
-app.get('/api/planday/payrates-raw', async (_req, res) => {
-  const out = {};
-  try {
-    const token = await getPlandayToken();
-    const endpoints = [
-      { key: 'pay_v1_payrates',     path: '/pay/v1/payrates',     params: { limit: 10, offset: 0 } },
-      { key: 'pay_v1_salaryrates',  path: '/pay/v1/salaryrates',  params: { limit: 10, offset: 0 } },
-      { key: 'hr_v1_employees',     path: '/hr/v1/employees',     params: { limit: 3,  offset: 0 } },
-      { key: 'payroll_v1_salaries', path: '/payroll/v1/salaries', params: { limit: 3,  offset: 0 } },
-    ];
-    for (const { key, path, params } of endpoints) {
-      try {
-        const r = await plandayGet(path, token, params);
-        out[key] = { status: r.status, body: r.data };
-      } catch (err) {
-        out[key] = { status: err.response?.status, error: err.message, body: err.response?.data };
-      }
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: employees raw ─────────────────────────────────────────────────────
-app.get('/api/planday/employees-raw', async (_req, res) => {
-  try {
-    const token = await getPlandayToken();
-    const r = await plandayGet('/hr/v1/employees', token, { limit: 5, offset: 0 });
-    const extras = {};
-    for (const ep of ['/hr/v1/contracts', '/hr/v1/salarytypes', '/payroll/v1/salaries']) {
-      try {
-        const x = await plandayGet(ep, token, { limit: 3, offset: 0 });
-        extras[ep] = { status: x.status, body: x.data };
-      } catch (e) {
-        extras[ep] = { status: e.response?.status, error: e.message, body: e.response?.data };
-      }
-    }
-    res.json({ employees_paging: r.data.paging, employees_sample: r.data.data, extra_endpoints: extras });
-  } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
-  }
-
-});
-
-// ── Planday: raw shifts debug ──────────────────────────────────────────────────
-app.get('/api/planday/shifts-raw', async (_req, res) => {
-  const out = {};
-  const date = '2026-03-25';
-  try {
-    const token = await getPlandayToken();
-    out.token_preview = token.slice(0, 20) + '...';
-    try {
-      const r = await plandayGet('/scheduling/v1/shifts', token, { from: date, to: date, limit: 10, offset: 0 });
-      const annotated = (r.data.data || []).map(s => ({
-        ...s,
-        _hours: (s.startDateTime && s.endDateTime)
-          ? ((new Date(s.endDateTime) - new Date(s.startDateTime)) / 3600000).toFixed(2)
-          : null
-      }));
-      out.shifts = { status: r.status, paging: r.data.paging, shifts: annotated, all_keys: annotated[0] ? Object.keys(annotated[0]) : [] };
-    } catch (err) {
-      out.shifts = { status: err.response?.status, error: err.message, response_body: err.response?.data };
-    }
-    try {
-      const r = await plandayGet('/scheduling/v1/shifttypes', token, { limit: 10, offset: 0 });
-      out.shifttypes = { status: r.status, body: r.data };
-    } catch (err) {
-      out.shifttypes = { status: err.response?.status, error: err.message, response_body: err.response?.data };
-    }
-    try {
-      const r = await plandayGet('/scheduling/v1/schedules', token, { from: date, to: date, limit: 10, offset: 0 });
-      out.schedules = { status: r.status, body: r.data };
-    } catch (err) {
-      out.schedules = { status: err.response?.status, error: err.message, response_body: err.response?.data };
-    }
-  } catch (err) {
-    out.token_error = { error: err.message, body: err.response?.data };
-  }
-  res.json(out);
-
-});
-
-// ── Planday: debug route ───────────────────────────────────────────────────────
-app.get('/api/planday/debug', async (_req, res) => {
-  const results = {};
-  try {
-    const token = await getPlandayToken();
-    results.token = { ok: true, preview: token.slice(0, 20) + '...' };
-    try {
-      const r = await plandayGet('/hr/v1/departments', token, { limit: 5, offset: 0 });
-      results.departments = { status: r.status, body: r.data };
-    } catch (err) {
-      results.departments = { status: err.response?.status, error: err.message, body: err.response?.data };
-    }
-    const today = new Date().toISOString().slice(0, 10);
-    try {
-      const r = await plandayGet('/scheduling/v1/shifts', token, { from: today, to: today, limit: 5, offset: 0 });
-      results.shifts = { status: r.status, body: r.data };
-    } catch (err) {
-      results.shifts = { status: err.response?.status, error: err.message, body: err.response?.data };
-    }
-  } catch (err) {
-    results.token = { ok: false, error: err.message, body: err.response?.data };
-  }
-  res.json(results);
-
-});
-
-// ── Planday: salary debug ──────────────────────────────────────────────────────
-app.get('/api/planday/salary-debug/:from/:to', async (req, res) => {
-  try {
-    const token = await getPlandayToken();
-    const shifts = await plandayGetAll('/scheduling/v1/shifts', token, { from: req.params.from, to: req.params.to });
-    const shiftRows = shifts.map(s => {
-      const hours   = (s.startDateTime && s.endDateTime)
-        ? (new Date(s.endDateTime) - new Date(s.startDateTime)) / 3600000
-        : null;
-      const cost    = hours != null ? hours * HOURLY_RATE : null;
-      const storeId = DEPT_TO_STORE[s.departmentId] ?? null;
-      return { shiftId: s.id, employeeId: s.employeeId, departmentId: s.departmentId, storeId,
-               startDateTime: s.startDateTime, endDateTime: s.endDateTime,
-               hours: hours != null ? +hours.toFixed(4) : null,
-               payRate: HOURLY_RATE, cost: cost != null ? +cost.toFixed(2) : null,
-               rawShiftKeys: Object.keys(s) };
-    });
-    const byDept = {};
-    for (const row of shiftRows) {
-      const key = row.departmentId + ' -> ' + (row.storeId ?? 'UNKNOWN');
-      if (!byDept[key]) byDept[key] = { shiftCount: 0, totalHours: 0, totalCost: 0 };
-      byDept[key].shiftCount++;
-      byDept[key].totalHours = +(byDept[key].totalHours + (row.hours || 0)).toFixed(4);
-      byDept[key].totalCost  = +(byDept[key].totalCost  + (row.cost  || 0)).toFixed(2);
-    }
-    res.json({ summary: { totalShifts: shifts.length, hourlyRate: HOURLY_RATE }, byDepartment: byDept, shifts: shiftRows });
-  } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, body: err.response?.data });
-  }
-
 });
 
 // All 6 department IDs as a comma-separated string for the payroll endpoint
@@ -689,38 +432,9 @@ async function fetchPayrollByStore(from, to, token) {
   return { byStore, payrollRows, shifts };
 }
 
-// ── Planday: payroll raw debug ─────────────────────────────────────────────────
-app.get('/api/planday/payroll-raw/:from/:to', async (req, res) => {
-  const { from, to } = req.params;
-  try {
-    const token = await getPlandayToken();
-    const [payrollRes, shiftsRes] = await Promise.allSettled([
-      plandayGet('/payroll/v1/payroll', token, { departmentIds: ALL_DEPT_IDS, from, to }),
-      plandayGet('/scheduling/v1/shifts', token, { from, to, limit: 10, offset: 0 })
-    ]);
-    const out = {};
-    if (payrollRes.status === 'fulfilled') {
-      out.payroll = { status: payrollRes.value.status, body: payrollRes.value.data };
-    } else {
-      const err = payrollRes.reason;
-      out.payroll = { status: err.response?.status, error: err.message, body: err.response?.data };
-    }
-    if (shiftsRes.status === 'fulfilled') {
-      out.shifts_sample = { status: shiftsRes.value.status, body: shiftsRes.value.data };
-    } else {
-      const err = shiftsRes.reason;
-      out.shifts_sample = { status: err.response?.status, error: err.message, body: err.response?.data };
-    }
-    res.json(out);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-
-});
-
 // ── Planday: scheduled salary costs grouped by department ─────────────────────
 // :from and :to are YYYY-MM-DD strings
-app.get('/api/planday/salaries/:from/:to', async (req, res) => {
+app.get('/api/planday/salaries/:from/:to', requireAuth, async (req, res) => {
   const { from, to } = req.params;
   const token = await getPlandayToken();
   // Primary: payroll endpoint cross-referenced with shifts for department mapping
@@ -750,7 +464,6 @@ app.get('/api/planday/salaries/:from/:to', async (req, res) => {
     console.error('[Planday] salaries fallback also failed:', err.response?.status, err.message);
     return res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
   }
-
 });
 
 // ── Katering recipes ──────────────────────────────────────────────────────────
@@ -839,7 +552,7 @@ function migrateKateringRecipes() {
 }
 migrateKateringRecipes();
 
-app.get('/api/katering-recipes', (_req, res) => {
+app.get('/api/katering-recipes', requireAuth, (_req, res) => {
   try {
     if (fs.existsSync(KATERING_RECIPES_PATH)) {
       const data = JSON.parse(fs.readFileSync(KATERING_RECIPES_PATH, 'utf8'));
@@ -851,7 +564,7 @@ app.get('/api/katering-recipes', (_req, res) => {
   res.json(KATERING_RECIPES_DEFAULT);
 });
 
-app.post('/api/katering-recipes', (req, res) => {
+app.post('/api/katering-recipes', requireAuth, requireCsrf, (req, res) => {
   try {
     const dir = path.dirname(KATERING_RECIPES_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -879,11 +592,11 @@ function saveMeat(data) {
   } catch(e) { console.error('[meat] write error:', e.message); }
 }
 
-app.get('/api/meat', (_req, res) => {
+app.get('/api/meat', requireAuth, (_req, res) => {
   res.json(loadMeat());
 });
 
-app.post('/api/meat', (req, res) => {
+app.post('/api/meat', requireAuth, requireCsrf, (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Expected array' });
   saveMeat(req.body);
   res.json({ ok: true });
@@ -938,11 +651,11 @@ function saveLemonadeHistory(history) {
   fs.writeFileSync(LEMONADE_HISTORY_PATH, JSON.stringify(history, null, 2), 'utf8');
 }
 
-app.get('/api/lemonade/history', (_req, res) => {
+app.get('/api/lemonade/history', requireAuth, (_req, res) => {
   res.json(loadLemonadeHistory());
 });
 
-app.post('/api/lemonade/history', (req, res) => {
+app.post('/api/lemonade/history', requireAuth, requireCsrf, (req, res) => {
   try {
     saveLemonadeHistory(req.body);
     res.json({ ok: true });
@@ -951,7 +664,7 @@ app.post('/api/lemonade/history', (req, res) => {
   }
 });
 
-app.get('/api/lemonade/today', async (_req, res) => {
+app.get('/api/lemonade/today', requireAuth, async (_req, res) => {
   try {
     const data = await fetchLemonadeToday();
     res.json(data);
@@ -960,33 +673,38 @@ app.get('/api/lemonade/today', async (_req, res) => {
   }
 });
 
-// Scheduled save at 22:00 Copenhagen time
-let lemonadeSavedDate = null;
-setInterval(() => {
-  const cph  = new Date().toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
-  const hour = parseInt(cph.slice(11, 13), 10);
-  const min  = parseInt(cph.slice(14, 16), 10);
-  const date = cph.slice(0, 10);
-  if (hour < 22) return;
-  if (lemonadeSavedDate === date) return;
-  lemonadeSavedDate = date;
-  (async () => {
-    try {
-      const data    = await fetchLemonadeToday();
-      const history = loadLemonadeHistory();
-      const idx     = history.findIndex(e => e.date === data.date);
-      if (idx >= 0) history[idx] = data; else history.push(data);
-      saveLemonadeHistory(history);
-      console.log('[lemonade] saved daily count:', data);
-    } catch(e) {
-      console.error('[lemonade] scheduled save error:', e.message);
-    }
-  })();
-}, 60000);
-
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(3000, () => {
-  console.log('\n  🔪  KILLER KALCULATOR');
-  console.log('  ──────────────────────────────');
-  console.log('  http://localhost:3000\n');
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log('\n  🔪  KILLER KALCULATOR');
+    console.log('  ──────────────────────────────');
+    console.log('  http://localhost:' + PORT + '\n');
+  });
+
+  // Scheduled lemonade save at 22:00 Copenhagen time.
+  // Only runs in the live process — not during tests.
+  let lemonadeSavedDate = null;
+  setInterval(() => {
+    const cph  = new Date().toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
+    const hour = parseInt(cph.slice(11, 13), 10);
+    const date = cph.slice(0, 10);
+    if (hour < 22) return;
+    if (lemonadeSavedDate === date) return;
+    lemonadeSavedDate = date;
+    (async () => {
+      try {
+        const data    = await fetchLemonadeToday();
+        const history = loadLemonadeHistory();
+        const idx     = history.findIndex(e => e.date === data.date);
+        if (idx >= 0) history[idx] = data; else history.push(data);
+        saveLemonadeHistory(history);
+        console.log('[lemonade] saved daily count:', data);
+      } catch(e) {
+        console.error('[lemonade] scheduled save error:', e.message);
+      }
+    })();
+  }, 60000);
+}
+
+module.exports = app;

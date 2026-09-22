@@ -1063,7 +1063,15 @@ const STORES = [
   { id: 'norrebro',       name: 'Nørrebro'        }
 ];
 
-const CREDS = { username: 'Killer Kebab', password: '!Killingit!' };
+// Auth token received from the server on login; required on state-changing requests.
+let csrfToken = null;
+// Set to false when session expires or logout happens; prevents stale
+// in-flight responses from updating the UI after the user is logged out.
+let sessionActive = false;
+// Incremented on every successful login. Captured at the start of each async
+// request so that a stale response or 401 from an old session cannot mutate
+// state or expire an already-established new session.
+let sessionNonce = 0;
 
 // ── State ──────────────────────────────────────────────────────────────────────
 const state = {
@@ -1097,9 +1105,15 @@ function saveInvoices() {
   localStorage.setItem('kk_invoices', JSON.stringify(state.invoices));
 }
 async function loadMeat() {
+  if (!sessionActive) { state.meat = []; return; }
+  const _myNonce = sessionNonce;
   try {
-    const res = await fetch('/api/meat');
+    const res = await apiFetch('/api/meat');
+    if (!res) { state.meat = []; return; }
     const data = await res.json();
+    // Abort if the session changed while the response was in-flight (logout or
+    // re-login between request dispatch and response delivery).
+    if (!sessionActive || sessionNonce !== _myNonce) return;
     if (Array.isArray(data) && data.length === 0) {
       // Migrate from localStorage if server has no entries yet
       const local = localStorage.getItem('kk_meat_tracking');
@@ -1122,7 +1136,7 @@ async function loadMeat() {
 async function saveMeat(entries) {
   const data = entries !== undefined ? entries : state.meat;
   try {
-    await fetch('/api/meat', {
+    await apiFetch('/api/meat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(data)
@@ -1278,7 +1292,8 @@ async function apiRevenue(storeId, from, to) {
   if (key in state.cache) return state.cache[key];
 
   try {
-    const res  = await fetch(`/api/revenue/${storeId}/${from}/${to}`);
+    const res  = await apiFetch(`/api/revenue/${storeId}/${from}/${to}`);
+    if (!res) { state.cache[key] = null; return null; }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'API error');
     const total = (data.location || []).reduce((s, l) => s + (l.amount || 0), 0);
@@ -1295,7 +1310,8 @@ async function apiAllRevenue(from, to) {
   if (key in state.cache) return state.cache[key];
 
   try {
-    const res  = await fetch(`/api/all-revenue/${from}/${to}`);
+    const res  = await apiFetch(`/api/all-revenue/${from}/${to}`);
+    if (!res) { state.cache[key] = {}; return {}; }
     const data = await res.json();
     const out  = {};
     for (const [id, d] of Object.entries(data)) {
@@ -1315,7 +1331,8 @@ async function apiSalesDay(storeId, dayUnix) {
   if (key in state.cache) return state.cache[key];
 
   try {
-    const res  = await fetch(`/api/sales/${storeId}/${dayUnix}`);
+    const res  = await apiFetch(`/api/sales/${storeId}/${dayUnix}`);
+    if (!res) { state.cache[key] = []; return []; }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'API error');
     state.cache[key] = data.data || [];
@@ -1366,7 +1383,8 @@ async function apiPlandaySalaries(from, to) {
     const toStr   = unixToDateStr(to);
     const url = `/api/planday/salaries/${fromStr}/${toStr}`;
     console.log('[Planday] fetching salaries:', url);
-    const res  = await fetch(url);
+    const res  = await apiFetch(url);
+    if (!res) return null;
     const data = await res.json();
     console.log('[Planday] salaries HTTP status:', res.status);
     console.log('[Planday] salaries raw response:', JSON.stringify(data));
@@ -1663,7 +1681,8 @@ function renderProductMix(el, items) {
 async function getLemonadeToday() {
   if (state.lemonadeToday) return state.lemonadeToday;
   try {
-    const r = await fetch('/api/lemonade/today');
+    const r = await apiFetch('/api/lemonade/today');
+    if (!r) return null;
     state.lemonadeToday = await r.json();
   } catch (e) {
     state.lemonadeToday = null;
@@ -2409,7 +2428,7 @@ async function handleInvoiceImage(file) {
   const mediaType = 'image/jpeg';
 
   try {
-    const res = await fetch('/api/scan-invoice', {
+    const res = await apiFetch('/api/scan-invoice', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ base64, mediaType })
@@ -3427,7 +3446,7 @@ async function gemKateringOpskrifter() {
   btn.textContent = 'Saving…';
   if (msg) msg.textContent = '';
   try {
-    await fetch('/api/katering-recipes', {
+    await apiFetch('/api/katering-recipes', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(recipes)
@@ -3489,7 +3508,8 @@ async function renderKateringView() {
   if (!state.kateringRecipes) {
     main.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div> Loading recipes…</div>`;
     try {
-      const r = await fetch('/api/katering-recipes');
+      const r = await apiFetch('/api/katering-recipes');
+      if (!r) return;
       state.kateringRecipes = await r.json();
     } catch (e) {
       main.innerHTML = `<div class="view-header"><h2>Killer Catering</h2></div>
@@ -3541,7 +3561,8 @@ async function renderLemonadeView() {
     const wrap = document.getElementById('lemonade-today-wrap');
     if (!wrap) return;
     try {
-      const r = await fetch('/api/lemonade/today');
+      const r = await apiFetch('/api/lemonade/today');
+      if (!r) return;
       const d = await r.json();
       let html = '<div class="kpi-grid">';
       for (const s of STORES) {
@@ -3560,7 +3581,8 @@ async function renderLemonadeView() {
     const wrap = document.getElementById('lemonade-history-wrap');
     if (!wrap) return;
     try {
-      const r = await fetch('/api/lemonade/history');
+      const r = await apiFetch('/api/lemonade/history');
+      if (!r) return;
       const history = await r.json();
 
       if (!history.length) {
@@ -3673,31 +3695,95 @@ function renderMain() {
   }
 }
 
-// ── Auth ────────────────────────────────────────────────────────────────────────
-function doLogin() {
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value;
-  const errEl = document.getElementById('login-error');
-
-  if (u === CREDS.username && p === CREDS.password) {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    errEl.textContent = '';
-    sessionStorage.setItem('kk_auth', '1');
-    boot();
-  } else {
-    errEl.textContent = 'Invalid username or password';
-    document.getElementById('password').value = '';
+// ── Authenticated fetch wrapper ─────────────────────────────────────────────────
+// Adds the CSRF token to state-changing requests and handles 401 globally.
+// Returns null if the session has already expired on the client side.
+async function apiFetch(url, opts = {}) {
+  if (!sessionActive) return null;
+  const _myNonce = sessionNonce;
+  const method = (opts.method || 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    opts = {
+      ...opts,
+      headers: { ...(opts.headers || {}), 'X-CSRF-Token': csrfToken }
+    };
   }
+  const res = await fetch(url, opts);
+  if (res.status === 401) {
+    // Only expire the current session. A 401 from a request that was dispatched
+    // before the most-recent login must not log out the new session.
+    if (sessionNonce === _myNonce) {
+      onSessionExpired('Session expired. Please sign in again.');
+    }
+    return null;
+  }
+  return res;
 }
 
-function doLogout() {
-  sessionStorage.removeItem('kk_auth');
+// Called on 401 from any API route or explicit logout.
+function onSessionExpired(message) {
+  sessionActive = false;
+  csrfToken = null;
+  state.cache = {};
+  if (lemonadeRefreshInterval) {
+    clearInterval(lemonadeRefreshInterval);
+    lemonadeRefreshInterval = null;
+  }
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('username').value = '';
   document.getElementById('password').value = '';
-  state.cache = {};
+  if (message) document.getElementById('login-error').textContent = message;
+  // Invoices and katering portions remain in localStorage — not cleared.
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.querySelector('.btn-login');
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent  = 'SIGNING IN…';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      csrfToken     = data.csrfToken;
+      sessionNonce++;
+      sessionActive = true;
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('password').value = '';
+      errEl.textContent = '';
+      boot();
+    } else {
+      errEl.textContent = data.error || 'Login failed.';
+      document.getElementById('password').value = '';
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error — please try again.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'SIGN IN';
+  }
+}
+
+async function doLogout() {
+  // Fire-and-forget logout — server destroys the session.
+  // Regardless of network outcome, clear the local session state immediately.
+  try {
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+  } catch (_) {}
+  onSessionExpired('');
 }
 
 // Allow Enter key on login form
@@ -3722,12 +3808,21 @@ async function boot() {
   renderMain();
 }
 
-// Auto-login if session active
-(function init() {
-  if (sessionStorage.getItem('kk_auth') === '1') {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    boot();
+// Auto-restore session on page load by checking the server.
+(async function init() {
+  try {
+    const res = await fetch('/api/auth/session');
+    if (res.ok) {
+      const data = await res.json();
+      csrfToken     = data.csrfToken;
+      sessionNonce++;
+      sessionActive = true;
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      boot();
+    }
+  } catch (_) {
+    // Network error on init — leave login screen visible.
   }
 })();
 </script>
