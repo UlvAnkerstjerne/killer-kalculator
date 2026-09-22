@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chelsea+Market&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Canonical product-metrics engine: classifies by product ID, no fuzzy name matching -->
+  <script src="/js/product-metrics.js"></script>
   <style>
     :root {
       --bg:        #0d0d0d;
@@ -1650,22 +1652,20 @@ async function loadSidebar() {
 }
 
 // ── Product mix helpers ────────────────────────────────────────────────────────
-function categorizeItems(items) {
-  const out = { rolls: 0, kombos: 0, kebab: 0, falafel: 0, chicken: 0 };
-  for (const item of items) {
-    const n = (item.name || item.productname || '').toLowerCase().trim();
-    const qty = parseInt(item.count || 1);
-    if (qty <= 0) continue;
-    const isKombo      = /kombo|combo/.test(n);
-    const isProtein    = /kebab|falafel|kylling|chicken|lamb/.test(n);
-    const isKillerRoll = n.startsWith('killer') && isProtein;
-    if (!isKombo && !isKillerRoll) continue;
-    if (isKombo) out.kombos += qty; else out.rolls += qty;
-    if (n.includes('lamb') || n.includes('kebab')) out.kebab += qty;
-    else if (n.includes('falafel')) out.falafel += qty;
-    else if (n.includes('chicken') || n.includes('kylling')) out.chicken += qty;
-  }
-  return out;
+// computeMetrics is the canonical classifier — loaded from /js/product-metrics.js.
+// Field mapping from breakdown to the mix bar categories:
+//   rolls   = m.rollUnits                                  (rollKebab + rollFalafel)
+//   kombos  = m.komboUnits                                 (komboLamb + komboFalafel)
+//   kebab   = m.breakdown.komboLamb + m.breakdown.rollKebab
+//   falafel = m.breakdown.komboFalafel + m.breakdown.rollFalafel
+function computeItemCategories(items) {
+  const m = window.ProductMetrics.computeMetrics(items);
+  return {
+    rolls:   m.rollUnits,
+    kombos:  m.komboUnits,
+    kebab:   m.breakdown.komboLamb    + m.breakdown.rollKebab,
+    falafel: m.breakdown.komboFalafel + m.breakdown.rollFalafel,
+  };
 }
 
 function makeMixBar(segments) {
@@ -1684,13 +1684,13 @@ function makeMixBar(segments) {
 }
 
 function renderProductMix(el, items) {
-  const c = categorizeItems(items);
+  const c = computeItemCategories(items);
 
   // Bar 1: Rolls vs Kombos
   const rkTotal = c.rolls + c.kombos;
 
-  // Bar 2: Protein mix (kebab + falafel + chicken across both rolls & kombos)
-  const protTotal = c.kebab + c.falafel + c.chicken;
+  // Bar 2: Protein mix (kebab and falafel — no chicken product IDs defined)
+  const protTotal = c.kebab + c.falafel;
 
   if (!rkTotal && !protTotal) {
     el.innerHTML = '<div class="empty">No categorized items in this period</div>';
@@ -1711,7 +1711,6 @@ function renderProductMix(el, items) {
     const seg = [
       { label: 'Kebab',   count: c.kebab,   color: '#b30000', pct: c.kebab   / protTotal * 100 },
       { label: 'Falafel', count: c.falafel, color: '#4ecca3', pct: c.falafel / protTotal * 100 },
-      { label: 'Chicken', count: c.chicken, color: '#f0a020', pct: c.chicken / protTotal * 100 },
     ].filter(s => s.count > 0);
     html += `<div class="mix-section-label" style="margin-top:18px">Protein Mix</div>${makeMixBar(seg)}`;
   }
@@ -3090,8 +3089,8 @@ async function loadGraphData() {
       data: bucketKeys.map(k => {
         const its = bucketMap[k];
         if (!its || !its.length) return null;
-        const c = categorizeItems(its);
-        const tot = c.kebab + c.falafel + c.chicken;
+        const c = computeItemCategories(its);
+        const tot = c.kebab + c.falafel;
         return tot > 0 ? getter(c) / tot * 100 : null;
       }),
       borderColor: color,
@@ -3107,7 +3106,6 @@ async function loadGraphData() {
     datasets = [
       mkDs('Lamb',    '#b30000', c => c.kebab),
       mkDs('Falafel', '#4ecca3', c => c.falafel),
-      mkDs('Chicken', '#f0a020', c => c.chicken),
     ];
   } else {
     datasets = selectedStores.map(storeId => {
@@ -3159,7 +3157,7 @@ async function loadGraphData() {
         data = bucketKeys.map(k => {
           const its = bucketMap[k];
           if (!its || !its.length) return null;
-          const c = categorizeItems(its);
+          const c = computeItemCategories(its);
           const tot = c.rolls + c.kombos;
           return tot > 0 ? c.rolls / tot * 100 : null;
         });

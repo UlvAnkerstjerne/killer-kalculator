@@ -334,6 +334,70 @@ describe('GET /api/lemonade/today — lemonade counting', () => {
     assert.equal(r.body.stores['norrebro'], 1);
   });
 
+  // ── Canonical product-ID classification tests ─────────────────────────────
+
+  test('lemonade addon (pid 27242080) is counted', async () => {
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'A001', productid: 27242080, productname: '+ Lemonade', price: 10, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 1);
+  });
+
+  test('lemonade upgrade (pid 27242148) is counted', async () => {
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'U001', productid: 27242148, productname: '+ Killer Lemonade (+10 kr)', price: 10, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 1);
+  });
+
+  test('Lover (pid 29838736) does NOT count as lemonade', async () => {
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'LV01', productid: 29838736, productname: 'Lover', price: 35, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 0);
+  });
+
+  test('+ Lover addon (pid 29843293) does NOT count as lemonade', async () => {
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'LVA1', productid: 29843293, productname: '+ Lover (+10 kr)', price: 10, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 0);
+  });
+
+  test('product named "lemonade" with an unregistered ID is not counted', async () => {
+    // Canonical classification is by ID only. A product with "lemonade" in its name
+    // but an unknown ID must never count — even if the old fuzzy filter would have matched.
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'X001', productid: 99999999, productname: 'Special Lemonade', price: 30, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 0);
+  });
+
+  test('unknown 4 DKK Wolt line (pid 29569042) does not count as lemonade', async () => {
+    const { jar } = await login();
+    mockHandlers['lem-tok-norrebro'] = () => mkPageResponse([
+      mkLemLine({ orderlineid: 'W001', productid: 29569042, productname: 'Unknown external product', price: 4, count: 1, timestamp_pay: TODAY_CPH + ' 12:00:00' }),
+    ]);
+    const r = await request('GET', '/api/lemonade/today', { headers: { Cookie: jar.header() } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.stores['norrebro'], 0);
+  });
+
   test('total equals sum across all stores', async () => {
     const { jar } = await login();
     mockHandlers['lem-tok-norrebro']  = () => mkPageResponse([

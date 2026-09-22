@@ -12,6 +12,7 @@ const MemStore  = require('memorystore')(session);
 const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
+const { computeMetrics } = require('./lib/product-metrics');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -100,6 +101,17 @@ const loginLimiter = rateLimit({
 // Serve only the single-page frontend — never the repository root.
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// Serve the canonical product-metrics module for browser use.
+// No auth required: the product ID classification contains no secrets —
+// only the public OnlinePOS product IDs for the menu items.
+// The UMD wrapper makes this module work in both Node.js and the browser.
+// Served via a specific hardcoded route, NOT express.static, so no other
+// repository files are reachable through this path.
+app.get('/js/product-metrics.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'lib', 'product-metrics.js'));
+});
 
 // ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -724,10 +736,10 @@ async function fetchLemonadeToday() {
       if (!result.meta.complete) {
         throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);
       }
-      // Sum the count field (signed) so refunds reduce the total correctly.
-      const count = result.lines
-        .filter(l => (l.productname || '').toLowerCase().includes('lemonade'))
-        .reduce((s, l) => s + (l.count || 0), 0);
+      // Count lemonade units using the canonical product ID engine.
+      // computeMetrics handles all three lemonade variants (addon, upgrade,
+      // standalone) by product ID — no fuzzy product-name matching.
+      const count = computeMetrics(result.lines).lemUnits;
       return { id, count };
     })
   );
