@@ -1211,10 +1211,17 @@ function getDateRange(period) {
   };
 }
 
-function lyRange(period) {
-  const { from, to } = getDateRange(period);
-  const offset = 364 * 86400; // 52 weeks
-  return { from: from - offset, to: to - offset };
+// Offset a "YYYY-MM-DD" date by N calendar days (negative = backwards).
+// Uses UTC arithmetic — DST-safe; never involves time-of-day.
+function cphDateOffset(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// CPH date range for the same-period-last-year (364 days = 52 weeks back).
+function lyDateRange(period) {
+  const { start, end } = getCphDateRange(period);
+  return { start: cphDateOffset(start, -364), end: cphDateOffset(end, -364) };
 }
 
 // ── Copenhagen date helpers ────────────────────────────────────────────────────
@@ -1338,43 +1345,31 @@ function badge(n) {
 }
 
 // ── API ────────────────────────────────────────────────────────────────────────
-async function apiRevenue(storeId, from, to) {
-  const key = `rev:${storeId}:${from}:${to}`;
-  if (key in state.cache) return state.cache[key];
-
+// Sum priceexclvat directly from safe sales-range lines — no VAT division.
+// Reuses the apiSalesRange cache: one HTTP request per store+range.
+// Returns null when the fetch is incomplete or fails.
+async function apiRevenue(storeId, start, end) {
   try {
-    const res  = await apiFetch(`/api/revenue/${storeId}/${from}/${to}`);
-    if (!res) { state.cache[key] = null; return null; }
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'API error');
-    const total = (data.location || []).reduce((s, l) => s + (l.amount || 0), 0);
-    state.cache[key] = total / 1.25;
+    const lines = await apiSalesRange(storeId, start, end);
+    return lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
   } catch(e) {
-    console.warn(`Revenue error [${storeId}]:`, e.message);
-    state.cache[key] = null;
+    console.warn(`[apiRevenue] ${storeId} ${start}→${end}:`, e.message);
+    return null;
   }
-  return state.cache[key];
 }
 
-async function apiAllRevenue(from, to) {
-  const key = `allrev:${from}:${to}`;
-  if (key in state.cache) return state.cache[key];
-
-  try {
-    const res  = await apiFetch(`/api/all-revenue/${from}/${to}`);
-    if (!res) { state.cache[key] = {}; return {}; }
-    const data = await res.json();
-    const out  = {};
-    for (const [id, d] of Object.entries(data)) {
-      const total = (d.location || []).reduce((s, l) => s + (l.amount || 0), 0);
-      out[id] = total / 1.25;
-    }
-    state.cache[key] = out;
-  } catch(e) {
-    console.warn('All-revenue error:', e.message);
-    state.cache[key] = {};
-  }
-  return state.cache[key];
+// Fetch revenue for all stores in parallel.
+// Each store delegates to apiSalesRange — shares its cache with sales metrics.
+// Failed stores are omitted from the result (callers use || 0 as fallback).
+async function apiAllRevenue(start, end) {
+  const out = {};
+  await Promise.allSettled(
+    STORES.map(async s => {
+      const lines = await apiSalesRange(s.id, start, end);
+      out[s.id] = lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0);
+    })
+  );
+  return out;
 }
 
 async function apiSalesRange(storeId, start, endExcl) {
@@ -1609,13 +1604,14 @@ function renderSidebarSkeleton() {
 
 async function loadSidebar() {
   const { from, to } = getDateRange(state.period);
-  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+  const { start, end } = getCphDateRange(state.period);
+  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
   // Kick off all fetches in parallel (revenue + planday)
   const [results, salaries] = await Promise.all([
     Promise.all(STORES.map(s => Promise.all([
-      apiRevenue(s.id, from, to),
-      apiRevenue(s.id, lyFrom, lyTo)
+      apiRevenue(s.id, start, end),
+      apiRevenue(s.id, lyStart, lyEnd)
     ]))),
     apiPlandaySalaries(from, to)
   ]);
@@ -1767,12 +1763,13 @@ async function renderChainView() {
   `;
 
   const { from, to } = getDateRange(state.period);
-  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+  const { start, end } = getCphDateRange(state.period);
+  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
   // Fetch revenue for current + LY + Planday salaries in parallel
   const [curData, lyData, salaries] = await Promise.all([
-    apiAllRevenue(from, to),
-    apiAllRevenue(lyFrom, lyTo),
+    apiAllRevenue(start, end),
+    apiAllRevenue(lyStart, lyEnd),
     apiPlandaySalaries(from, to)
   ]);
 
@@ -1999,11 +1996,12 @@ async function renderStoreView(storeId) {
   `;
 
   const { from, to } = getDateRange(state.period);
-  const { from: lyFrom, to: lyTo } = lyRange(state.period);
+  const { start, end } = getCphDateRange(state.period);
+  const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
   const [rev, lyRev, salaries] = await Promise.all([
-    apiRevenue(storeId, from, to),
-    apiRevenue(storeId, lyFrom, lyTo),
+    apiRevenue(storeId, start, end),
+    apiRevenue(storeId, lyStart, lyEnd),
     apiPlandaySalaries(from, to)
   ]);
 
@@ -2273,7 +2271,8 @@ function renderInvoicesView() {
 
   // Async: fetch revenue, fill summaries + supplier breakdown
   (async () => {
-    const revMap   = await apiAllRevenue(from, to);
+    const { start: revStart, end: revEnd } = getCphDateRange(state.period);
+    const revMap   = await apiAllRevenue(revStart, revEnd);
     const totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
 
     // Fill cost summary by store
@@ -2332,11 +2331,10 @@ function renderInvoicesView() {
     for (const r of sorted) {
       const el = document.getElementById(`cst-${r.id}`);
       if (!el) continue;
-      const monthTs  = new Date(r.month + '-01T12:00:00');
-      const monthEnd = new Date(monthTs.getFullYear(), monthTs.getMonth() + 1, 0, 23, 59, 59);
-      const mFrom    = Math.floor(monthTs.getTime()  / 1000);
-      const mTo      = Math.floor(monthEnd.getTime() / 1000);
-      const rev = await apiRevenue(r.storeId, mFrom, mTo);
+      const [mYr, mMo] = r.month.split('-').map(Number);
+      const mStart = r.month + '-01';
+      const mEnd   = new Date(Date.UTC(mYr, mMo, 1)).toISOString().slice(0, 10);
+      const rev    = await apiRevenue(r.storeId, mStart, mEnd);
       if (rev && rev > 0) {
         el.textContent = (r.amount / rev * 100).toFixed(1) + '%';
       } else {
@@ -2970,19 +2968,6 @@ function formatBucketLabel(key, interval) {
   return new Date(yr, mo - 1, 1).toLocaleDateString('da-DK', { month: 'short', year: 'numeric' });
 }
 
-// apiRevenue with 30 s timeout and 0-on-failure fallback
-async function safeApiRevenue(storeId, from, to) {
-  try {
-    const result = await Promise.race([
-      apiRevenue(storeId, from, to),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000)),
-    ]);
-    return result || 0;
-  } catch (e) {
-    console.warn(`[graphs] revenue fetch failed for ${storeId}:`, e.message);
-    return 0;
-  }
-}
 
 async function loadGraphData() {
   const card = document.getElementById('graph-chart-card');
@@ -3001,14 +2986,21 @@ async function loadGraphData() {
   const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
   const isPercent     = ['food-cost', 'salary', 'rolls', 'produktmix'].includes(state.graphMetric);
 
-  // ── Revenue: one safeApiRevenue call per bucket per store, all in parallel ──
-  const revByStore = {}; // storeId → { bucketKey: number }
+  // ── Revenue: one apiSalesRange call per store; group priceexclvat by bucket ──
+  // Six stores → six requests total, regardless of bucket count.
+  const revByStore = {}; // storeId → { bucketKey: DKK ex VAT }
   await Promise.all(selectedStores.map(async storeId => {
     revByStore[storeId] = {};
-    await Promise.all(bucketKeys.map(async key => {
-      const { from: bkF, to: bkT } = bucketTimestamps(key, state.graphInterval);
-      revByStore[storeId][key] = await safeApiRevenue(storeId, bkF, bkT);
-    }));
+    try {
+      const lines = await apiSalesRange(storeId, state.graphFrom, cphDateNextDay(state.graphTo));
+      for (const line of lines) {
+        const key = itemBucket(line.date, state.graphInterval);
+        if (!key) continue;
+        revByStore[storeId][key] = (revByStore[storeId][key] || 0) + (line.priceexclvat || 0);
+      }
+    } catch(e) {
+      console.warn('[graphs] revenue fetch failed for', storeId, ':', e.message);
+    }
   }));
 
   // ── Rolls %: fetch whole period items, bucket by item.date ─────────────────

@@ -591,10 +591,10 @@ describe('sales-range — metadata storeId', () => {
 // ── 8. Existing endpoints unaffected ─────────────────────────────────────────
 
 describe('sales-range — existing endpoints unaffected', () => {
-  test('GET /api/revenue/:storeId/:from/:to still requires authentication', async () => {
+  test('GET /api/revenue/:storeId/:from/:to returns 404 (route removed)', async () => {
     resetMock();
     const r = await request({ path: '/api/revenue/vesterbro/1700000000/1700086400' });
-    assert.equal(r.status, 401);
+    assert.equal(r.status, 404);
   });
 
   test('GET /api/sales/:storeId/:unixtime returns 404 (route removed)', async () => {
@@ -603,10 +603,10 @@ describe('sales-range — existing endpoints unaffected', () => {
     assert.equal(r.status, 404);
   });
 
-  test('GET /api/all-revenue/:from/:to still requires authentication', async () => {
+  test('GET /api/all-revenue/:from/:to returns 404 (route removed)', async () => {
     resetMock();
     const r = await request({ path: '/api/all-revenue/1700000000/1700086400' });
-    assert.equal(r.status, 401);
+    assert.equal(r.status, 404);
   });
 
   test('GET /api/lemonade/today still requires authentication', async () => {

@@ -283,34 +283,6 @@ function posGet(endpoint, store) {
 
 // ── Business routes (all require authentication) ──────────────────────────────
 
-// Revenue for one store over a unix time range
-app.get('/api/revenue/:storeId/:from/:to', requireAuth, async (req, res) => {
-  const store = findStore(req.params.storeId);
-  if (!store) return res.status(404).json({ error: 'Unknown store' });
-  try {
-    const r = await posGet(`/getByUnixTimeSales/${req.params.from}/${req.params.to}`, store);
-    res.json(r.data);
-  } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
-  }
-});
-
-// Revenue for ALL 6 stores in parallel
-app.get('/api/all-revenue/:from/:to', requireAuth, async (req, res) => {
-  const { from, to } = req.params;
-  const settled = await Promise.allSettled(
-    Object.entries(STORES).map(async ([id, store]) => {
-      const r = await posGet(`/getByUnixTimeSales/${from}/${to}`, store);
-      return { id, data: r.data };
-    })
-  );
-  const out = {};
-  for (const r of settled) {
-    if (r.status === 'fulfilled') out[r.value.id] = r.value.data;
-    else console.warn('Revenue fetch error:', r.reason?.message);
-  }
-  res.json(out);
-});
 
 // ── Sales-range endpoint ──────────────────────────────────────────────────────
 
