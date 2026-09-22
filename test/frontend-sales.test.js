@@ -8,7 +8,8 @@
  *  • apiSalesRange                               — request count, caching, error cases
  *  • buildHourlyMap                              — item.date + item.hour fields
  *  • itemBucket                                  — YYYY-MM-DD bucketing
- *  • buildChannelKpis / categorizeItems          — field-shape compatibility
+ *  • lineChannel / buildChannelKpis / WOLT_VIA_HEAPS — store-aware Wolt classification
+ *  • categorizeItems                             — field-shape compatibility
  *  • Calculation regression against the Nørrebro 2026-09-20 fixture
  *
  * All functions are inlined here (pure JS, no DOM) so the test can run
@@ -121,14 +122,29 @@ function itemBucket(dateStr, interval) {
   return mon.toISOString().slice(0, 10);
 }
 
-function buildChannelKpis(items) {
+// Inline match of index.html WOLT_VIA_HEAPS + lineChannel + buildChannelKpis.
+// These must exactly mirror the production implementations in index.html.
+const WOLT_VIA_HEAPS = {
+  'indre-by': 'Online External 2',
+};
+
+function lineChannel(paymenttype, storeId) {
+  if (paymenttype === 'Wolt') return 'wolt';
+  if (WOLT_VIA_HEAPS[storeId] === paymenttype) return 'wolt';
+  if (paymenttype === 'Online External 3') return 'uberEats';
+  if (paymenttype === 'Heaps online') return 'heaps';
+  return null;
+}
+
+function buildChannelKpis(items, storeId) {
   let total = 0, wolt = 0, uberEats = 0, heaps = 0;
   for (const item of items) {
-    const v = item.priceexclvat || 0;
+    const v  = item.priceexclvat || 0;
+    const ch = lineChannel(item.paymenttype, storeId);
     total += v;
-    if (item.paymenttype === 'Wolt') wolt += v;
-    else if (item.paymenttype === 'Online External 3') uberEats += v;
-    else if (item.paymenttype === 'Heaps online') heaps += v;
+    if      (ch === 'wolt')     wolt     += v;
+    else if (ch === 'uberEats') uberEats += v;
+    else if (ch === 'heaps')    heaps    += v;
   }
   return { total, wolt, uberEats, heaps };
 }
@@ -674,5 +690,308 @@ describe('calculation regression — Nørrebro 2026-09-20 fixture', () => {
     const ch  = buildChannelKpis(lines);
     const sum = lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
     assert.ok(Math.abs(ch.total - sum) < 0.001);
+  });
+});
+
+// ── lineChannel — channel classification rules ────────────────────────────────
+describe('lineChannel — classification rules', () => {
+  // Direct Wolt
+  test('paymenttype=Wolt → wolt at any store', () => {
+    for (const id of ['norrebro','vesterbro','indre-by','christianshavn','fisketorvet','frederiksberg',undefined]) {
+      assert.equal(lineChannel('Wolt', id), 'wolt', `Failed for storeId=${id}`);
+    }
+  });
+
+  // Online External 2 — Wolt only at indre-by
+  test('Online External 2 at indre-by → wolt', () =>
+    assert.equal(lineChannel('Online External 2', 'indre-by'), 'wolt'));
+
+  test('Online External 2 at norrebro → null (not wolt)', () =>
+    assert.equal(lineChannel('Online External 2', 'norrebro'), null));
+
+  test('Online External 2 at vesterbro → null', () =>
+    assert.equal(lineChannel('Online External 2', 'vesterbro'), null));
+
+  test('Online External 2 at christianshavn → null', () =>
+    assert.equal(lineChannel('Online External 2', 'christianshavn'), null));
+
+  test('Online External 2 at fisketorvet → null', () =>
+    assert.equal(lineChannel('Online External 2', 'fisketorvet'), null));
+
+  test('Online External 2 at frederiksberg → null', () =>
+    assert.equal(lineChannel('Online External 2', 'frederiksberg'), null));
+
+  test('Online External 2 with no storeId → null', () =>
+    assert.equal(lineChannel('Online External 2', undefined), null));
+
+  // Heaps never Wolt
+  test('Heaps online → heaps (never wolt)', () => {
+    for (const id of ['norrebro','indre-by',undefined]) {
+      assert.equal(lineChannel('Heaps online', id), 'heaps', `Failed for storeId=${id}`);
+    }
+  });
+
+  // Other channels
+  test('Online External 3 → uberEats at any store', () => {
+    for (const id of ['norrebro','indre-by',undefined]) {
+      assert.equal(lineChannel('Online External 3', id), 'uberEats');
+    }
+  });
+
+  test('Betalingskort → null', () =>
+    assert.equal(lineChannel('Betalingskort', 'norrebro'), null));
+
+  test('Kontant → null', () =>
+    assert.equal(lineChannel('Kontant', 'norrebro'), null));
+
+  test('Splitbetaling → null', () =>
+    assert.equal(lineChannel('Splitbetaling', 'norrebro'), null));
+
+  test('LifePeaks → null', () =>
+    assert.equal(lineChannel('LifePeaks', 'norrebro'), null));
+
+  test('null paymenttype → null', () =>
+    assert.equal(lineChannel(null, 'indre-by'), null));
+
+  test('unknown paymenttype → null', () =>
+    assert.equal(lineChannel('SomeNewPlatform', 'indre-by'), null));
+});
+
+// ── buildChannelKpis — store-aware Wolt classification ────────────────────────
+describe('buildChannelKpis — store-aware Wolt', () => {
+  const ALL_STORES = ['norrebro','vesterbro','indre-by','christianshavn','fisketorvet','frederiksberg'];
+
+  test('direct paymenttype=Wolt counts as wolt at all 6 stores', () => {
+    for (const id of ALL_STORES) {
+      const ch = buildChannelKpis([{ priceexclvat: 100, paymenttype: 'Wolt' }], id);
+      assert.ok(Math.abs(ch.wolt - 100) < 0.001, `Failed for ${id}`);
+    }
+  });
+
+  test('Online External 2 counts as wolt at indre-by', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 200, paymenttype: 'Online External 2' }], 'indre-by');
+    assert.ok(Math.abs(ch.wolt - 200) < 0.001);
+    assert.equal(ch.heaps, 0);
+    assert.equal(ch.uberEats, 0);
+  });
+
+  test('Online External 2 does NOT count as wolt at norrebro', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 200, paymenttype: 'Online External 2' }], 'norrebro');
+    assert.equal(ch.wolt, 0);
+    assert.ok(Math.abs(ch.total - 200) < 0.001);
+  });
+
+  test('Online External 2 does NOT count as wolt at vesterbro', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'vesterbro');
+    assert.equal(ch.wolt, 0);
+  });
+
+  test('Online External 2 does NOT count as wolt at christianshavn', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'christianshavn');
+    assert.equal(ch.wolt, 0);
+  });
+
+  test('Online External 2 does NOT count as wolt at fisketorvet', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'fisketorvet');
+    assert.equal(ch.wolt, 0);
+  });
+
+  test('Online External 2 does NOT count as wolt at frederiksberg', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'frederiksberg');
+    assert.equal(ch.wolt, 0);
+  });
+
+  test('Heaps online never counts as wolt at indre-by', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 300, paymenttype: 'Heaps online' }], 'indre-by');
+    assert.equal(ch.wolt, 0);
+    assert.ok(Math.abs(ch.heaps - 300) < 0.001);
+  });
+
+  test('Heaps online never counts as wolt at any store', () => {
+    for (const id of ALL_STORES) {
+      const ch = buildChannelKpis([{ priceexclvat: 100, paymenttype: 'Heaps online' }], id);
+      assert.equal(ch.wolt, 0, `Heaps counted as wolt at ${id}`);
+    }
+  });
+
+  test('Online External 3 remains uberEats at all stores', () => {
+    for (const id of ALL_STORES) {
+      const ch = buildChannelKpis([{ priceexclvat: 100, paymenttype: 'Online External 3' }], id);
+      assert.ok(Math.abs(ch.uberEats - 100) < 0.001, `Failed for ${id}`);
+      assert.equal(ch.wolt, 0);
+    }
+  });
+
+  test('Splitbetaling stays only in total (not attributed)', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 250, paymenttype: 'Splitbetaling' }], 'norrebro');
+    assert.ok(Math.abs(ch.total - 250) < 0.001);
+    assert.equal(ch.wolt, 0);
+    assert.equal(ch.uberEats, 0);
+    assert.equal(ch.heaps, 0);
+  });
+
+  test('LifePeaks stays only in total', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 76, paymenttype: 'LifePeaks' }], 'norrebro');
+    assert.ok(Math.abs(ch.total - 76) < 0.001);
+    assert.equal(ch.wolt, 0);
+  });
+
+  test('Wolt refund (negative priceexclvat) subtracts from wolt', () => {
+    const ch = buildChannelKpis([
+      { priceexclvat:  100, paymenttype: 'Wolt' },
+      { priceexclvat:  -50, paymenttype: 'Wolt' },
+    ], 'norrebro');
+    assert.ok(Math.abs(ch.wolt  -  50) < 0.001);
+    assert.ok(Math.abs(ch.total -  50) < 0.001);
+  });
+
+  test('Online External 2 refund at indre-by subtracts from wolt', () => {
+    const ch = buildChannelKpis([
+      { priceexclvat:  200, paymenttype: 'Online External 2' },
+      { priceexclvat:  -80, paymenttype: 'Online External 2' },
+    ], 'indre-by');
+    assert.ok(Math.abs(ch.wolt  - 120) < 0.001);
+    assert.ok(Math.abs(ch.total - 120) < 0.001);
+  });
+
+  test('count=2 does NOT multiply priceexclvat', () => {
+    // priceexclvat is already the line total; count must never multiply it
+    const ch = buildChannelKpis([{ priceexclvat: 298, count: 2, paymenttype: 'Wolt' }], 'norrebro');
+    assert.ok(Math.abs(ch.wolt  - 298) < 0.001, 'wolt must not be 596');
+    assert.ok(Math.abs(ch.total - 298) < 0.001, 'total must not be 596');
+  });
+
+  test('count=3 does NOT multiply priceexclvat', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 447, count: 3, paymenttype: 'Heaps online' }], 'norrebro');
+    assert.ok(Math.abs(ch.heaps - 447) < 0.001);
+    assert.ok(Math.abs(ch.total - 447) < 0.001);
+  });
+
+  test('null priceexclvat treated as 0', () => {
+    const ch = buildChannelKpis([{ priceexclvat: null, paymenttype: 'Wolt' }], 'norrebro');
+    assert.equal(ch.wolt, 0);
+    assert.equal(ch.total, 0);
+  });
+
+  test('Wolt % formula: wolt / total × 100', () => {
+    const items = [
+      { priceexclvat: 100, paymenttype: 'Betalingskort' },
+      { priceexclvat:  50, paymenttype: 'Wolt' },
+    ];
+    const ch  = buildChannelKpis(items, 'norrebro');
+    const pct = ch.total > 0 ? ch.wolt / ch.total * 100 : null;
+    assert.ok(Math.abs(pct - 33.3333) < 0.001);
+  });
+});
+
+// ── buildChannelKpis — fixture regression with storeId ────────────────────────
+describe('buildChannelKpis — fixture regression (norrebro, with storeId)', () => {
+  const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'norrebro-2026-09-20.fixture.json');
+  const lines = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8')).lines;
+
+  test('total ex VAT = 13,143.68 DKK (with storeId)', () => {
+    const ch = buildChannelKpis(lines, 'norrebro');
+    assert.ok(Math.abs(ch.total - 13143.68) < 0.005, `Got ${ch.total}`);
+  });
+
+  test('Wolt ex VAT = 2,120.48 DKK (with storeId)', () => {
+    const ch = buildChannelKpis(lines, 'norrebro');
+    assert.ok(Math.abs(ch.wolt - 2120.48) < 0.005, `Got ${ch.wolt}`);
+  });
+
+  test('Wolt share = 16.1331% (with storeId)', () => {
+    const ch  = buildChannelKpis(lines, 'norrebro');
+    const pct = ch.wolt / ch.total * 100;
+    assert.ok(Math.abs(pct - 16.1331) < 0.001, `Got ${pct}`);
+  });
+
+  test('no Online External 2 lines in fixture — storeId has no effect on result', () => {
+    // The fixture pre-dates Wolt-via-Heaps; passing 'indre-by' must give same total
+    const chNb = buildChannelKpis(lines, 'norrebro');
+    const chIb = buildChannelKpis(lines, 'indre-by');
+    assert.ok(Math.abs(chNb.wolt  - chIb.wolt)  < 0.001);
+    assert.ok(Math.abs(chNb.total - chIb.total) < 0.001);
+  });
+});
+
+// ── chain totals — mixed stores classify correctly ────────────────────────────
+describe('chain totals — mixed stores classify correctly', () => {
+  // Simulate a chain call: per-store line arrays, accumulated with per-store storeId
+  function chainKpis(storeLineMap) {
+    return storeLineMap.reduce((acc, { id, lines }) => {
+      const kpis = buildChannelKpis(lines, id);
+      return { total: acc.total + kpis.total, wolt: acc.wolt + kpis.wolt,
+               uberEats: acc.uberEats + kpis.uberEats, heaps: acc.heaps + kpis.heaps };
+    }, { total: 0, wolt: 0, uberEats: 0, heaps: 0 });
+  }
+
+  test('norrebro Wolt + indre-by OE2 both land in wolt', () => {
+    const ch = chainKpis([
+      { id: 'norrebro', lines: [{ priceexclvat: 100, paymenttype: 'Wolt' }] },
+      { id: 'indre-by', lines: [{ priceexclvat: 200, paymenttype: 'Online External 2' }] },
+    ]);
+    assert.ok(Math.abs(ch.wolt  - 300) < 0.001);
+    assert.ok(Math.abs(ch.total - 300) < 0.001);
+  });
+
+  test('indre-by OE2 goes to wolt; norrebro OE2 goes only to total', () => {
+    const ch = chainKpis([
+      { id: 'indre-by', lines: [{ priceexclvat: 200, paymenttype: 'Online External 2' }] },
+      { id: 'norrebro', lines: [{ priceexclvat: 150, paymenttype: 'Online External 2' }] },
+    ]);
+    assert.ok(Math.abs(ch.wolt  - 200) < 0.001);   // only indre-by
+    assert.ok(Math.abs(ch.total - 350) < 0.001);   // both in total
+  });
+
+  test('Heaps from all stores stays in heaps, not wolt', () => {
+    const ch = chainKpis([
+      { id: 'norrebro', lines: [{ priceexclvat: 100, paymenttype: 'Heaps online' }] },
+      { id: 'indre-by', lines: [{ priceexclvat: 200, paymenttype: 'Heaps online' }] },
+    ]);
+    assert.equal(ch.wolt, 0);
+    assert.ok(Math.abs(ch.heaps - 300) < 0.001);
+  });
+
+  test('Splitbetaling at any store stays only in total', () => {
+    const ch = chainKpis([
+      { id: 'norrebro', lines: [{ priceexclvat: 150, paymenttype: 'Splitbetaling' }] },
+      { id: 'indre-by', lines: [{ priceexclvat: 100, paymenttype: 'Splitbetaling' }] },
+    ]);
+    assert.equal(ch.wolt, 0);
+    assert.ok(Math.abs(ch.total - 250) < 0.001);
+  });
+
+  test('chain total = sum of all store totals', () => {
+    const storeLineMap = [
+      { id: 'norrebro',       lines: [{ priceexclvat: 100, paymenttype: 'Wolt' },         { priceexclvat: 200, paymenttype: 'Betalingskort' }] },
+      { id: 'indre-by',       lines: [{ priceexclvat: 150, paymenttype: 'Online External 2' }, { priceexclvat: 80, paymenttype: 'Kontant' }] },
+      { id: 'vesterbro',      lines: [{ priceexclvat: 120, paymenttype: 'Heaps online' }] },
+    ];
+    const ch = chainKpis(storeLineMap);
+    const expected = storeLineMap.flatMap(s => s.lines).reduce((s, l) => s + (l.priceexclvat || 0), 0);
+    assert.ok(Math.abs(ch.total - expected) < 0.001);
+    assert.ok(Math.abs(ch.wolt  - 250) < 0.001);   // 100 (norrebro Wolt) + 150 (indre-by OE2)
+    assert.ok(Math.abs(ch.heaps - 120) < 0.001);
+  });
+});
+
+// ── no extra requests — buildChannelKpis is synchronous ──────────────────────
+describe('no extra requests — buildChannelKpis and lineChannel are synchronous', () => {
+  test('buildChannelKpis returns synchronously (no I/O)', () => {
+    const items = [{ priceexclvat: 100, paymenttype: 'Wolt' }];
+    const start = Date.now();
+    const ch = buildChannelKpis(items, 'norrebro');
+    assert.ok(Date.now() - start < 10, 'must complete in < 10 ms');
+    assert.ok(ch.wolt > 0);
+  });
+
+  test('apiSalesRange result is used directly by buildChannelKpis — no additional fetch', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse([{ priceexclvat: 100, paymenttype: 'Wolt' }]); };
+    const cache = {};
+    const lines = await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache);
+    const ch    = buildChannelKpis(lines, 'norrebro');
+    assert.equal(calls, 1, 'only 1 request should have been made');
+    assert.ok(Math.abs(ch.wolt - 100) < 0.001);
   });
 });

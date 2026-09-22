@@ -267,12 +267,55 @@ Refunds (count < 0) subtract from the total.
 
 ---
 
+## Store-aware Wolt classification
+
+Wolt orders are identified by `paymenttype`. The mapping is store-specific because
+Indre By routes Wolt orders through its Heaps terminal connection (verified from
+2026-09-21 onward), giving them a different `paymenttype` value than all other stores.
+
+### Channel classification rules
+
+| Rule | `paymenttype` value | Condition | Channel |
+|------|---------------------|-----------|---------|
+| 1 | `'Wolt'` | any store | `wolt` |
+| 2 | `'Online External 2'` | `storeId === 'indre-by'` | `wolt` |
+| 3 | `'Online External 3'` | any store | `uberEats` |
+| 4 | `'Heaps online'` | any store | `heaps` |
+| 5 | anything else | any store | unattributed (in total only) |
+
+Rules are evaluated in order; first match wins.
+
+### `WOLT_VIA_HEAPS` map
+
+```
+{ 'indre-by': 'Online External 2' }
+```
+
+This map is the single source of truth for store-specific Wolt paymenttype overrides.
+**Add a new entry only after verifying the mapping in production data for that store.**
+Verification must confirm: (a) the paymenttype value appears exclusively for Wolt orders
+at that store, and (b) it is not shared with another channel (e.g. direct Heaps orders).
+
+### `lineChannel(paymenttype, storeId)` — pure classifier
+
+Returns `'wolt' | 'uberEats' | 'heaps' | null`. Used by `buildChannelKpis(items, storeId)`.
+
+### Chain view note
+
+When aggregating across all stores, per-store KPIs are computed separately (preserving
+each store's `storeId`) and then summed. Flattening lines before KPI calculation would
+lose store identity and misclassify Indre By's `'Online External 2'` lines.
+
+---
+
 ## Wolt %
 
 `wolt_pct = wolt_excl_revenue / total_excl_revenue × 100`
 
 where:
-- `wolt_excl_revenue  = sum(priceexclvat) for lines where paymenttype = 'Wolt'`
+- `wolt_excl_revenue  = sum(priceexclvat) for lines classified as channel 'wolt'`
+  (i.e. `paymenttype = 'Wolt'` at any store, or `paymenttype = 'Online External 2'`
+  at Indre By — see store-aware Wolt classification above)
 - `total_excl_revenue = sum(priceexclvat) for all lines`
 
 Both sums use the same date filter as the revenue metric.

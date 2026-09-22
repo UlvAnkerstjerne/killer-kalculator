@@ -1546,14 +1546,40 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
 }
 
 // ── Channel KPIs (Wolt / Uber Eats / Heaps) ──────────────────────────────────
-function buildChannelKpis(items) {
+//
+// WOLT_VIA_HEAPS: stores that route Wolt orders through their Heaps connection.
+// Each such store surfaces Wolt as a distinct paymenttype value rather than the
+// standard 'Wolt' string.  Add a new entry ONLY after verifying the mapping in
+// production data for that specific store.
+// See docs/metric-spec.md — "Store-aware Wolt classification".
+const WOLT_VIA_HEAPS = {
+  'indre-by': 'Online External 2',   // verified from 2026-09-21 onward
+};
+
+// Single source of truth for per-line channel classification.
+// Returns 'wolt' | 'uberEats' | 'heaps' | null.
+// storeId is required so Wolt-via-Heaps mappings apply correctly per store.
+function lineChannel(paymenttype, storeId) {
+  if (paymenttype === 'Wolt') return 'wolt';
+  if (WOLT_VIA_HEAPS[storeId] === paymenttype) return 'wolt';
+  if (paymenttype === 'Online External 3') return 'uberEats';
+  if (paymenttype === 'Heaps online') return 'heaps';
+  return null;
+}
+
+// Compute channel KPIs for one store's lines.
+// storeId must be passed so Wolt-via-Heaps rules apply correctly.
+// Monetary values use priceexclvat directly — never multiplied by count.
+// Refunds (negative priceexclvat) subtract from their original channel.
+function buildChannelKpis(items, storeId) {
   let total = 0, wolt = 0, uberEats = 0, heaps = 0;
   for (const item of items) {
-    const v = item.priceexclvat || 0;
+    const v  = item.priceexclvat || 0;
+    const ch = lineChannel(item.paymenttype, storeId);
     total += v;
-    if (item.paymenttype === 'Wolt') wolt += v;
-    else if (item.paymenttype === 'Online External 3') uberEats += v;
-    else if (item.paymenttype === 'Heaps online') heaps += v;
+    if      (ch === 'wolt')     wolt     += v;
+    else if (ch === 'uberEats') uberEats += v;
+    else if (ch === 'heaps')    heaps    += v;
   }
   return { total, wolt, uberEats, heaps };
 }
@@ -1958,9 +1984,15 @@ async function renderChainView() {
     document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div><div class="empty">Select ≤14 days to view top items.</div>';
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
-    const allItems = await Promise.all(STORES.map(s => apiSalesRange(s.id, salesStart, salesEnd))).then(r => r.flat());
-
-    const chCh = buildChannelKpis(allItems);
+    // Fetch per-store lines preserving store identity for Wolt-via-Heaps classification.
+    // allItems is still built (flat) for top-items and product-mix which need no store context.
+    const storeLines = await Promise.all(STORES.map(async s => ({ id: s.id, lines: await apiSalesRange(s.id, salesStart, salesEnd) })));
+    const allItems   = storeLines.flatMap(s => s.lines);
+    const chCh       = storeLines.reduce((acc, s) => {
+      const kpis = buildChannelKpis(s.lines, s.id);
+      return { total: acc.total + kpis.total, wolt: acc.wolt + kpis.wolt,
+               uberEats: acc.uberEats + kpis.uberEats, heaps: acc.heaps + kpis.heaps };
+    }, { total: 0, wolt: 0, uberEats: 0, heaps: 0 });
     const chWoltP     = chCh.total > 0 ? (chCh.wolt     / chCh.total * 100) : null;
     const chUberEatsP = chCh.total > 0 ? (chCh.uberEats / chCh.total * 100) : null;
     const chHeapsP    = chCh.total > 0 ? (chCh.heaps    / chCh.total * 100) : null;
@@ -2110,7 +2142,7 @@ async function renderStoreView(storeId) {
   } else {
     const items = await apiSalesRange(storeId, salesStart, salesEnd);
 
-    const stCh = buildChannelKpis(items);
+    const stCh = buildChannelKpis(items, storeId);
     const stWoltP     = stCh.total > 0 ? (stCh.wolt     / stCh.total * 100) : null;
     const stUberEatsP = stCh.total > 0 ? (stCh.uberEats / stCh.total * 100) : null;
     const stHeapsP    = stCh.total > 0 ? (stCh.heaps    / stCh.total * 100) : null;
