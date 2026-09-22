@@ -11,6 +11,8 @@ const session   = require('express-session');
 const MemStore  = require('memorystore')(session);
 const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const { fetchSalesRange } = require('./lib/pos-fetcher');
+const { computeMetrics } = require('./lib/product-metrics');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -99,6 +101,17 @@ const loginLimiter = rateLimit({
 // Serve only the single-page frontend — never the repository root.
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// Serve the canonical product-metrics module for browser use.
+// No auth required: the product ID classification contains no secrets —
+// only the public OnlinePOS product IDs for the menu items.
+// The UMD wrapper makes this module work in both Node.js and the browser.
+// Served via a specific hardcoded route, NOT express.static, so no other
+// repository files are reachable through this path.
+app.get('/js/product-metrics.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'lib', 'product-metrics.js'));
+});
 
 // ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -282,44 +295,139 @@ function posGet(endpoint, store) {
 
 // ── Business routes (all require authentication) ──────────────────────────────
 
-// Revenue for one store over a unix time range
-app.get('/api/revenue/:storeId/:from/:to', requireAuth, async (req, res) => {
-  const store = findStore(req.params.storeId);
-  if (!store) return res.status(404).json({ error: 'Unknown store' });
-  try {
-    const r = await posGet(`/getByUnixTimeSales/${req.params.from}/${req.params.to}`, store);
-    res.json(r.data);
-  } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
-  }
-});
 
-// Revenue for ALL 6 stores in parallel
-app.get('/api/all-revenue/:from/:to', requireAuth, async (req, res) => {
-  const { from, to } = req.params;
-  const settled = await Promise.allSettled(
-    Object.entries(STORES).map(async ([id, store]) => {
-      const r = await posGet(`/getByUnixTimeSales/${from}/${to}`, store);
-      return { id, data: r.data };
-    })
+// ── Sales-range endpoint ──────────────────────────────────────────────────────
+
+// Maximum date range for a single request.  Prevents exhaustive historical
+// exports over the paginated exportSales/v20 endpoint.  366 days covers any
+// single calendar year including leap years.
+const SALES_RANGE_MAX_DAYS = 366;
+
+/**
+ * Return true when str is a real YYYY-MM-DD calendar date.
+ * Rejects month 13, day 32, Feb 30, etc. via UTC round-trip.
+ */
+function isValidISODate(str) {
+  if (typeof str !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const [y, m, d] = str.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth()    === m - 1 &&
+    dt.getUTCDate()     === d
   );
-  const out = {};
-  for (const r of settled) {
-    if (r.status === 'fulfilled') out[r.value.id] = r.value.data;
-    else console.warn('Revenue fetch error:', r.reason?.message);
-  }
-  res.json(out);
-});
+}
 
-// Detailed item-level sales for one store on one day
-app.get('/api/sales/:storeId/:unixtime', requireAuth, async (req, res) => {
-  const store = findStore(req.params.storeId);
+/**
+ * Extract the Copenhagen hour (0–23) directly from a naive CPH-local timestamp
+ * string such as "2026-09-20 14:31:00".  The string already encodes CPH local
+ * time so the hour component is read without any UTC conversion.
+ */
+function cphHourFromLine(line) {
+  const tsStr = line.timestamp_pay || line.datetime || null;
+  if (!tsStr || typeof tsStr !== 'string') return null;
+  const m = /[ T](\d{2}):\d{2}:\d{2}/.exec(tsStr.trim());
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Return only the allowlisted fields from a processed sales line.
+ * All raw upstream fields not on this list — cardnumber, clerk, orderlineid,
+ * firmaid, debtorname, timestamps, order IDs, costing fields, and any other
+ * customer/employee fields — are discarded here and never reach the browser.
+ */
+function sanitiseSalesLine(line) {
+  return {
+    productid:       line.productid       ?? null,
+    productname:     line.productname     ?? null,
+    productgroupid:  line.productgroupid  ?? null,
+    productgroup:    line.productgroup    ?? null,
+    count:           line.count           ?? null,
+    price:           line.price           ?? null,
+    priceexclvat:    line.priceexclvat    ?? null,
+    paymenttype:     line.paymenttype     ?? null,
+    paymenttypecode: line.paymenttypecode ?? null,
+    date:            line._cphDate        ?? null,
+    hour:            cphHourFromLine(line),
+  };
+}
+
+/**
+ * Thin axios adapter matching the httpGet signature expected by fetchSalesRange.
+ * Credentials travel in the headers object constructed inside fetchSalesRange —
+ * never embedded in the URL.
+ */
+async function posHttpGet(url, headers) {
+  return axios.get(url, { headers, timeout: 20000 });
+}
+
+/**
+ * GET /api/sales-range/:storeId/:start/:end
+ *
+ * :start  Inclusive CPH date  YYYY-MM-DD (Europe/Copenhagen)
+ * :end    Exclusive CPH date  YYYY-MM-DD (Europe/Copenhagen)
+ *
+ * Fetches all exportSales/v20 pages for the store over the date range,
+ * filters to [start, end) by CPH timestamp_pay, deduplicates by orderlineid,
+ * and returns only allowlisted non-sensitive fields plus safe completeness
+ * metadata.  Pagination, loop/stall detection and URL validation are performed
+ * by lib/pos-fetcher before this route responds.
+ *
+ * 400  Bad or missing params (invalid date, end ≤ start, range > 366 days)
+ * 404  Unknown storeId
+ * 502  Any upstream / network / pagination failure
+ */
+app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) => {
+  const { storeId, start, end } = req.params;
+
+  const store = findStore(storeId);
   if (!store) return res.status(404).json({ error: 'Unknown store' });
+
+  if (!isValidISODate(start)) {
+    return res.status(400).json({ error: 'start must be a valid YYYY-MM-DD date' });
+  }
+  if (!isValidISODate(end)) {
+    return res.status(400).json({ error: 'end must be a valid YYYY-MM-DD date' });
+  }
+  if (end <= start) {
+    return res.status(400).json({ error: 'end must be strictly after start' });
+  }
+
+  const diffDays = Math.round(
+    (new Date(end + 'T12:00:00Z') - new Date(start + 'T12:00:00Z')) / 86_400_000
+  );
+  if (diffDays > SALES_RANGE_MAX_DAYS) {
+    return res.status(400).json({
+      error: `Date range must not exceed ${SALES_RANGE_MAX_DAYS} days`
+    });
+  }
+
   try {
-    const r = await posGet(`/exportSales/v20/${req.params.unixtime}`, store);
-    res.json(r.data);
+    const result = await fetchSalesRange({ store, start, end, httpGet: posHttpGet });
+
+    const lines = result.lines.map(sanitiseSalesLine);
+
+    // Raw conflict records and orderlineids are never sent to the browser;
+    // only the conflict count is exposed so completeness can be assessed.
+    const meta = {
+      complete:           result.meta.complete,
+      pages:              result.meta.pages,
+      rawLineCount:       result.meta.rawLineCount,
+      processedLineCount: result.meta.processedLineCount,
+      outOfRange:         result.meta.outOfRange,
+      duplicatesRemoved:  result.meta.duplicatesRemoved,
+      invalidCount:       result.meta.invalidCount,
+      conflictCount:      result.meta.conflicts.length,
+      start:              result.meta.start,
+      end:                result.meta.end,
+      storeId,
+    };
+
+    return res.json({ lines, meta });
   } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+    // Log the message only — never the store token, firmaid or upstream body
+    console.error('[sales-range] upstream error:', err.message);
+    return res.status(502).json({ error: 'Upstream data fetch failed' });
   }
 });
 
@@ -609,32 +717,48 @@ function cphDateStr() {
   return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
 }
 
-function cphMidnightTs() {
-  const s    = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
-  const [y, mo, dy] = s.split('-').map(Number);
-  const noonUTC = Date.UTC(y, mo - 1, dy, 12, 0, 0);
-  const noonCPH = new Date(noonUTC).toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
-  const off     = parseInt(noonCPH.slice(11, 13), 10) - 12;
-  return (Date.UTC(y, mo - 1, dy) - off * 3600000) / 1000;
+// Return the calendar day after dateStr as "YYYY-MM-DD" (UTC arithmetic; DST-safe).
+function cphDateNextDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 async function fetchLemonadeToday() {
-  const midnight = cphMidnightTs();
-  const results  = await Promise.allSettled(
+  const today    = cphDateStr();
+  const tomorrow = cphDateNextDay(today);   // exclusive end — today only
+
+  const results = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
-      const r     = await posGet(`/exportSales/v20/${midnight}`, store);
-      const items = r.data.data || [];
-      const count = items.filter(i => (i.productname || '').toLowerCase().includes('lemonade')).length;
+      const result = await fetchSalesRange({
+        store, start: today, end: tomorrow, httpGet: posHttpGet,
+      });
+      // Incomplete result (conflicts / invalids) must not corrupt totals.
+      if (!result.meta.complete) {
+        throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);
+      }
+      // Count lemonade units using the canonical product ID engine.
+      // computeMetrics handles all three lemonade variants (addon, upgrade,
+      // standalone) by product ID — no fuzzy product-name matching.
+      const count = computeMetrics(result.lines).lemUnits;
       return { id, count };
     })
   );
-  const stores = {};
-  let total = 0;
+
+  const stores   = {};
+  let   total    = 0;
+  let   complete = true;
+
   for (const r of results) {
-    if (r.status === 'fulfilled') { stores[r.value.id] = r.value.count; total += r.value.count; }
-    else console.warn('[lemonade] fetch error:', r.reason?.message);
+    if (r.status === 'fulfilled') {
+      stores[r.value.id] = r.value.count;
+      total += r.value.count;
+    } else {
+      console.warn('[lemonade] fetch error:', r.reason?.message);
+      complete = false;   // partial data — do not save to history
+    }
   }
-  return { date: cphDateStr(), stores, total };
+
+  return { date: today, stores, total, complete };
 }
 
 function loadLemonadeHistory() {
@@ -694,7 +818,11 @@ if (require.main === module) {
     lemonadeSavedDate = date;
     (async () => {
       try {
-        const data    = await fetchLemonadeToday();
+        const data = await fetchLemonadeToday();
+        if (!data.complete) {
+          console.warn('[lemonade] skipping history save: incomplete data for', data.date);
+          return;
+        }
         const history = loadLemonadeHistory();
         const idx     = history.findIndex(e => e.date === data.date);
         if (idx >= 0) history[idx] = data; else history.push(data);
