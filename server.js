@@ -312,18 +312,6 @@ app.get('/api/all-revenue/:from/:to', requireAuth, async (req, res) => {
   res.json(out);
 });
 
-// Detailed item-level sales for one store on one day
-app.get('/api/sales/:storeId/:unixtime', requireAuth, async (req, res) => {
-  const store = findStore(req.params.storeId);
-  if (!store) return res.status(404).json({ error: 'Unknown store' });
-  try {
-    const r = await posGet(`/exportSales/v20/${req.params.unixtime}`, store);
-    res.json(r.data);
-  } catch (err) {
-    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
-  }
-});
-
 // ── Sales-range endpoint ──────────────────────────────────────────────────────
 
 // Maximum date range for a single request.  Prevents exhaustive historical
@@ -745,32 +733,48 @@ function cphDateStr() {
   return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
 }
 
-function cphMidnightTs() {
-  const s    = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
-  const [y, mo, dy] = s.split('-').map(Number);
-  const noonUTC = Date.UTC(y, mo - 1, dy, 12, 0, 0);
-  const noonCPH = new Date(noonUTC).toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
-  const off     = parseInt(noonCPH.slice(11, 13), 10) - 12;
-  return (Date.UTC(y, mo - 1, dy) - off * 3600000) / 1000;
+// Return the calendar day after dateStr as "YYYY-MM-DD" (UTC arithmetic; DST-safe).
+function cphDateNextDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 async function fetchLemonadeToday() {
-  const midnight = cphMidnightTs();
-  const results  = await Promise.allSettled(
+  const today    = cphDateStr();
+  const tomorrow = cphDateNextDay(today);   // exclusive end — today only
+
+  const results = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
-      const r     = await posGet(`/exportSales/v20/${midnight}`, store);
-      const items = r.data.data || [];
-      const count = items.filter(i => (i.productname || '').toLowerCase().includes('lemonade')).length;
+      const result = await fetchSalesRange({
+        store, start: today, end: tomorrow, httpGet: posHttpGet,
+      });
+      // Incomplete result (conflicts / invalids) must not corrupt totals.
+      if (!result.meta.complete) {
+        throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);
+      }
+      // Sum the count field (signed) so refunds reduce the total correctly.
+      const count = result.lines
+        .filter(l => (l.productname || '').toLowerCase().includes('lemonade'))
+        .reduce((s, l) => s + (l.count || 0), 0);
       return { id, count };
     })
   );
-  const stores = {};
-  let total = 0;
+
+  const stores   = {};
+  let   total    = 0;
+  let   complete = true;
+
   for (const r of results) {
-    if (r.status === 'fulfilled') { stores[r.value.id] = r.value.count; total += r.value.count; }
-    else console.warn('[lemonade] fetch error:', r.reason?.message);
+    if (r.status === 'fulfilled') {
+      stores[r.value.id] = r.value.count;
+      total += r.value.count;
+    } else {
+      console.warn('[lemonade] fetch error:', r.reason?.message);
+      complete = false;   // partial data — do not save to history
+    }
   }
-  return { date: cphDateStr(), stores, total };
+
+  return { date: today, stores, total, complete };
 }
 
 function loadLemonadeHistory() {
@@ -830,7 +834,11 @@ if (require.main === module) {
     lemonadeSavedDate = date;
     (async () => {
       try {
-        const data    = await fetchLemonadeToday();
+        const data = await fetchLemonadeToday();
+        if (!data.complete) {
+          console.warn('[lemonade] skipping history save: incomplete data for', data.date);
+          return;
+        }
         const history = loadLemonadeHistory();
         const idx     = history.findIndex(e => e.date === data.date);
         if (idx >= 0) history[idx] = data; else history.push(data);

@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "node server.js",
-    "test": "node --test server.test.js fixture.test.js test/sales-lines.test.js test/pos-fetcher.test.js test/sales-range.test.js test/frontend-sales.test.js"
+    "test": "node --test server.test.js fixture.test.js test/sales-lines.test.js test/pos-fetcher.test.js test/sales-range.test.js test/frontend-sales.test.js test/lemonade.test.js"
   },
   "dependencies": {
     "axios": "^1.13.6",

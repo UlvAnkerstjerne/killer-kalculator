@@ -258,7 +258,6 @@ describe('Unauthenticated access to business routes is denied', () => {
   const protectedGets = [
     '/api/revenue/vesterbro/1700000000/1700086400',
     '/api/all-revenue/1700000000/1700086400',
-    '/api/sales/vesterbro/1700000000',
     '/api/planday/salaries/2026-01-01/2026-01-07',
     '/api/katering-recipes',
     '/api/meat',
