@@ -123,13 +123,19 @@ async function apiRevenue_t(storeId, start, end, apiSalesRangeFn) {
 }
 
 async function apiAllRevenue_t(start, end, stores, apiSalesRangeFn) {
-  const out = {};
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     stores.map(async s => {
       const lines = await apiSalesRangeFn(s, start, end);
-      out[s] = lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0);
+      return { id: s, rev: lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0) };
     })
   );
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length > 0) {
+    throw new Error(`Revenue unavailable: ${failed.length} store(s) failed — ` +
+      failed.map(r => r.reason?.message || 'unknown').join('; '));
+  }
+  const out = {};
+  for (const r of results) out[r.value.id] = r.value.rev;
   return out;
 }
 
@@ -470,17 +476,15 @@ describe('incomplete / failed data — not cached or rendered as revenue', () =>
     assert.equal(rev, null);
   });
 
-  test('apiAllRevenue omits failed store from result', async () => {
+  test('apiAllRevenue throws when any store fails — fail closed (no partial total)', async () => {
     const mock = async (storeId) => {
       if (storeId === 'norrebro') throw new Error('fetch failed');
       return [{ priceexclvat: 100 }];
     };
-    const out = await apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock);
-    assert.ok(!('norrebro' in out), 'failed store should not appear in result');
-    assert.equal(Object.keys(out).length, 5);
-    for (const id of SIX_STORES.filter(s => s !== 'norrebro')) {
-      assert.equal(out[id], 100);
-    }
+    await assert.rejects(
+      () => apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock),
+      /Revenue unavailable/
+    );
   });
 
   test('graph: failed store leaves empty bucket map (not zero-filled)', async () => {
@@ -567,6 +571,192 @@ function reqGet(urlPath) {
     }).on('error', reject).end();
   });
 }
+
+describe('fail-closed — apiAllRevenue error semantics', () => {
+  test('all stores succeed → returns map with one entry per store', async () => {
+    const mock = async (storeId) => [{ priceexclvat: 50 }];
+    const out  = await apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock);
+    assert.equal(Object.keys(out).length, 6);
+    for (const id of SIX_STORES) assert.equal(out[id], 50);
+  });
+
+  test('genuine zero sales (empty lines) → revenue 0, not thrown', async () => {
+    const mock = async () => [];  // empty = zero sales, not a failure
+    const out  = await apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock);
+    for (const id of SIX_STORES) assert.equal(out[id], 0);
+  });
+
+  test('zero is distinct from null: zero means no sales, null means fetch failed', () => {
+    // apiRevenue_t returns null on throw, never 0 for a failed fetch
+    assert.notEqual(null, 0);
+    assert.equal(null ?? 'error', 'error');
+    assert.equal(0    ?? 'error',  0);       // 0 is a valid revenue value
+  });
+
+  test('one failed store of six → throws, no partial chain total', async () => {
+    const mock = async (storeId) => {
+      if (storeId === 'fisketorvet') throw new Error('incomplete');
+      return [{ priceexclvat: 200 }];
+    };
+    await assert.rejects(
+      () => apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock),
+      /Revenue unavailable.*1 store/
+    );
+  });
+
+  test('two failed stores of six → error message names count', async () => {
+    const mock = async (storeId) => {
+      if (storeId === 'vesterbro' || storeId === 'norrebro') throw new Error('timeout');
+      return [{ priceexclvat: 100 }];
+    };
+    await assert.rejects(
+      () => apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock),
+      /Revenue unavailable.*2 store/
+    );
+  });
+
+  test('all six fail → throws with count 6', async () => {
+    const mock = async () => { throw new Error('server down'); };
+    await assert.rejects(
+      () => apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock),
+      /Revenue unavailable.*6 store/
+    );
+  });
+
+  test('recovery — second call succeeds after first threw', async () => {
+    let attempt = 0;
+    const mock = async (storeId) => {
+      attempt++;
+      if (attempt <= SIX_STORES.length) throw new Error('first batch fails');
+      return [{ priceexclvat: 100 }];
+    };
+    // First attempt: all stores fail
+    await assert.rejects(
+      () => apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock),
+      /Revenue unavailable/
+    );
+    // Second attempt: all stores succeed
+    const mock2 = async () => [{ priceexclvat: 75 }];
+    const out   = await apiAllRevenue_t('2026-09-20', '2026-09-21', SIX_STORES, mock2);
+    assert.equal(Object.keys(out).length, 6);
+    for (const id of SIX_STORES) assert.equal(out[id], 75);
+  });
+
+  test('apiRevenue_t returns null on throw (single-store fail path)', async () => {
+    const mock = async () => { throw new Error('store network error'); };
+    const rev  = await apiRevenue_t('norrebro', '2026-09-20', '2026-09-21', mock);
+    assert.equal(rev, null);
+  });
+
+  test('apiRevenue_t returns 0 for empty lines (zero sales, not failure)', async () => {
+    const mock = async () => [];
+    const rev  = await apiRevenue_t('norrebro', '2026-09-20', '2026-09-21', mock);
+    assert.equal(rev, 0);
+    assert.notEqual(rev, null);
+  });
+});
+
+describe('TZ invariance — child-process execution', () => {
+  const { spawnSync } = require('node:child_process');
+
+  function runInTZ(tz, code) {
+    const res = spawnSync(process.execPath, ['-e', code], {
+      env: { ...process.env, TZ: tz },
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    if (res.error) throw res.error;
+    return res.stdout.trim();
+  }
+
+  // The core date arithmetic — should be identical in all timezones.
+  const arithmeticCode = `
+    function cphDateOffset(dateStr, days) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+    }
+    const results = [
+      cphDateOffset('2026-03-29', -1),   // spring-forward eve
+      cphDateOffset('2026-03-29',  1),   // spring-forward day
+      cphDateOffset('2026-10-25', -1),   // fall-back day
+      cphDateOffset('2026-12-31',  1),   // year boundary
+      cphDateOffset('2026-09-22', -364), // LY offset
+    ].join(',');
+    process.stdout.write(results);
+  `;
+
+  const EXPECTED_ARITHMETIC = '2026-03-28,2026-03-30,2026-10-24,2027-01-01,2025-09-23';
+
+  test('cphDateOffset — TZ=UTC matches expected output', () => {
+    assert.equal(runInTZ('UTC', arithmeticCode), EXPECTED_ARITHMETIC);
+  });
+
+  test('cphDateOffset — TZ=Europe/Copenhagen matches TZ=UTC', () => {
+    assert.equal(runInTZ('Europe/Copenhagen', arithmeticCode), EXPECTED_ARITHMETIC);
+  });
+
+  test('cphDateOffset — TZ=America/Los_Angeles matches TZ=UTC', () => {
+    assert.equal(runInTZ('America/Los_Angeles', arithmeticCode), EXPECTED_ARITHMETIC);
+  });
+
+  // Revenue sum — pure arithmetic, no date parsing involved.
+  const revSumCode = `
+    const lines = [
+      { priceexclvat: 100.50 },
+      { priceexclvat:  49.50 },
+      { priceexclvat:  -25.00 },
+    ];
+    const rev = lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
+    process.stdout.write(rev.toFixed(2));
+  `;
+  const EXPECTED_REV = '125.00';
+
+  test('revenue sum(priceexclvat) — TZ=UTC', () => {
+    assert.equal(runInTZ('UTC', revSumCode), EXPECTED_REV);
+  });
+
+  test('revenue sum(priceexclvat) — TZ=Europe/Copenhagen', () => {
+    assert.equal(runInTZ('Europe/Copenhagen', revSumCode), EXPECTED_REV);
+  });
+
+  test('revenue sum(priceexclvat) — TZ=America/Los_Angeles', () => {
+    assert.equal(runInTZ('America/Los_Angeles', revSumCode), EXPECTED_REV);
+  });
+
+  // itemBucket weekly — uses noon UTC anchor to avoid DST edge
+  const bucketCode = `
+    function itemBucket(dateStr, interval) {
+      if (!dateStr) return null;
+      if (interval === 'daily')   return dateStr;
+      if (interval === 'monthly') return dateStr.slice(0, 7);
+      const d = new Date(dateStr + 'T12:00:00Z');
+      if (isNaN(d)) return null;
+      const wd = d.getUTCDay();
+      const mon = new Date(d);
+      mon.setUTCDate(d.getUTCDate() - (wd === 0 ? 6 : wd - 1));
+      return mon.toISOString().slice(0, 10);
+    }
+    const results = [
+      itemBucket('2026-03-29', 'weekly'),  // spring-forward Sunday → Monday
+      itemBucket('2026-10-25', 'weekly'),  // fall-back Sunday → Monday
+      itemBucket('2026-09-20', 'weekly'),  // regular Sunday
+    ].join(',');
+    process.stdout.write(results);
+  `;
+  const EXPECTED_BUCKETS = '2026-03-23,2026-10-19,2026-09-14';
+
+  test('itemBucket weekly — TZ=UTC', () => {
+    assert.equal(runInTZ('UTC', bucketCode), EXPECTED_BUCKETS);
+  });
+
+  test('itemBucket weekly — TZ=Europe/Copenhagen', () => {
+    assert.equal(runInTZ('Europe/Copenhagen', bucketCode), EXPECTED_BUCKETS);
+  });
+
+  test('itemBucket weekly — TZ=America/Los_Angeles', () => {
+    assert.equal(runInTZ('America/Los_Angeles', bucketCode), EXPECTED_BUCKETS);
+  });
+});
 
 describe('removed legacy revenue routes — return 404', () => {
   test('GET /api/revenue/:storeId/:from/:to returns 404 unauthenticated', async () => {

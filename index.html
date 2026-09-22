@@ -1360,15 +1360,22 @@ async function apiRevenue(storeId, start, end) {
 
 // Fetch revenue for all stores in parallel.
 // Each store delegates to apiSalesRange — shares its cache with sales metrics.
-// Failed stores are omitted from the result (callers use || 0 as fallback).
+// Throws if any store fails — callers must handle the error (fail closed).
+// Never substitutes 0 for a failed store; genuine zero is { id, rev:0 }.
 async function apiAllRevenue(start, end) {
-  const out = {};
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     STORES.map(async s => {
       const lines = await apiSalesRange(s.id, start, end);
-      out[s.id] = lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0);
+      return { id: s.id, rev: lines.reduce((sum, l) => sum + (l.priceexclvat || 0), 0) };
     })
   );
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length > 0) {
+    throw new Error(`Revenue unavailable: ${failed.length} store(s) failed — ` +
+      failed.map(r => r.reason?.message || 'unknown').join('; '));
+  }
+  const out = {};
+  for (const r of results) out[r.value.id] = r.value.rev;
   return out;
 }
 
@@ -1728,6 +1735,10 @@ async function getLemonadeToday() {
 const PERIODS_WITH_TODAY = ['today', 'this-week', 'this-month', 'this-year'];
 
 // ── Chain view ─────────────────────────────────────────────────────────────────
+// Preserved across render attempts so a failed re-render can restore the last
+// good state rather than leaving the user with a blank skeleton.
+let _chainLastRender = null;
+
 async function renderChainView() {
   const main = document.getElementById('main');
   main.innerHTML = `
@@ -1766,12 +1777,26 @@ async function renderChainView() {
   const { start, end } = getCphDateRange(state.period);
   const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
-  // Fetch revenue for current + LY + Planday salaries in parallel
-  const [curData, lyData, salaries] = await Promise.all([
-    apiAllRevenue(start, end),
-    apiAllRevenue(lyStart, lyEnd),
-    apiPlandaySalaries(from, to)
-  ]);
+  // Fetch revenue for current + LY + Planday salaries in parallel.
+  // apiAllRevenue throws if any store fails — catch and preserve last valid render.
+  let curData, lyData, salaries;
+  try {
+    [curData, lyData, salaries] = await Promise.all([
+      apiAllRevenue(start, end),
+      apiAllRevenue(lyStart, lyEnd),
+      apiPlandaySalaries(from, to)
+    ]);
+  } catch(err) {
+    console.error('[renderChainView] revenue fetch failed:', err.message);
+    if (_chainLastRender) main.innerHTML = _chainLastRender;
+    main.insertAdjacentHTML('afterbegin',
+      `<div style="background:rgba(179,0,0,0.12);border:1px solid #b30000;color:#b30000;` +
+      `padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:12px">` +
+      `<strong>Revenue data unavailable</strong> — ${err.message} &nbsp;` +
+      `<button onclick="renderChainView()" style="padding:4px 12px;cursor:pointer;border-radius:4px;` +
+      `border:1px solid #b30000;background:transparent;color:#b30000;font-size:13px">Retry</button></div>`);
+    return;
+  }
 
   const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
   const totalLY     = STORES.reduce((s, st) => s + (lyData[st.id]  || 0), 0);
@@ -1813,6 +1838,9 @@ async function renderChainView() {
       ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
     </div>
   `;
+
+  // Snapshot the successfully-rendered KPI state so future failed renders can restore it.
+  _chainLastRender = main.innerHTML;
 
   if (PERIODS_WITH_TODAY.includes(state.period)) {
     getLemonadeToday().then(d => {
@@ -2004,6 +2032,18 @@ async function renderStoreView(storeId) {
     apiRevenue(storeId, lyStart, lyEnd),
     apiPlandaySalaries(from, to)
   ]);
+
+  // rev === null means the fetch failed (incomplete data). Show a retryable error
+  // rather than rendering '—' silently in a KPI card.
+  if (rev === null) {
+    document.getElementById('store-kpis').innerHTML =
+      `<div style="background:rgba(179,0,0,0.12);border:1px solid #b30000;color:#b30000;` +
+      `padding:12px 16px;border-radius:8px;display:flex;align-items:center;gap:12px">` +
+      `<strong>Revenue data unavailable</strong> — sales data incomplete or unavailable &nbsp;` +
+      `<button onclick="renderStoreView('${storeId}')" style="padding:4px 12px;cursor:pointer;` +
+      `border-radius:4px;border:1px solid #b30000;background:transparent;color:#b30000;font-size:13px">Retry</button></div>`;
+    return;
+  }
 
   const budget   = lyRev ? lyRev * 1.10 : null;
   const vsLY     = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
@@ -2269,11 +2309,19 @@ function renderInvoicesView() {
     </div>
   `;
 
-  // Async: fetch revenue, fill summaries + supplier breakdown
+  // Async: fetch revenue, fill summaries + supplier breakdown.
+  // apiAllRevenue throws if any store fails — catch and degrade gracefully.
   (async () => {
     const { start: revStart, end: revEnd } = getCphDateRange(state.period);
-    const revMap   = await apiAllRevenue(revStart, revEnd);
-    const totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
+    let revMap, totalRev;
+    try {
+      revMap   = await apiAllRevenue(revStart, revEnd);
+      totalRev = Object.values(revMap).reduce((s, v) => s + v, 0);
+    } catch(err) {
+      console.warn('[invoices] revenue unavailable:', err.message);
+      revMap = {};
+      totalRev = 0;
+    }
 
     // Fill cost summary by store
     for (const s of STORES) {
