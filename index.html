@@ -1781,8 +1781,100 @@ const PERIODS_WITH_TODAY = ['today', 'this-week', 'this-month', 'this-year'];
 // Preserved across render attempts so a failed re-render can restore the last
 // good state rather than leaving the user with a blank skeleton.
 let _chainLastRender = null;
+// Generation counter: incremented on every new renderChainView call so that
+// async Phase-2 callbacks can detect when their render has been superseded.
+let _chainRenderGen = 0;
+
+// Render (or re-render) the store breakdown table.
+// lyData and salaries may be null while they are still loading.
+function _renderChainBreakdown(curData, lyData, salaries, from, to) {
+  const el = document.getElementById('chain-stores-card');
+  if (!el) return;
+
+  const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
+  const totalLY     = lyData   ? STORES.reduce((s, st) => s + (lyData[st.id]    || 0), 0) : null;
+  const totalCost   = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
+  const totalSalary = salaries ? STORES.reduce((s, st) => s + (salaries[st.id]  || 0), 0) : null;
+  const budget      = totalLY != null ? totalLY * 1.10 : null;
+  const vsLY        = (totalLY != null && totalLY) ? ((totalRev - totalLY) / totalLY * 100) : null;
+  const vsBudget    = budget ? ((totalRev - budget) / budget * 100) : null;
+  const chainCostP  = (totalRev && totalCost)   ? (totalCost   / totalRev * 100) : null;
+  const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
+
+  let html = `<table>
+    <thead><tr>
+      <th>Store</th>
+      <th class="td-num">Revenue ex VAT</th>
+      <th class="td-num">vs LY</th>
+      <th class="td-num">vs Budget</th>
+      <th class="td-num">Cost %</th>
+      <th class="td-num">Salary %</th>
+    </tr></thead><tbody>`;
+
+  for (const s of STORES) {
+    const rev  = curData[s.id] || 0;
+    const ly   = lyData   ? (lyData[s.id]   || 0) : null;
+    const bgt  = ly != null ? ly * 1.10 : null;
+    const chg  = (ly != null && ly) ? ((rev - ly) / ly * 100) : null;
+    const chgB = bgt ? ((rev - bgt) / bgt * 100) : null;
+    const cost = invoicesFor(s.id, from, to);
+    const costP = rev && cost ? (cost / rev * 100) : null;
+    const sal  = salaries ? (salaries[s.id] || null) : null;
+    const salP = (rev && sal) ? (sal / rev * 100) : null;
+
+    html += `<tr>
+      <td style="font-weight:600;cursor:pointer;color:var(--red)" onclick="setView('store:${s.id}')">${s.name}</td>
+      <td class="td-rev">${kr(rev)}</td>
+      <td class="td-num ${updown(chg)}">${pct(chg)}</td>
+      <td class="td-num ${updown(chgB)}">${pct(chgB)}</td>
+      <td class="td-num">${costP !== null ? costP.toFixed(1) + '%' : '—'}</td>
+      <td class="td-num">${salP  !== null ? salP.toFixed(1)  + '%' : '—'}</td>
+    </tr>`;
+  }
+
+  html += `<tr style="border-top:1px solid var(--border2);font-weight:700">
+    <td>CHAIN TOTAL</td>
+    <td class="td-rev">${kr(totalRev)}</td>
+    <td class="td-num ${updown(vsLY)}">${pct(vsLY)}</td>
+    <td class="td-num ${updown(vsBudget)}">${pct(vsBudget)}</td>
+    <td class="td-num">${chainCostP !== null ? chainCostP.toFixed(1) + '%' : '—'}</td>
+    <td class="td-num">${chainSalP  !== null ? chainSalP.toFixed(1)  + '%' : '—'}</td>
+  </tr>`;
+
+  html += '</tbody></table>';
+  el.innerHTML = '<div class="section-title">Store Breakdown</div>' + html;
+}
+
+// Render (or re-render) the Revenue-by-Store bar chart.
+// lyVals may be an array of zeros while LY data is still loading.
+function _renderChainBarChart(periodLbl, curVals, lyVals) {
+  const labels = STORES.map(s => s.name);
+  makeChart('chain-bar-chart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: periodLbl, data: curVals, backgroundColor: 'rgba(179,0,0,0.85)', borderRadius: 4, borderSkipped: false },
+        { label: 'Last Year', data: lyVals, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#787878', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${kr(ctx.raw)}` } }
+      },
+      scales: {
+        x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878' } },
+        y: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878', callback: v => kr(v) } }
+      }
+    }
+  });
+}
 
 async function renderChainView() {
+  const gen = ++_chainRenderGen;
   const main = document.getElementById('main');
   main.innerHTML = `
     <div class="page-header">
@@ -1820,16 +1912,13 @@ async function renderChainView() {
   const { start, end } = getCphDateRange(state.period);
   const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
-  // Fetch revenue for current + LY + Planday salaries in parallel.
-  // apiAllRevenue throws if any store fails — catch and preserve last valid render.
-  let curData, lyData, salaries;
+  // ── Phase 1: current revenue ─────────────────────────────────────────────────
+  // apiAllRevenue throws if any store fails — catch and restore last valid render.
+  let curData;
   try {
-    [curData, lyData, salaries] = await Promise.all([
-      apiAllRevenue(start, end),
-      apiAllRevenue(lyStart, lyEnd),
-      apiPlandaySalaries(from, to)
-    ]);
+    curData = await apiAllRevenue(start, end);
   } catch(err) {
+    if (_chainRenderGen !== gen) return;
     console.error('[renderChainView] revenue fetch failed:', err.message);
     if (_chainLastRender) main.innerHTML = _chainLastRender;
     main.insertAdjacentHTML('afterbegin',
@@ -1840,33 +1929,29 @@ async function renderChainView() {
       `border:1px solid #b30000;background:transparent;color:#b30000;font-size:13px">Retry</button></div>`);
     return;
   }
+  if (_chainRenderGen !== gen) return;
 
-  const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
-  const totalLY     = STORES.reduce((s, st) => s + (lyData[st.id]  || 0), 0);
-  const totalCost   = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
-  const totalSalary = STORES.reduce((s, st) => s + (salaries[st.id] || 0), 0);
-  const budget      = totalLY * 1.10;
-  const vsLY        = totalLY  ? ((totalRev - totalLY)  / totalLY  * 100) : null;
-  const vsBudget    = budget   ? ((totalRev - budget)   / budget   * 100) : null;
-  const chainCostP  = (totalRev && totalCost)   ? (totalCost   / totalRev * 100) : null;
-  const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
+  const totalRev   = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
+  const totalCost  = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
+  const chainCostP = (totalRev && totalCost) ? (totalCost / totalRev * 100) : null;
+  const curVals    = STORES.map(s => curData[s.id] || 0);
 
-  // KPIs
+  // Render KPIs: revenue and food cost immediately; LY/budget/salary show shimmers.
   document.getElementById('chain-kpis').innerHTML = `
     <div class="card">
       <div class="card-title">Total Revenue ex VAT</div>
       <div class="metric-val">${kr(totalRev)}</div>
       <div class="metric-sub">${periodLabel(state.period)}</div>
     </div>
-    <div class="card">
+    <div class="card" id="chain-kpi-vly">
       <div class="card-title">vs Same Period Last Year</div>
-      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
-      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(totalLY)}</div>
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading comparison…</div>
     </div>
-    <div class="card">
+    <div class="card" id="chain-kpi-vbgt">
       <div class="card-title">vs Budget (LY +10%)</div>
-      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
-      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading comparison…</div>
     </div>
     <div class="card">
       <div class="card-title">Food Cost % (Chain)</div>
@@ -1874,19 +1959,26 @@ async function renderChainView() {
       <div class="metric-sub">${totalCost ? 'Cost: ' + kr(totalCost) : 'Enter invoices to track'}</div>
       ${chainCostP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainCostP)}%"></div></div>` : ''}
     </div>
-    <div class="card">
+    <div class="card" id="chain-kpi-sal">
       <div class="card-title">Salary % (Chain)</div>
-      <div class="metric-val ${chainSalP !== null ? (chainSalP > 35 ? 'down' : chainSalP < 20 ? 'up' : '') : ''}">${chainSalP !== null ? chainSalP.toFixed(1) + '%' : '—'}</div>
-      <div class="metric-sub">${totalSalary ? 'Salary: ' + kr(totalSalary) : 'No Planday data'}</div>
-      ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading wage data…</div>
     </div>
   `;
 
-  // Snapshot the successfully-rendered KPI state so future failed renders can restore it.
+  // Bar chart with current data; LY bars are placeholder zeros until Phase 2 resolves.
+  _renderChainBarChart(periodLabel(state.period), curVals, STORES.map(() => 0));
+
+  // Breakdown table: LY and salary columns show — until Phase 2 resolves.
+  _renderChainBreakdown(curData, null, null, from, to);
+
+  // Snapshot so a later failed re-render can restore current progress.
   _chainLastRender = main.innerHTML;
 
+  // Lemonade card (always fire-and-forget; guarded by gen check)
   if (PERIODS_WITH_TODAY.includes(state.period)) {
     getLemonadeToday().then(d => {
+      if (_chainRenderGen !== gen) return;
       const el = document.getElementById('chain-kpis');
       if (!el || !d) return;
       el.insertAdjacentHTML('beforeend', `
@@ -1898,103 +1990,7 @@ async function renderChainView() {
     });
   }
 
-  // Bar chart
-  const labels  = STORES.map(s => s.name);
-  const curVals = STORES.map(s => curData[s.id] || 0);
-  const lyVals  = STORES.map(s => lyData[s.id]  || 0);
-
-  makeChart('chain-bar-chart', {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: periodLabel(state.period),
-          data: curVals,
-          backgroundColor: 'rgba(179,0,0,0.85)',
-          borderRadius: 4,
-          borderSkipped: false
-        },
-        {
-          label: 'Last Year',
-          data: lyVals,
-          backgroundColor: 'rgba(255,255,255,0.08)',
-          borderRadius: 4,
-          borderSkipped: false
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#787878', font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${kr(ctx.raw)}`
-          }
-        }
-      },
-      scales: {
-        x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878' } },
-        y: {
-          grid: { color: '#2c2c2c' },
-          ticks: {
-            color: '#787878',
-            callback: v => kr(v)
-          }
-        }
-      }
-    }
-  });
-
-  // Store breakdown table
-  let breakdownHtml = `<table>
-    <thead><tr>
-      <th>Store</th>
-      <th class="td-num">Revenue ex VAT</th>
-      <th class="td-num">vs LY</th>
-      <th class="td-num">vs Budget</th>
-      <th class="td-num">Cost %</th>
-      <th class="td-num">Salary %</th>
-    </tr></thead><tbody>`;
-
-  for (const s of STORES) {
-    const rev    = curData[s.id] || 0;
-    const ly     = lyData[s.id]  || 0;
-    const bgt    = ly * 1.10;
-    const chg    = ly     ? ((rev - ly)  / ly  * 100) : null;
-    const chgB   = bgt    ? ((rev - bgt) / bgt * 100) : null;
-    const cost   = invoicesFor(s.id, from, to);
-    const costP  = rev && cost ? (cost / rev * 100) : null;
-    const sal    = salaries[s.id] || null;
-    const salP   = rev && sal ? (sal / rev * 100) : null;
-
-    breakdownHtml += `<tr>
-      <td style="font-weight:600;cursor:pointer;color:var(--red)" onclick="setView('store:${s.id}')">${s.name}</td>
-      <td class="td-rev">${kr(rev)}</td>
-      <td class="td-num ${updown(chg)}">${pct(chg)}</td>
-      <td class="td-num ${updown(chgB)}">${pct(chgB)}</td>
-      <td class="td-num">${costP !== null ? costP.toFixed(1) + '%' : '—'}</td>
-      <td class="td-num">${salP  !== null ? salP.toFixed(1)  + '%' : '—'}</td>
-    </tr>`;
-  }
-
-  // Chain total row
-  breakdownHtml += `<tr style="border-top:1px solid var(--border2);font-weight:700">
-    <td>CHAIN TOTAL</td>
-    <td class="td-rev">${kr(totalRev)}</td>
-    <td class="td-num ${updown(vsLY)}">${pct(vsLY)}</td>
-    <td class="td-num ${updown(vsBudget)}">${pct(vsBudget)}</td>
-    <td class="td-num">${chainCostP !== null ? chainCostP.toFixed(1) + '%' : '—'}</td>
-    <td class="td-num">${chainSalP  !== null ? chainSalP.toFixed(1)  + '%' : '—'}</td>
-  </tr>`;
-
-  breakdownHtml += '</tbody></table>';
-  document.getElementById('chain-stores-card').innerHTML =
-    '<div class="section-title">Store Breakdown</div>' + breakdownHtml;
-
-  // Product mix — only for ≤14 day ranges
+  // ── Phase 1b: per-store lines (Wolt%, top items, product mix) ────────────────
   const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
   const mixCard = document.getElementById('chain-mix-card');
 
@@ -2002,11 +1998,11 @@ async function renderChainView() {
     document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div><div class="empty">Select ≤14 days to view top items.</div>';
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div class="empty">Select ≤14 days to view product mix.</div>';
   } else {
-    // Fetch per-store lines preserving store identity for Wolt-via-Heaps classification.
-    // allItems is still built (flat) for top-items and product-mix which need no store context.
     const storeLines = await Promise.all(STORES.map(async s => ({ id: s.id, lines: await apiSalesRange(s.id, salesStart, salesEnd) })));
-    const allItems   = storeLines.flatMap(s => s.lines);
-    const chCh       = storeLines.reduce((acc, s) => {
+    if (_chainRenderGen !== gen) return;
+
+    const allItems = storeLines.flatMap(s => s.lines);
+    const chCh     = storeLines.reduce((acc, s) => {
       const kpis = buildChannelKpis(s.lines, s.id);
       return { total: acc.total + kpis.total, wolt: acc.wolt + kpis.wolt,
                uberEats: acc.uberEats + kpis.uberEats, heaps: acc.heaps + kpis.heaps };
@@ -2014,6 +2010,7 @@ async function renderChainView() {
     const chWoltP     = chCh.total > 0 ? (chCh.wolt     / chCh.total * 100) : null;
     const chUberEatsP = chCh.total > 0 ? (chCh.uberEats / chCh.total * 100) : null;
     const chHeapsP    = chCh.total > 0 ? (chCh.heaps    / chCh.total * 100) : null;
+
     const chainKpisEl = document.getElementById('chain-kpis');
     if (chainKpisEl) chainKpisEl.insertAdjacentHTML('beforeend', `
       <div class="card">
@@ -2033,14 +2030,100 @@ async function renderChainView() {
       </div>`);
 
     document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(allItems));
-
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
     renderProductMix(document.getElementById('chain-mix-body'), allItems);
+
+    _chainLastRender = main.innerHTML;
   }
+
+  // ── Phase 2: LY comparison + Planday salaries (non-blocking) ─────────────────
+  // Both callbacks share closure state so the breakdown table can be re-rendered
+  // with whatever has resolved so far.
+  let lyData   = null;
+  let salaries = null;
+
+  apiAllRevenue(lyStart, lyEnd).then(ly => {
+    if (_chainRenderGen !== gen) return;
+    lyData = ly;
+
+    const totalLY  = STORES.reduce((s, st) => s + (lyData[st.id] || 0), 0);
+    const budget   = totalLY * 1.10;
+    const vsLY     = totalLY ? ((totalRev - totalLY) / totalLY * 100) : null;
+    const vsBudget = budget  ? ((totalRev - budget)  / budget  * 100) : null;
+    const lyVals   = STORES.map(s => lyData[s.id] || 0);
+
+    const lyEl = document.getElementById('chain-kpi-vly');
+    if (lyEl) lyEl.outerHTML = `<div class="card" id="chain-kpi-vly">
+      <div class="card-title">vs Same Period Last Year</div>
+      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
+      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(totalLY)}</div>
+    </div>`;
+
+    const bgtEl = document.getElementById('chain-kpi-vbgt');
+    if (bgtEl) bgtEl.outerHTML = `<div class="card" id="chain-kpi-vbgt">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
+      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+    </div>`;
+
+    _renderChainBreakdown(curData, lyData, salaries, from, to);
+    _renderChainBarChart(periodLabel(state.period), curVals, lyVals);
+    _chainLastRender = main.innerHTML;
+  }).catch(err => {
+    if (_chainRenderGen !== gen) return;
+    console.warn('[renderChainView] LY fetch failed:', err.message);
+    const lyEl = document.getElementById('chain-kpi-vly');
+    if (lyEl) lyEl.outerHTML = `<div class="card" id="chain-kpi-vly">
+      <div class="card-title">vs Same Period Last Year</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Comparison unavailable</div>
+      <div class="metric-sub">${err.message}</div>
+    </div>`;
+    const bgtEl = document.getElementById('chain-kpi-vbgt');
+    if (bgtEl) bgtEl.outerHTML = `<div class="card" id="chain-kpi-vbgt">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Comparison unavailable</div>
+      <div class="metric-sub">&nbsp;</div>
+    </div>`;
+    _chainLastRender = main.innerHTML;
+  });
+
+  apiPlandaySalaries(from, to).then(sal => {
+    if (_chainRenderGen !== gen) return;
+    salaries = sal;
+
+    const totalSalary = STORES.reduce((s, st) => s + (salaries[st.id] || 0), 0);
+    const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
+
+    const salEl = document.getElementById('chain-kpi-sal');
+    if (salEl) salEl.outerHTML = `<div class="card" id="chain-kpi-sal">
+      <div class="card-title">Salary % (Chain)</div>
+      <div class="metric-val ${chainSalP !== null ? (chainSalP > 35 ? 'down' : chainSalP < 20 ? 'up' : '') : ''}">${chainSalP !== null ? chainSalP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${totalSalary ? 'Salary: ' + kr(totalSalary) : 'No Planday data'}</div>
+      ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
+    </div>`;
+
+    _renderChainBreakdown(curData, lyData, salaries, from, to);
+    _chainLastRender = main.innerHTML;
+  }).catch(err => {
+    if (_chainRenderGen !== gen) return;
+    console.warn('[renderChainView] Planday fetch failed:', err.message);
+    const salEl = document.getElementById('chain-kpi-sal');
+    if (salEl) salEl.outerHTML = `<div class="card" id="chain-kpi-sal">
+      <div class="card-title">Salary % (Chain)</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Wage data unavailable</div>
+      <div class="metric-sub">${err.message}</div>
+    </div>`;
+    _chainLastRender = main.innerHTML;
+  });
 }
 
 // ── Store view ─────────────────────────────────────────────────────────────────
+// Generation counter for progressive rendering: incremented on every new
+// renderStoreView call so that async Phase-2 callbacks detect superseded renders.
+let _storeRenderGen = 0;
+
 async function renderStoreView(storeId) {
+  const gen = ++_storeRenderGen;
   const store = STORES.find(s => s.id === storeId);
   if (!store) return;
 
@@ -2076,14 +2159,11 @@ async function renderStoreView(storeId) {
   const { start, end } = getCphDateRange(state.period);
   const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
 
-  const [rev, lyRev, salaries] = await Promise.all([
-    apiRevenue(storeId, start, end),
-    apiRevenue(storeId, lyStart, lyEnd),
-    apiPlandaySalaries(from, to)
-  ]);
+  // ── Phase 1: current revenue ─────────────────────────────────────────────────
+  // rev === null means the fetch failed (incomplete data). Show a retryable error.
+  const rev = await apiRevenue(storeId, start, end);
+  if (_storeRenderGen !== gen) return;
 
-  // rev === null means the fetch failed (incomplete data). Show a retryable error
-  // rather than rendering '—' silently in a KPI card.
   if (rev === null) {
     document.getElementById('store-kpis').innerHTML =
       `<div style="background:rgba(179,0,0,0.12);border:1px solid #b30000;color:#b30000;` +
@@ -2094,29 +2174,25 @@ async function renderStoreView(storeId) {
     return;
   }
 
-  const budget   = lyRev ? lyRev * 1.10 : null;
-  const vsLY     = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
-  const vsBudget = (rev !== null && budget) ? ((rev - budget) / budget * 100) : null;
-  const cost     = invoicesFor(storeId, from, to);
-  const costP    = (rev && cost) ? (cost / rev * 100) : null;
-  const salary   = salaries[storeId] || null;
-  const salaryP  = (rev && salary) ? (salary / rev * 100) : null;
+  const cost  = invoicesFor(storeId, from, to);
+  const costP = (rev && cost) ? (cost / rev * 100) : null;
 
+  // Render current revenue and food cost immediately; LY/budget/salary show shimmers.
   document.getElementById('store-kpis').innerHTML = `
     <div class="card">
       <div class="card-title">Revenue ex VAT</div>
       <div class="metric-val">${kr(rev)}</div>
       <div class="metric-sub">${periodLabel(state.period)}</div>
     </div>
-    <div class="card">
+    <div class="card" id="store-kpi-vly">
       <div class="card-title">vs Last Year</div>
-      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
-      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(lyRev)}</div>
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading comparison…</div>
     </div>
-    <div class="card">
+    <div class="card" id="store-kpi-vbgt">
       <div class="card-title">vs Budget (LY +10%)</div>
-      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
-      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading comparison…</div>
     </div>
     <div class="card">
       <div class="card-title">Food Cost %</div>
@@ -2124,16 +2200,17 @@ async function renderStoreView(storeId) {
       <div class="metric-sub">${cost ? 'Cost: ' + kr(cost) : 'Enter invoices to track'}</div>
       ${costP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,costP)}%"></div></div>` : ''}
     </div>
-    <div class="card">
+    <div class="card" id="store-kpi-sal">
       <div class="card-title">Salary %</div>
-      <div class="metric-val ${salaryP !== null ? (salaryP > 35 ? 'down' : salaryP < 20 ? 'up' : '') : ''}">${salaryP !== null ? salaryP.toFixed(1) + '%' : '—'}</div>
-      <div class="metric-sub">${salary ? 'Salary cost: ' + kr(salary) : 'No Planday data'}</div>
-      ${salaryP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,salaryP)}%"></div></div>` : ''}
+      <div class="metric-val"><span class="shimmer" style="width:80px">&nbsp;</span></div>
+      <div class="metric-sub">Loading wage data…</div>
     </div>
   `;
 
+  // Lemonade card (always fire-and-forget; guarded by gen check)
   if (PERIODS_WITH_TODAY.includes(state.period)) {
     getLemonadeToday().then(d => {
+      if (_storeRenderGen !== gen) return;
       const el = document.getElementById('store-kpis');
       if (!el || !d) return;
       const cnt = (d.stores && d.stores[storeId] != null) ? d.stores[storeId] : '—';
@@ -2146,11 +2223,10 @@ async function renderStoreView(storeId) {
     });
   }
 
-  // Detailed sales for items + heatmap
+  // ── Phase 1b: detailed sales lines (channels, top items, mix, heatmap) ───────
   const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
-  const maxDays = 31;
 
-  if (cphDaySpan(salesStart, salesEnd) > maxDays) {
+  if (cphDaySpan(salesStart, salesEnd) > 31) {
     document.getElementById('store-top-card').innerHTML =
       '<div class="section-title">Top Items</div><div class="empty">Period too long. Select ≤31 days.</div>';
     document.getElementById('store-mix-card').innerHTML =
@@ -2159,6 +2235,7 @@ async function renderStoreView(storeId) {
       '<div class="empty">Period too long for heatmap. Select ≤31 days.</div>';
   } else {
     const items = await apiSalesRange(storeId, salesStart, salesEnd);
+    if (_storeRenderGen !== gen) return;
 
     const stCh = buildChannelKpis(items, storeId);
     const stWoltP     = stCh.total > 0 ? (stCh.wolt     / stCh.total * 100) : null;
@@ -2185,15 +2262,74 @@ async function renderStoreView(storeId) {
     document.getElementById('store-top-card').innerHTML =
       '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(items));
 
-    // Product mix
     const mixCard = document.getElementById('store-mix-card');
     mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="store-mix-body"></div>';
     renderProductMix(document.getElementById('store-mix-body'), items);
 
-    // Heatmap
     const hourlyMap = buildHourlyMap(items);
     renderHeatmap('store-heatmap', hourlyMap, from, to);
   }
+
+  // ── Phase 2: LY comparison + Planday salaries (non-blocking) ─────────────────
+  apiRevenue(storeId, lyStart, lyEnd).then(lyRev => {
+    if (_storeRenderGen !== gen) return;
+
+    const budget   = lyRev ? lyRev * 1.10 : null;
+    const vsLY     = (rev && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
+    const vsBudget = (rev && budget) ? ((rev - budget) / budget * 100) : null;
+
+    const lyEl = document.getElementById('store-kpi-vly');
+    if (lyEl) lyEl.outerHTML = `<div class="card" id="store-kpi-vly">
+      <div class="card-title">vs Last Year</div>
+      <div class="metric-val ${updown(vsLY)}">${pct(vsLY)}</div>
+      <div class="metric-sub">${badge(vsLY)} &nbsp; LY: ${kr(lyRev)}</div>
+    </div>`;
+
+    const bgtEl = document.getElementById('store-kpi-vbgt');
+    if (bgtEl) bgtEl.outerHTML = `<div class="card" id="store-kpi-vbgt">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val ${updown(vsBudget)}">${pct(vsBudget)}</div>
+      <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
+    </div>`;
+  }).catch(err => {
+    if (_storeRenderGen !== gen) return;
+    console.warn('[renderStoreView] LY fetch failed:', err.message);
+    const lyEl = document.getElementById('store-kpi-vly');
+    if (lyEl) lyEl.outerHTML = `<div class="card" id="store-kpi-vly">
+      <div class="card-title">vs Last Year</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Comparison unavailable</div>
+      <div class="metric-sub">${err.message}</div>
+    </div>`;
+    const bgtEl = document.getElementById('store-kpi-vbgt');
+    if (bgtEl) bgtEl.outerHTML = `<div class="card" id="store-kpi-vbgt">
+      <div class="card-title">vs Budget (LY +10%)</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Comparison unavailable</div>
+      <div class="metric-sub">&nbsp;</div>
+    </div>`;
+  });
+
+  apiPlandaySalaries(from, to).then(salaries => {
+    if (_storeRenderGen !== gen) return;
+    const salary  = salaries[storeId] || null;
+    const salaryP = (rev && salary) ? (salary / rev * 100) : null;
+
+    const salEl = document.getElementById('store-kpi-sal');
+    if (salEl) salEl.outerHTML = `<div class="card" id="store-kpi-sal">
+      <div class="card-title">Salary %</div>
+      <div class="metric-val ${salaryP !== null ? (salaryP > 35 ? 'down' : salaryP < 20 ? 'up' : '') : ''}">${salaryP !== null ? salaryP.toFixed(1) + '%' : '—'}</div>
+      <div class="metric-sub">${salary ? 'Salary cost: ' + kr(salary) : 'No Planday data'}</div>
+      ${salaryP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,salaryP)}%"></div></div>` : ''}
+    </div>`;
+  }).catch(err => {
+    if (_storeRenderGen !== gen) return;
+    console.warn('[renderStoreView] Planday fetch failed:', err.message);
+    const salEl = document.getElementById('store-kpi-sal');
+    if (salEl) salEl.outerHTML = `<div class="card" id="store-kpi-sal">
+      <div class="card-title">Salary %</div>
+      <div class="metric-val" style="font-size:14px;color:var(--muted)">Wage data unavailable</div>
+      <div class="metric-sub">${err.message}</div>
+    </div>`;
+  });
 }
 
 // ── Invoices view ──────────────────────────────────────────────────────────────
@@ -3311,6 +3447,7 @@ function setPeriod(period) {
   state.period = period;
   state.cache  = {}; // Clear cache on period change
   _salesInFlight.clear(); // Drop any in-flight requests for the old period
+  _chainLastRender = null; // Stale rollback would show wrong period
 
   // Update period buttons
   document.querySelectorAll('.pb').forEach(btn => {

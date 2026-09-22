@@ -1124,3 +1124,168 @@ describe('apiSalesRange — in-flight coalescing', () => {
     assert.equal(calls, 1, 'cache still works without inFlight map');
   });
 });
+
+// ── Progressive rendering — generation guard ───────────────────────────────────
+//
+// Verifies the mechanism that prevents stale Phase-2 callbacks (LY comparison,
+// Planday salary) from overwriting a later render when the user switches view
+// or period before the slow requests resolve.
+//
+// All tests use pure logic — no DOM required.
+describe('progressive rendering — generation guard', () => {
+  // Minimal guard object mirroring the module-level counters in index.html.
+  // next() = ++gen (called once per renderChainView/renderStoreView invocation)
+  // bump() = simulates a new render superseding the current one
+  function makeGuard() {
+    let _gen = 0;
+    return { next: () => ++_gen, current: () => _gen, bump: () => { _gen++; } };
+  }
+
+  test('Phase-2 callback fires when gen is current', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    let fired = false;
+    await Promise.resolve().then(() => { if (guard.current() === myGen) fired = true; });
+    assert.ok(fired, 'callback fires when gen has not changed');
+  });
+
+  test('Phase-2 callback is suppressed when view switches away (gen bumped)', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    guard.bump(); // new renderChainView() call supersedes this render
+    let fired = false;
+    await Promise.resolve().then(() => { if (guard.current() === myGen) fired = true; });
+    assert.ok(!fired, 'stale callback is suppressed');
+  });
+
+  test('only the latest render receives Phase-2 updates', async () => {
+    const guard = makeGuard();
+    const gen1 = guard.next();
+    const gen2 = guard.next(); // supersedes gen1
+
+    const updates = [];
+    await Promise.all([
+      Promise.resolve().then(() => { if (guard.current() === gen1) updates.push('gen1'); }),
+      Promise.resolve().then(() => { if (guard.current() === gen2) updates.push('gen2'); }),
+    ]);
+    assert.deepEqual(updates, ['gen2'], 'only the latest render gets updates');
+  });
+
+  test('LY failure callback is also gen-guarded: stale error does not run', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    guard.bump(); // supersede before LY resolves
+    let handled = false;
+    await Promise.reject(new Error('LY unavailable')).catch(() => {
+      if (guard.current() === myGen) handled = true;
+    });
+    assert.ok(!handled, 'stale LY error callback suppressed');
+  });
+
+  test('LY and Planday Phase-2 callbacks fire independently for the same gen', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    let lyFired = false, salFired = false;
+    await Promise.all([
+      Promise.resolve().then(() => { if (guard.current() === myGen) lyFired = true; }),
+      Promise.resolve().then(() => { if (guard.current() === myGen) salFired = true; }),
+    ]);
+    assert.ok(lyFired,  'LY update fires');
+    assert.ok(salFired, 'salary update fires');
+  });
+});
+
+// ── apiRevenue — testable wrapper ──────────────────────────────────────────────
+//
+// apiRevenue in index.html wraps apiSalesRange and sums priceexclvat.
+// The testable version accepts a salesRangeFn instead of the global apiSalesRange.
+describe('apiRevenue — revenue sum wrapper', () => {
+  async function apiRevenue(storeId, start, end, salesRangeFn) {
+    try {
+      const lines = await salesRangeFn(storeId, start, end);
+      return lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
+    } catch(e) {
+      return null;
+    }
+  }
+
+  test('sums priceexclvat across all lines', async () => {
+    const lines = [{ priceexclvat: 100 }, { priceexclvat: 200 }, { priceexclvat: 50 }];
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21', async () => lines);
+    assert.equal(rev, 350);
+  });
+
+  test('returns 0 for empty lines array', async () => {
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21', async () => []);
+    assert.equal(rev, 0);
+  });
+
+  test('returns null when salesRange throws — does not block current data', async () => {
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21',
+      async () => { throw new Error('network error'); });
+    assert.equal(rev, null, 'null returned on failure; caller decides what to display');
+  });
+
+  test('current revenue resolves before LY, which is still pending', async () => {
+    // Simulates Phase 1 (current) completing while Phase 2 (LY) is still in flight.
+    let lyResolve;
+    const lyPromise = new Promise(res => { lyResolve = res; });
+
+    // Phase 1: current resolves immediately
+    const curRev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21',
+      async () => [{ priceexclvat: 500 }]);
+    assert.equal(curRev, 500, 'current revenue available before LY resolves');
+
+    // Phase 2: LY still pending
+    const lyTask = apiRevenue('norrebro', '2025-09-21', '2025-09-22',
+      () => lyPromise.then(() => [{ priceexclvat: 450 }]));
+
+    // curRev is already available — no waiting on lyTask
+    assert.equal(curRev, 500, 'current revenue unchanged while LY pending');
+
+    lyResolve(); // now resolve LY
+    const lyRev = await lyTask;
+    assert.equal(lyRev, 450, 'LY revenue resolves correctly');
+  });
+});
+
+// ── lyDateRange — 364-day shift ────────────────────────────────────────────────
+//
+// Same-period-last-year range: 364 days = 52 weeks back so the weekday pattern
+// matches (2026-09-23 Wednesday → 2025-09-24 Wednesday).
+describe('lyDateRange — 364-day shift', () => {
+  function cphDateOffset(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  }
+  function lyDateRange(start, end) {
+    return { start: cphDateOffset(start, -364), end: cphDateOffset(end, -364) };
+  }
+
+  test('today 2026-09-23 maps LY start to 2025-09-24 (52 weeks earlier)', () => {
+    const { start, end } = lyDateRange('2026-09-23', '2026-09-24');
+    assert.equal(start, '2025-09-24');
+    assert.equal(end,   '2025-09-25');
+  });
+
+  test('shifted range has the same day-span as the original', () => {
+    const origStart = '2026-09-01', origEnd = '2026-09-24';
+    const { start, end } = lyDateRange(origStart, origEnd);
+    const orig = (new Date(origEnd   + 'T12:00:00Z') - new Date(origStart + 'T12:00:00Z')) / 86400000;
+    const ly   = (new Date(end       + 'T12:00:00Z') - new Date(start     + 'T12:00:00Z')) / 86400000;
+    assert.equal(ly, orig, 'LY range has same day count');
+  });
+
+  test('LY start is exactly 364 days before current start for several periods', () => {
+    const ranges = [
+      ['2026-09-21', '2026-09-24'], // this week
+      ['2026-09-01', '2026-10-01'], // last month
+      ['2026-01-01', '2026-10-01'], // YTD
+    ];
+    for (const [start, end] of ranges) {
+      const ly = lyDateRange(start, end);
+      const diffDays = (new Date(start + 'T12:00:00Z') - new Date(ly.start + 'T12:00:00Z')) / 86400000;
+      assert.equal(diffDays, 364, `${start}: shift is exactly 364 days`);
+    }
+  });
+});
