@@ -1,96 +1,178 @@
 # Killer Kalculator — Metric Specification
 
-Store: Nørrebro
-Reference date: 2026-09-20
+Audit: Stage 4 Job 3 — 97 381 lines across 6 stores, 2026-08-23 → 2026-09-22
+Reference date for fixture: 2026-09-20 (Nørrebro)
 Timezone: Europe/Copenhagen
 
 ---
 
-## Product ID classification table
+## Stores
 
-All classification is by explicit product ID. Display names are recorded for
-reference only — they must never be used for classification logic.
+| Store           | firmaid | Kylling | Free lemonade addon |
+|-----------------|---------|---------|---------------------|
+| Nørrebro        | 18095   | No      | Yes (27242080)      |
+| Indre By        | 15143   | Yes     | No                  |
+| Vesterbro       | 13205   | No      | No                  |
+| Christianshavn  | 21331   | Yes     | No                  |
+| Fisketorvet     | 18926   | Yes     | Yes (27240940)      |
+| Frederiksberg   | 18924   | No      | Yes (27241304)      |
 
-| Product ID | Display name (2026-09-20)      | Category         | Price filter | Notes |
-|------------|-------------------------------|-----------------|-------------|-------|
-| 27242208   | Kombo - Lamb                  | kombo           | ≠ 0         | Header line represents the roll; no separate roll component |
-| 27242204   | Kombo - Falafel               | kombo           | ≠ 0         | Same as above |
-| 27242336   | Killer Kebab                  | standalone roll | ≠ 0         | Includes rolls in mixed orders |
-| 27242332   | Killer Falafel                | standalone roll | ≠ 0         | Includes rolls in mixed orders |
-| 27242080   | + Lemonade                    | lemonade-addon  | none        | Kombo addon; price varies (0, 10, 35 seen in fixture) |
-| 27242148   | + Killer Lemonade (+10 kr)    | lemonade-upgrade| none        | Kombo upgrade; count=2 line observed |
-| 27242164   | Killer Lemonade (35 kr)       | lemonade-standalone | none    | Standalone purchase |
+**Confirmed business decisions (2026-09-22):**
+
+1. Both Fisketorvet Killer Kebab IDs (`27241228` and `27241196`) count as ordinary standalone rolls.
+   The secondary ID (`27241196`) accounts for ~94 units/30 days alongside ~1 800 for the primary.
+2. Vesterbro, Indre By and Christianshavn have no free `+ Lemonade` addon line.
+   Their kombos offer only the +10 kr upgrade or standalone purchase.  This is not a bug.
+3. No stores sell bowls. `BOWL_IDS` remains empty until IDs are confirmed from the OnlinePOS catalogue.
+4. Every Lover / +Lover ID is a different drink product, not lemonade.
+   All 12 IDs are documented in the `OTHER_LOVER_*` registry and explicitly absent from `LEM_IDS`.
+5. Unknown external/Wolt product IDs remain unclassified and are excluded from all metrics.
+
+---
+
+## Product ID classification table — all stores
+
+All classification is by explicit product ID. Display names are recorded for reference only —
+they must never be used for classification logic.
+
+### Kombo — Lamb (Kombo - Lamb)
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242208   | Nørrebro        | ≠ 0         |
+| 27241816   | Indre By        | ≠ 0         |
+| 27240680   | Vesterbro       | ≠ 0         |
+| 27859906   | Christianshavn  | ≠ 0         |
+| 27241068   | Fisketorvet     | ≠ 0         |
+| 27241432   | Frederiksberg   | ≠ 0         |
+
+### Kombo — Falafel (Kombo - Falafel)
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242204   | Nørrebro        | ≠ 0         |
+| 27241812   | Indre By        | ≠ 0         |
+| 27240676   | Vesterbro       | ≠ 0         |
+| 27859903   | Christianshavn  | ≠ 0         |
+| 27241064   | Fisketorvet     | ≠ 0         |
+| 27241428   | Frederiksberg   | ≠ 0         |
+
+### Kombo — Kylling (Kombo - Kylling)
+
+Sold only at Indre By, Christianshavn and Fisketorvet.
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 29838316   | Indre By        | ≠ 0         |
+| 29493147   | Christianshavn  | ≠ 0         |
+| 29652666   | Fisketorvet     | ≠ 0         |
+
+### Standalone roll — Killer Kebab
+
+| Product ID | Store                         | price filter | Notes                       |
+|------------|-------------------------------|--------------|-----------------------------|
+| 27242336   | Nørrebro                      | ≠ 0          |                             |
+| 27241944   | Indre By                      | ≠ 0          |                             |
+| 27240808   | Vesterbro                     | ≠ 0          |                             |
+| 27860038   | Christianshavn                | ≠ 0          |                             |
+| 27241228   | Fisketorvet (primary)         | ≠ 0          | ~1 800 units/30 days        |
+| 27241196   | Fisketorvet (secondary)       | ≠ 0          | ~94 units/30 days, same SKU |
+| 27241560   | Frederiksberg                 | ≠ 0          |                             |
+
+### Standalone roll — Killer Falafel
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242332   | Nørrebro        | ≠ 0         |
+| 27241940   | Indre By        | ≠ 0         |
+| 27240804   | Vesterbro       | ≠ 0         |
+| 27860035   | Christianshavn  | ≠ 0         |
+| 27241192   | Fisketorvet     | ≠ 0         |
+| 27241556   | Frederiksberg   | ≠ 0         |
+
+### Standalone roll — Killer Kylling
+
+Sold only at Indre By, Christianshavn and Fisketorvet.
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 29838301   | Indre By        | ≠ 0         |
+| 29493150   | Christianshavn  | ≠ 0         |
+| 29652669   | Fisketorvet     | ≠ 0         |
+
+### Lemonade — free included addon (+ Lemonade)
+
+Only three stores emit a free-addon line. The others confirmed not to carry this product.
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242080   | Nørrebro        | none        |
+| 27240940   | Fisketorvet     | none        |
+| 27241304   | Frederiksberg   | none        |
+
+### Lemonade — paid upgrade (+ Killer Lemonade, +10 kr)
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242148   | Nørrebro        | none        |
+| 27241756   | Indre By        | none        |
+| 27240620   | Vesterbro       | none        |
+| 27859873   | Christianshavn  | none        |
+| 27241008   | Fisketorvet     | none        |
+| 27241372   | Frederiksberg   | none        |
+
+### Lemonade — standalone (Killer Lemonade, 35 kr)
+
+| Product ID | Store           | price filter |
+|------------|-----------------|-------------|
+| 27242164   | Nørrebro        | none        |
+| 27241772   | Indre By        | none        |
+| 27240636   | Vesterbro       | none        |
+| 27859885   | Christianshavn  | none        |
+| 27241024   | Fisketorvet     | none        |
+| 27241388   | Frederiksberg   | none        |
 
 **Price filter semantics for kombos and rolls:**
 - `price = 0` → staff meal or fully-comped order → **excluded**
 - `price ≠ 0` → paid sale (`price > 0`) or refund (`price < 0`) → **included**
 - Refunds have `price < 0` and `count < 0`; signed count subtracts from the total
 
-**Bowl products:** No bowl product IDs have been identified in the Nørrebro reference
-dataset. `BOWL_IDS` in `lib/product-metrics.js` is currently empty. IDs must be added
-explicitly when confirmed from OnlinePOS catalogue or other store data.
+**Lemonade: no price filter.** All three lemonade variants are counted regardless of price.
+Refunds (count < 0) subtract from the total automatically.
 
-### Observed product IDs not yet classified
+---
 
-These IDs appear in the Nørrebro 2026-09-20 fixture but are not counted in any metric:
+## Confirmed other-drink products — NOT lemonade
 
-| Product ID | Display name                 | Prices seen | Notes |
-|------------|------------------------------|------------|-------|
-| 27242028   | + Dip                        | 0          | Modifier |
-| 27242032   | Harissa Chili Dip            | 10, 12     | Side |
-| 27242036   | Killer Ketchup               | 10         | Side |
-| 27242040   | Harissa Mayo                 | 10         | Side |
-| 27242044   | Truffle Mayo                 | 10, 12     | Side |
-| 27242048   | + Truffle Mayo               | 0          | Modifier |
-| 27242052   | + Harissa mayo               | 0          | Modifier |
-| 27242056   | + Ketchup                    | 0          | Modifier |
-| 27242060   | + Harissa OTS                | 0          | Modifier |
-| 27242068   | + Harissa                    | 0          | Modifier |
-| 27242072   | + Harissa, a little          | 0          | Modifier |
-| 27242076   | + Killer Fries               | 0          | Modifier |
-| 27242084   | + Pale Ale                   | 45         | Beverage |
-| 27242096   | + Faxe Kondi (+0kr)          | 0, 25      | Beverage |
-| 27242100   | + Pepsi Max (+0kr)           | 0, 25      | Beverage |
-| 27242108   | + Water, still (+0kr)        | 0          | Beverage modifier |
-| 27242112   | Faxe Kondi (25kr)            | 0, 25      | Beverage |
-| 27242120   | Water, still (25kr)          | 0, 25      | Beverage |
-| 27242124   | Water, sparkling (25kr)      | 0          | Beverage |
-| 27242136   | Extra Hummus (10 kr)         | 10         | Side |
-| 27242144   | Pepsi Max (25 kr)            | 0, 25      | Beverage |
-| 27242152   | + Killer Pale Ale (+20kr)    | 20         | Beverage modifier |
-| 27242156   | + SOFT DRINK (+0kr)          | 0          | Beverage modifier |
-| 27242168   | Killer Pale Ale (45 kr)      | 45         | Beverage |
-| 27242176   | SOFT DRINK (25kr)            | 0          | Beverage |
-| 27242232   | EAT NOW                      | 0          | Instruction/modifier |
-| 27242260   | Hummus in flatbread          | 0          | Instruction/modifier (not a bowl) |
-| 27242272   | No Onion                     | 0          | Customisation modifier |
-| 27242276   | No yogurt                    | 0          | Customisation modifier |
-| 27242284   | No Mayo                      | 0          | Customisation modifier |
-| 27242292   | No Parsley                   | 0          | Customisation modifier |
-| 27242308   | Split in Half                | 0          | Instruction/modifier |
-| 27242316   | No Dukkah                    | 0          | Customisation modifier |
-| 27242328   | TO GO                        | 0          | Instruction/modifier |
-| 27242340   | 1 x Falafel Ball             | 0, 15      | Side |
-| 27242344   | 3 x Falafel Balls/Mayo       | 39         | Side |
-| 27242356   | Hummus TO-GO (35 kr)         | 20         | Side (pricing note: listed 35 kr but charged 20 in fixture) |
-| 27242364   | Killer Fries (35 kr)         | 35         | Side |
-| 27339842   | Legally required bag fee     | 4          | Fee |
-| 28715716   | + BEER (+20kr)               | 0          | Beverage modifier |
-| 28715731   | + Blå Thor (+20kr)           | 20         | Beverage modifier |
-| 28715758   | Pilsner (45kr)               | 45         | Beverage |
-| 28715788   | Heineken 0,0% (45kr)         | 45         | Beverage |
-| 28717057   | BEER (45kr)                  | 0          | Beverage |
-| 29569042   | Unknown external product     | 4          | Unidentified — appears once in TXN_068 (Wolt) |
-| 29838736   | Lover                        | 35         | Unidentified — possibly a new drink/dessert |
-| 29843293   | + Lover (+10 kr)             | 10         | Kombo addon for "Lover" — possibly lemonade variant; needs confirmation |
+Decision confirmed 2026-09-22: Lover is a different drink product. All store-specific IDs are
+registered in `OTHER_LOVER_*` and explicitly absent from every counted Set.
 
-### Unresolved IDs requiring classification decision
+| Product ID | Display name         | Store           |
+|------------|---------------------|-----------------|
+| 29838736   | Lover               | Nørrebro        |
+| 29838730   | Lover               | Indre By        |
+| 29838742   | Lover               | Vesterbro       |
+| 29838682   | Lover               | Christianshavn  |
+| 29838706   | Lover               | Fisketorvet     |
+| 29838724   | Lover               | Frederiksberg   |
+| 29843293   | + Lover (+10 kr)    | Nørrebro        |
+| 29843290   | + Lover (+10 kr)    | Indre By        |
+| 29843296   | + Lover (+10 kr)    | Vesterbro       |
+| 29838694   | + Lover ( 10 kr )   | Christianshavn  |
+| 29843302   | + Lover (+10 kr)    | Fisketorvet     |
+| 29843299   | + Lover (+10 kr)    | Frederiksberg   |
 
-| Product ID | Display name    | Concern |
-|------------|-----------------|---------|
-| 29838736   | Lover           | May be a new kombo-eligible lemonade or dessert item; confirm with ops |
-| 29843293   | + Lover (+10 kr)| If "Lover" is a lemonade variant, this should be added to LEM_IDS |
-| 29569042   | Unknown external product | Single occurrence on Wolt at 4 DKK; likely a fee or third-party line |
+---
+
+## Unclassified external lines (excluded)
+
+| Product ID | Observed name / context                            |
+|------------|----------------------------------------------------|
+| 29569042   | Unknown external product — Nørrebro, Wolt, 4 DKK  |
+| 29553679   | Unknown external product — Christianshavn          |
+| 29557357   | Unknown external product — Fisketorvet             |
+| 29557363   | Unknown external product — Indre By                |
+| 30528491   | Unknown external product — Indre By                |
 
 ---
 
@@ -138,30 +220,28 @@ subtract automatically from the sum.
 
 ## Kombo units
 
-Product IDs:
-- `27242208` — Kombo - Lamb
-- `27242204` — Kombo - Falafel
+`kombo_units = sum(count) for lines where productid ∈ KOMBO_IDS AND price ≠ 0`
 
-`kombo_units = sum(count) for lines where productid ∈ {kombo PIDs} AND price > 0`
+KOMBO_IDS is the union of KOMBO_LAMB_IDS (6 stores), KOMBO_FALAFEL_IDS (6 stores),
+and KOMBO_KYLLING_IDS (3 stores) = 15 IDs total.
 
 The kombo header line IS the roll — there are no separate zero-priced roll
 component lines inside a kombo transaction.
-Staff meals (price = 0) are excluded by the `price > 0` filter.
-Refunds (count < 0, price < 0) are excluded by the `price > 0` filter.
+Staff meals (price = 0) are excluded.
+Refunds (count < 0, price < 0) are included; signed count subtracts.
 
 ---
 
 ## Standalone roll units
 
-Product IDs:
-- `27242336` — Killer Kebab
-- `27242332` — Killer Falafel
+`roll_units = sum(count) for lines where productid ∈ ROLL_IDS AND price ≠ 0`
 
-`roll_units = sum(count) for lines where productid ∈ {roll PIDs} AND price > 0`
+ROLL_IDS is the union of ROLL_KEBAB_IDS (7 IDs — Fisketorvet has two),
+ROLL_FALAFEL_IDS (6 stores), and ROLL_KYLLING_IDS (3 stores) = 16 IDs total.
 
 This includes rolls sold alongside kombos in mixed orders; they are legitimate
 paid units and must not be excluded by transaction context.
-Staff meals (price = 0) and refunds (price < 0) are excluded by `price > 0`.
+Staff meals (price = 0) and refunds (price < 0) semantics as above.
 
 ---
 
@@ -169,19 +249,18 @@ Staff meals (price = 0) and refunds (price < 0) are excluded by `price > 0`.
 
 `kombo_pct = kombo_units / (kombo_units + roll_units) × 100`
 
-Bowls are excluded from the denominator (no bowl sales in the reference data).
+Bowls are excluded from the denominator (no bowl sales found in cross-store audit).
+Returns null when denominator = 0.
 Rounded to 4 decimal places for display.
 
 ---
 
 ## Lemonade units
 
-Product IDs:
-- `27242080` — + Lemonade (kombo addon, 0 kr)
-- `27242148` — + Killer Lemonade (kombo upgrade, +10 kr)
-- `27242164` — Killer Lemonade standalone (35 kr)
+`lemonade_units = sum(count) for lines where productid ∈ LEM_IDS`
 
-`lemonade_units = sum(count) for lines where productid ∈ {lemonade PIDs}`
+LEM_IDS is the union of LEM_ADDON_IDS (3 stores), LEM_UPGRADE_IDS (6 stores),
+and LEM_STANDALONE_IDS (6 stores) = 15 IDs total.
 
 No price filter: all three variants are counted regardless of price.
 Refunds (count < 0) subtract from the total.
@@ -202,7 +281,7 @@ Rounded to 4 decimal places for display.
 
 ---
 
-## Reference values — Nørrebro 2026-09-20
+## Reference values — Nørrebro 2026-09-20 (fixture)
 
 | Metric                          | Value            |
 |---------------------------------|-----------------|

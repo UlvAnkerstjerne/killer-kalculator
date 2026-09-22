@@ -13,6 +13,9 @@
  *  • Lemonade forms           — addon, upgrade, standalone all counted
  *  • Unknown ID gating        — misleading product name does NOT classify
  *  • ID-stable classification — known ID still classifies if display name changes
+ *  • Cross-store coverage     — every registered ID across all 6 stores
+ *  • Kylling stores           — roll and kombo IDs at 3 kylling stores
+ *  • Lover exclusion          — all 12 Lover/+Lover IDs excluded from every metric
  */
 
 const { describe, test } = require('node:test');
@@ -21,7 +24,11 @@ const path   = require('node:path');
 const fs     = require('node:fs');
 
 const {
-  PRODUCT_IDS, KOMBO_IDS, ROLL_IDS, LEM_IDS, BOWL_IDS, ALL_KNOWN_IDS, computeMetrics,
+  PRODUCT_IDS,
+  KOMBO_IDS, KOMBO_LAMB_IDS, KOMBO_FALAFEL_IDS, KOMBO_KYLLING_IDS,
+  ROLL_IDS,  ROLL_KEBAB_IDS, ROLL_FALAFEL_IDS,  ROLL_KYLLING_IDS,
+  LEM_IDS,   LEM_ADDON_IDS,  LEM_UPGRADE_IDS,   LEM_STANDALONE_IDS,
+  BOWL_IDS, ALL_KNOWN_IDS, computeMetrics,
 } = require('../lib/product-metrics');
 
 // ── Convenience line builders ─────────────────────────────────────────────────
@@ -80,14 +87,16 @@ describe('product-metrics — fixture regression', () => {
     assert.equal(m.lemUnits, 20);
   });
 
-  test('kombo breakdown: Lamb = 49, Falafel = 17', () => {
+  test('kombo breakdown: Lamb = 49, Falafel = 17, Kylling = 0', () => {
     assert.equal(m.breakdown.komboLamb,    49);
     assert.equal(m.breakdown.komboFalafel, 17);
+    assert.equal(m.breakdown.komboKylling,  0);
   });
 
-  test('roll breakdown: Kebab = 39, Falafel = 15', () => {
+  test('roll breakdown: Kebab = 39, Falafel = 15, Kylling = 0', () => {
     assert.equal(m.breakdown.rollKebab,   39);
     assert.equal(m.breakdown.rollFalafel, 15);
+    assert.equal(m.breakdown.rollKylling,  0);
   });
 
   test('lemonade breakdown: addon=12, upgrade=3, standalone=5', () => {
@@ -398,23 +407,23 @@ describe('product-metrics — edge cases', () => {
 });
 
 describe('product-metrics — ID registry', () => {
-  test('KOMBO_IDS contains both kombo product IDs', () => {
+  test('KOMBO_IDS contains all kombo product IDs (6 lamb + 6 falafel + 3 kylling = 15)', () => {
     assert.ok(KOMBO_IDS.has(PRODUCT_IDS.KOMBO_LAMB));
     assert.ok(KOMBO_IDS.has(PRODUCT_IDS.KOMBO_FALAFEL));
-    assert.equal(KOMBO_IDS.size, 2);
+    assert.equal(KOMBO_IDS.size, 15);
   });
 
-  test('ROLL_IDS contains both roll product IDs', () => {
+  test('ROLL_IDS contains all roll product IDs (7 kebab + 6 falafel + 3 kylling = 16)', () => {
     assert.ok(ROLL_IDS.has(PRODUCT_IDS.ROLL_KEBAB));
     assert.ok(ROLL_IDS.has(PRODUCT_IDS.ROLL_FALAFEL));
-    assert.equal(ROLL_IDS.size, 2);
+    assert.equal(ROLL_IDS.size, 16);
   });
 
-  test('LEM_IDS contains all three lemonade product IDs', () => {
+  test('LEM_IDS contains all lemonade product IDs (3 addon + 6 upgrade + 6 standalone = 15)', () => {
     assert.ok(LEM_IDS.has(PRODUCT_IDS.LEM_ADDON));
     assert.ok(LEM_IDS.has(PRODUCT_IDS.LEM_UPGRADE));
     assert.ok(LEM_IDS.has(PRODUCT_IDS.LEM_STANDALONE));
-    assert.equal(LEM_IDS.size, 3);
+    assert.equal(LEM_IDS.size, 15);
   });
 
   test('KOMBO_IDS and ROLL_IDS are disjoint', () => {
@@ -424,5 +433,412 @@ describe('product-metrics — ID registry', () => {
   test('all ID sets are disjoint', () => {
     const all = [...KOMBO_IDS, ...ROLL_IDS, ...LEM_IDS, ...BOWL_IDS];
     assert.equal(all.length, new Set(all).size, 'All product IDs must be unique across sets');
+  });
+
+  test('KOMBO_LAMB_IDS has 6 entries (one per store)', () => {
+    assert.equal(KOMBO_LAMB_IDS.size, 6);
+  });
+
+  test('KOMBO_FALAFEL_IDS has 6 entries (one per store)', () => {
+    assert.equal(KOMBO_FALAFEL_IDS.size, 6);
+  });
+
+  test('KOMBO_KYLLING_IDS has 3 entries (kylling stores only)', () => {
+    assert.equal(KOMBO_KYLLING_IDS.size, 3);
+  });
+
+  test('ROLL_KEBAB_IDS has 7 entries (6 stores + Fisketorvet secondary)', () => {
+    assert.equal(ROLL_KEBAB_IDS.size, 7);
+    assert.ok(ROLL_KEBAB_IDS.has(PRODUCT_IDS.ROLL_KEBAB_FISKETORVET));
+    assert.ok(ROLL_KEBAB_IDS.has(PRODUCT_IDS.ROLL_KEBAB_FISKETORVET_B));
+  });
+
+  test('ROLL_FALAFEL_IDS has 6 entries (one per store)', () => {
+    assert.equal(ROLL_FALAFEL_IDS.size, 6);
+  });
+
+  test('ROLL_KYLLING_IDS has 3 entries (kylling stores only)', () => {
+    assert.equal(ROLL_KYLLING_IDS.size, 3);
+  });
+
+  test('LEM_ADDON_IDS has 3 entries (Nørrebro, Fisketorvet, Frederiksberg only)', () => {
+    assert.equal(LEM_ADDON_IDS.size, 3);
+    assert.ok(LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_ADDON));
+    assert.ok(LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_ADDON_FISKETORVET));
+    assert.ok(LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_ADDON_FREDERIKSBERG));
+  });
+
+  test('LEM_UPGRADE_IDS has 6 entries (all stores)', () => {
+    assert.equal(LEM_UPGRADE_IDS.size, 6);
+  });
+
+  test('LEM_STANDALONE_IDS has 6 entries (all stores)', () => {
+    assert.equal(LEM_STANDALONE_IDS.size, 6);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Cross-store coverage — every registered ID tested individually
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('product-metrics — Kombo-Lamb: all 6 store IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.KOMBO_LAMB,                'Nørrebro'],
+    [PRODUCT_IDS.KOMBO_LAMB_INDRE_BY,       'Indre By'],
+    [PRODUCT_IDS.KOMBO_LAMB_VESTERBRO,      'Vesterbro'],
+    [PRODUCT_IDS.KOMBO_LAMB_CHRISTIANSHAVN, 'Christianshavn'],
+    [PRODUCT_IDS.KOMBO_LAMB_FISKETORVET,    'Fisketorvet'],
+    [PRODUCT_IDS.KOMBO_LAMB_FREDERIKSBERG,  'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as kombo (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 149 }]);
+      assert.equal(m.komboUnits, 1);
+      assert.equal(m.breakdown.komboLamb, 1);
+      assert.equal(m.rollUnits,  0);
+      assert.equal(m.lemUnits,   0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.komboUnits, 0);
+    });
+  }
+});
+
+describe('product-metrics — Kombo-Falafel: all 6 store IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.KOMBO_FALAFEL,                'Nørrebro'],
+    [PRODUCT_IDS.KOMBO_FALAFEL_INDRE_BY,       'Indre By'],
+    [PRODUCT_IDS.KOMBO_FALAFEL_VESTERBRO,      'Vesterbro'],
+    [PRODUCT_IDS.KOMBO_FALAFEL_CHRISTIANSHAVN, 'Christianshavn'],
+    [PRODUCT_IDS.KOMBO_FALAFEL_FISKETORVET,    'Fisketorvet'],
+    [PRODUCT_IDS.KOMBO_FALAFEL_FREDERIKSBERG,  'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as kombo (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 149 }]);
+      assert.equal(m.komboUnits, 1);
+      assert.equal(m.breakdown.komboFalafel, 1);
+      assert.equal(m.rollUnits, 0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.komboUnits, 0);
+    });
+  }
+});
+
+describe('product-metrics — Kombo-Kylling: 3 kylling-store IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY,       'Indre By'],
+    [PRODUCT_IDS.KOMBO_KYLLING_CHRISTIANSHAVN,  'Christianshavn'],
+    [PRODUCT_IDS.KOMBO_KYLLING_FISKETORVET,     'Fisketorvet'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as kombo (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 149 }]);
+      assert.equal(m.komboUnits, 1);
+      assert.equal(m.breakdown.komboKylling, 1);
+      assert.equal(m.rollUnits,  0);
+      assert.equal(m.lemUnits,   0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.komboUnits, 0);
+    });
+    test(`${store} pid ${pid} refund (count=-1, price=-149) subtracts`, () => {
+      const m = computeMetrics([
+        { productid: pid, count: 2, price: 298 },
+        { productid: pid, count: -1, price: -149 },
+      ]);
+      assert.equal(m.komboUnits, 1);
+    });
+  }
+});
+
+describe('product-metrics — Killer Kebab: all 7 roll IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.ROLL_KEBAB,               'Nørrebro'],
+    [PRODUCT_IDS.ROLL_KEBAB_INDRE_BY,      'Indre By'],
+    [PRODUCT_IDS.ROLL_KEBAB_VESTERBRO,     'Vesterbro'],
+    [PRODUCT_IDS.ROLL_KEBAB_CHRISTIANSHAVN,'Christianshavn'],
+    [PRODUCT_IDS.ROLL_KEBAB_FISKETORVET,   'Fisketorvet (primary)'],
+    [PRODUCT_IDS.ROLL_KEBAB_FISKETORVET_B, 'Fisketorvet (secondary 27241196)'],
+    [PRODUCT_IDS.ROLL_KEBAB_FREDERIKSBERG, 'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as roll (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 95 }]);
+      assert.equal(m.rollUnits, 1);
+      assert.equal(m.breakdown.rollKebab, 1);
+      assert.equal(m.komboUnits, 0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.rollUnits, 0);
+    });
+  }
+
+  test('both Fisketorvet Killer Kebab IDs together produce 2 roll units', () => {
+    const m = computeMetrics([
+      { productid: PRODUCT_IDS.ROLL_KEBAB_FISKETORVET,   count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_FISKETORVET_B, count: 1, price: 95 },
+    ]);
+    assert.equal(m.rollUnits, 2);
+    assert.equal(m.breakdown.rollKebab, 2);
+  });
+});
+
+describe('product-metrics — Killer Falafel: all 6 store IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.ROLL_FALAFEL,                'Nørrebro'],
+    [PRODUCT_IDS.ROLL_FALAFEL_INDRE_BY,       'Indre By'],
+    [PRODUCT_IDS.ROLL_FALAFEL_VESTERBRO,      'Vesterbro'],
+    [PRODUCT_IDS.ROLL_FALAFEL_CHRISTIANSHAVN, 'Christianshavn'],
+    [PRODUCT_IDS.ROLL_FALAFEL_FISKETORVET,    'Fisketorvet'],
+    [PRODUCT_IDS.ROLL_FALAFEL_FREDERIKSBERG,  'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as roll (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 95 }]);
+      assert.equal(m.rollUnits, 1);
+      assert.equal(m.breakdown.rollFalafel, 1);
+      assert.equal(m.komboUnits, 0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.rollUnits, 0);
+    });
+  }
+});
+
+describe('product-metrics — Killer Kylling roll: 3 kylling-store IDs count', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.ROLL_KYLLING_INDRE_BY,       'Indre By'],
+    [PRODUCT_IDS.ROLL_KYLLING_CHRISTIANSHAVN,  'Christianshavn'],
+    [PRODUCT_IDS.ROLL_KYLLING_FISKETORVET,     'Fisketorvet'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts as roll (price≠0)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 95 }]);
+      assert.equal(m.rollUnits, 1);
+      assert.equal(m.breakdown.rollKylling, 1);
+      assert.equal(m.komboUnits, 0);
+    });
+    test(`${store} pid ${pid} zero-price is excluded (staff meal)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.rollUnits, 0);
+    });
+    test(`${store} pid ${pid} refund (count=-1) subtracts`, () => {
+      const m = computeMetrics([
+        { productid: pid, count: 3, price: 285 },
+        { productid: pid, count: -1, price: -95 },
+      ]);
+      assert.equal(m.rollUnits, 2);
+    });
+  }
+});
+
+describe('product-metrics — lemonade addon (+Lemonade): 3 stores', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.LEM_ADDON,              'Nørrebro'],
+    [PRODUCT_IDS.LEM_ADDON_FISKETORVET,  'Fisketorvet'],
+    [PRODUCT_IDS.LEM_ADDON_FREDERIKSBERG,'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts regardless of price`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 10 }]);
+      assert.equal(m.lemUnits, 1);
+      assert.equal(m.breakdown.lemAddon, 1);
+    });
+    test(`${store} pid ${pid} counted at price=0`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 0 }]);
+      assert.equal(m.lemUnits, 1);
+    });
+  }
+
+  test('Vesterbro/Indre By/Christianshavn have no free-addon ID registered', () => {
+    // These stores were confirmed (Stage 4 Job 3) to have no separate free-addon line.
+    assert.ok(!LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_UPGRADE_VESTERBRO));
+    assert.ok(!LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_UPGRADE_INDRE_BY));
+    assert.ok(!LEM_ADDON_IDS.has(PRODUCT_IDS.LEM_UPGRADE_CHRISTIANSHAVN));
+  });
+});
+
+describe('product-metrics — lemonade upgrade (+Killer Lemonade): all 6 stores', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.LEM_UPGRADE,               'Nørrebro'],
+    [PRODUCT_IDS.LEM_UPGRADE_INDRE_BY,      'Indre By'],
+    [PRODUCT_IDS.LEM_UPGRADE_VESTERBRO,     'Vesterbro'],
+    [PRODUCT_IDS.LEM_UPGRADE_CHRISTIANSHAVN,'Christianshavn'],
+    [PRODUCT_IDS.LEM_UPGRADE_FISKETORVET,   'Fisketorvet'],
+    [PRODUCT_IDS.LEM_UPGRADE_FREDERIKSBERG, 'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts (no price filter)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 10 }]);
+      assert.equal(m.lemUnits, 1);
+      assert.equal(m.breakdown.lemUpgrade, 1);
+    });
+  }
+});
+
+describe('product-metrics — lemonade standalone (Killer Lemonade 35kr): all 6 stores', () => {
+  const ENTRIES = [
+    [PRODUCT_IDS.LEM_STANDALONE,               'Nørrebro'],
+    [PRODUCT_IDS.LEM_STANDALONE_INDRE_BY,      'Indre By'],
+    [PRODUCT_IDS.LEM_STANDALONE_VESTERBRO,     'Vesterbro'],
+    [PRODUCT_IDS.LEM_STANDALONE_CHRISTIANSHAVN,'Christianshavn'],
+    [PRODUCT_IDS.LEM_STANDALONE_FISKETORVET,   'Fisketorvet'],
+    [PRODUCT_IDS.LEM_STANDALONE_FREDERIKSBERG, 'Frederiksberg'],
+  ];
+  for (const [pid, store] of ENTRIES) {
+    test(`${store} pid ${pid} counts (no price filter)`, () => {
+      const m = computeMetrics([{ productid: pid, count: 1, price: 35 }]);
+      assert.equal(m.lemUnits, 1);
+      assert.equal(m.breakdown.lemStandalone, 1);
+    });
+  }
+});
+
+describe('product-metrics — Lover: all 12 IDs excluded from every metric', () => {
+  const LOVER_IDS = [
+    [PRODUCT_IDS.OTHER_LOVER,                      'Lover Nørrebro'],
+    [PRODUCT_IDS.OTHER_LOVER_VESTERBRO,             'Lover Vesterbro'],
+    [PRODUCT_IDS.OTHER_LOVER_CHRISTIANSHAVN,        'Lover Christianshavn'],
+    [PRODUCT_IDS.OTHER_LOVER_FISKETORVET,           'Lover Fisketorvet'],
+    [PRODUCT_IDS.OTHER_LOVER_FREDERIKSBERG,         'Lover Frederiksberg'],
+    [PRODUCT_IDS.OTHER_LOVER_INDRE_BY,              'Lover Indre By'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON,                 '+Lover Nørrebro'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON_VESTERBRO,       '+Lover Vesterbro'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON_CHRISTIANSHAVN,  '+Lover Christianshavn'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON_FISKETORVET,     '+Lover Fisketorvet'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON_FREDERIKSBERG,   '+Lover Frederiksberg'],
+    [PRODUCT_IDS.OTHER_LOVER_ADDON_INDRE_BY,        '+Lover Indre By'],
+  ];
+
+  for (const [pid, label] of LOVER_IDS) {
+    test(`${label} (${pid}) contributes nothing to any metric`, () => {
+      const m = computeMetrics([{ productid: pid, count: 5, price: 35 }]);
+      assert.equal(m.komboUnits, 0);
+      assert.equal(m.rollUnits,  0);
+      assert.equal(m.lemUnits,   0);
+      assert.equal(m.komboPct,   null);
+    });
+    test(`${label} (${pid}) is not in LEM_IDS`, () => {
+      assert.ok(!LEM_IDS.has(pid));
+    });
+  }
+});
+
+describe('product-metrics — cross-store aggregate: all 6 stores combined', () => {
+  test('kombos from all 6 stores sum correctly', () => {
+    const lines = [
+      // One paid Kombo-Lamb from each store
+      { productid: PRODUCT_IDS.KOMBO_LAMB,                count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_LAMB_INDRE_BY,       count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_LAMB_VESTERBRO,      count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_LAMB_CHRISTIANSHAVN, count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_LAMB_FISKETORVET,    count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_LAMB_FREDERIKSBERG,  count: 1, price: 149 },
+    ];
+    const m = computeMetrics(lines);
+    assert.equal(m.komboUnits, 6);
+    assert.equal(m.breakdown.komboLamb, 6);
+  });
+
+  test('Killer Kebab rolls from all 6 stores (7 IDs) sum correctly', () => {
+    const lines = [
+      { productid: PRODUCT_IDS.ROLL_KEBAB,                count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_INDRE_BY,       count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_VESTERBRO,      count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_CHRISTIANSHAVN, count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_FISKETORVET,    count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_FISKETORVET_B,  count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KEBAB_FREDERIKSBERG,  count: 1, price: 95 },
+    ];
+    const m = computeMetrics(lines);
+    assert.equal(m.rollUnits, 7);
+    assert.equal(m.breakdown.rollKebab, 7);
+  });
+
+  test('lemonade from all stores: 3 addons + 6 upgrades + 6 standalone = 15 IDs, all count', () => {
+    const lines = [
+      // addons (3 stores)
+      { productid: PRODUCT_IDS.LEM_ADDON,               count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_ADDON_FISKETORVET,   count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_ADDON_FREDERIKSBERG, count: 1, price: 10 },
+      // upgrades (6 stores)
+      { productid: PRODUCT_IDS.LEM_UPGRADE,               count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_UPGRADE_INDRE_BY,      count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_UPGRADE_VESTERBRO,     count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_UPGRADE_CHRISTIANSHAVN,count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_UPGRADE_FISKETORVET,   count: 1, price: 10 },
+      { productid: PRODUCT_IDS.LEM_UPGRADE_FREDERIKSBERG, count: 1, price: 10 },
+      // standalone (6 stores)
+      { productid: PRODUCT_IDS.LEM_STANDALONE,               count: 1, price: 35 },
+      { productid: PRODUCT_IDS.LEM_STANDALONE_INDRE_BY,      count: 1, price: 35 },
+      { productid: PRODUCT_IDS.LEM_STANDALONE_VESTERBRO,     count: 1, price: 35 },
+      { productid: PRODUCT_IDS.LEM_STANDALONE_CHRISTIANSHAVN,count: 1, price: 35 },
+      { productid: PRODUCT_IDS.LEM_STANDALONE_FISKETORVET,   count: 1, price: 35 },
+      { productid: PRODUCT_IDS.LEM_STANDALONE_FREDERIKSBERG, count: 1, price: 35 },
+    ];
+    const m = computeMetrics(lines);
+    assert.equal(m.lemUnits, 15);
+    assert.equal(m.breakdown.lemAddon,      3);
+    assert.equal(m.breakdown.lemUpgrade,    6);
+    assert.equal(m.breakdown.lemStandalone, 6);
+  });
+});
+
+describe('product-metrics — kylling aggregate: 3 stores combined', () => {
+  test('kylling kombos from all 3 kylling stores sum correctly', () => {
+    const lines = [
+      { productid: PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY,      count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_KYLLING_CHRISTIANSHAVN, count: 1, price: 149 },
+      { productid: PRODUCT_IDS.KOMBO_KYLLING_FISKETORVET,    count: 1, price: 149 },
+    ];
+    const m = computeMetrics(lines);
+    assert.equal(m.komboUnits, 3);
+    assert.equal(m.breakdown.komboKylling, 3);
+    assert.equal(m.breakdown.komboLamb,    0);
+    assert.equal(m.breakdown.komboFalafel, 0);
+  });
+
+  test('kylling rolls from all 3 kylling stores sum correctly', () => {
+    const lines = [
+      { productid: PRODUCT_IDS.ROLL_KYLLING_INDRE_BY,       count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KYLLING_CHRISTIANSHAVN,  count: 1, price: 95 },
+      { productid: PRODUCT_IDS.ROLL_KYLLING_FISKETORVET,     count: 1, price: 95 },
+    ];
+    const m = computeMetrics(lines);
+    assert.equal(m.rollUnits, 3);
+    assert.equal(m.breakdown.rollKylling, 3);
+    assert.equal(m.breakdown.rollKebab,   0);
+    assert.equal(m.breakdown.rollFalafel, 0);
+  });
+
+  test('kylling kombo + kylling roll: komboPct uses kylling in both numerator and denominator', () => {
+    const m = computeMetrics([
+      { productid: PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY, count: 1, price: 149 },
+      { productid: PRODUCT_IDS.ROLL_KYLLING_INDRE_BY,  count: 1, price: 95  },
+    ]);
+    assert.equal(m.komboUnits, 1);
+    assert.equal(m.rollUnits,  1);
+    assert.ok(Math.abs(m.komboPct - 50) < 0.0001);
+  });
+
+  test('zero-price kylling kombo excluded (staff meal)', () => {
+    const m = computeMetrics([
+      { productid: PRODUCT_IDS.KOMBO_KYLLING_FISKETORVET, count: 1, price: 0 },
+    ]);
+    assert.equal(m.komboUnits, 0);
+  });
+
+  test('zero-price kylling roll excluded (staff meal)', () => {
+    const m = computeMetrics([
+      { productid: PRODUCT_IDS.ROLL_KYLLING_FISKETORVET, count: 1, price: 0 },
+    ]);
+    assert.equal(m.rollUnits, 0);
   });
 });
