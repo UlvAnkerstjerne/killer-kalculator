@@ -11,6 +11,7 @@ const session   = require('express-session');
 const MemStore  = require('memorystore')(session);
 const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const { fetchSalesRange } = require('./lib/pos-fetcher');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -320,6 +321,141 @@ app.get('/api/sales/:storeId/:unixtime', requireAuth, async (req, res) => {
     res.json(r.data);
   } catch (err) {
     res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+  }
+});
+
+// ── Sales-range endpoint ──────────────────────────────────────────────────────
+
+// Maximum date range for a single request.  Prevents exhaustive historical
+// exports over the paginated exportSales/v20 endpoint.  366 days covers any
+// single calendar year including leap years.
+const SALES_RANGE_MAX_DAYS = 366;
+
+/**
+ * Return true when str is a real YYYY-MM-DD calendar date.
+ * Rejects month 13, day 32, Feb 30, etc. via UTC round-trip.
+ */
+function isValidISODate(str) {
+  if (typeof str !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const [y, m, d] = str.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth()    === m - 1 &&
+    dt.getUTCDate()     === d
+  );
+}
+
+/**
+ * Extract the Copenhagen hour (0–23) directly from a naive CPH-local timestamp
+ * string such as "2026-09-20 14:31:00".  The string already encodes CPH local
+ * time so the hour component is read without any UTC conversion.
+ */
+function cphHourFromLine(line) {
+  const tsStr = line.timestamp_pay || line.datetime || null;
+  if (!tsStr || typeof tsStr !== 'string') return null;
+  const m = /[ T](\d{2}):\d{2}:\d{2}/.exec(tsStr.trim());
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Return only the allowlisted fields from a processed sales line.
+ * All raw upstream fields not on this list — cardnumber, clerk, orderlineid,
+ * firmaid, debtorname, timestamps, order IDs, costing fields, and any other
+ * customer/employee fields — are discarded here and never reach the browser.
+ */
+function sanitiseSalesLine(line) {
+  return {
+    productid:       line.productid       ?? null,
+    productname:     line.productname     ?? null,
+    productgroupid:  line.productgroupid  ?? null,
+    productgroup:    line.productgroup    ?? null,
+    count:           line.count           ?? null,
+    price:           line.price           ?? null,
+    priceexclvat:    line.priceexclvat    ?? null,
+    paymenttype:     line.paymenttype     ?? null,
+    paymenttypecode: line.paymenttypecode ?? null,
+    date:            line._cphDate        ?? null,
+    hour:            cphHourFromLine(line),
+  };
+}
+
+/**
+ * Thin axios adapter matching the httpGet signature expected by fetchSalesRange.
+ * Credentials travel in the headers object constructed inside fetchSalesRange —
+ * never embedded in the URL.
+ */
+async function posHttpGet(url, headers) {
+  return axios.get(url, { headers, timeout: 20000 });
+}
+
+/**
+ * GET /api/sales-range/:storeId/:start/:end
+ *
+ * :start  Inclusive CPH date  YYYY-MM-DD (Europe/Copenhagen)
+ * :end    Exclusive CPH date  YYYY-MM-DD (Europe/Copenhagen)
+ *
+ * Fetches all exportSales/v20 pages for the store over the date range,
+ * filters to [start, end) by CPH timestamp_pay, deduplicates by orderlineid,
+ * and returns only allowlisted non-sensitive fields plus safe completeness
+ * metadata.  Pagination, loop/stall detection and URL validation are performed
+ * by lib/pos-fetcher before this route responds.
+ *
+ * 400  Bad or missing params (invalid date, end ≤ start, range > 366 days)
+ * 404  Unknown storeId
+ * 502  Any upstream / network / pagination failure
+ */
+app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) => {
+  const { storeId, start, end } = req.params;
+
+  const store = findStore(storeId);
+  if (!store) return res.status(404).json({ error: 'Unknown store' });
+
+  if (!isValidISODate(start)) {
+    return res.status(400).json({ error: 'start must be a valid YYYY-MM-DD date' });
+  }
+  if (!isValidISODate(end)) {
+    return res.status(400).json({ error: 'end must be a valid YYYY-MM-DD date' });
+  }
+  if (end <= start) {
+    return res.status(400).json({ error: 'end must be strictly after start' });
+  }
+
+  const diffDays = Math.round(
+    (new Date(end + 'T12:00:00Z') - new Date(start + 'T12:00:00Z')) / 86_400_000
+  );
+  if (diffDays > SALES_RANGE_MAX_DAYS) {
+    return res.status(400).json({
+      error: `Date range must not exceed ${SALES_RANGE_MAX_DAYS} days`
+    });
+  }
+
+  try {
+    const result = await fetchSalesRange({ store, start, end, httpGet: posHttpGet });
+
+    const lines = result.lines.map(sanitiseSalesLine);
+
+    // Raw conflict records and orderlineids are never sent to the browser;
+    // only the conflict count is exposed so completeness can be assessed.
+    const meta = {
+      complete:           result.meta.complete,
+      pages:              result.meta.pages,
+      rawLineCount:       result.meta.rawLineCount,
+      processedLineCount: result.meta.processedLineCount,
+      outOfRange:         result.meta.outOfRange,
+      duplicatesRemoved:  result.meta.duplicatesRemoved,
+      invalidCount:       result.meta.invalidCount,
+      conflictCount:      result.meta.conflicts.length,
+      start:              result.meta.start,
+      end:                result.meta.end,
+      storeId,
+    };
+
+    return res.json({ lines, meta });
+  } catch (err) {
+    // Log the message only — never the store token, firmaid or upstream body
+    console.error('[sales-range] upstream error:', err.message);
+    return res.status(502).json({ error: 'Upstream data fetch failed' });
   }
 });
 
