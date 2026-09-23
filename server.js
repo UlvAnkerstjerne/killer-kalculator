@@ -15,6 +15,11 @@ const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
 const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
+const {
+  secondOfDayFromLine,
+  buildRevenueSummaryResult,
+  publicRevenueSummary,
+} = require('./lib/revenue-summary');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -335,11 +340,7 @@ function cphHourFromLine(line) {
 // Seconds since Copenhagen-local midnight. This retains enough precision for
 // point-in-time LY comparisons without exposing the original sale timestamp.
 function cphSecondOfDayFromLine(line) {
-  const tsStr = line.timestamp_pay || line.datetime || null;
-  if (!tsStr || typeof tsStr !== 'string') return null;
-  const m = /[ T](\d{2}):(\d{2}):(\d{2})/.exec(tsStr.trim());
-  if (!m) return null;
-  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  return secondOfDayFromLine(line);
 }
 
 /**
@@ -407,6 +408,20 @@ salesRangeCache = createSalesRangeCache({
   },
 });
 app.locals.salesRangeCache = salesRangeCache;
+
+// LY revenue has a distinct compact cache. It deliberately does not retain
+// product lines: only complete revenue, per-day totals, and second aggregates
+// used at the active comparison boundary. Cache/coalescing/freshness semantics
+// match the proven sales-range cache, including fail-closed incomplete results.
+const revenueSummaryCache = createSalesRangeCache({
+  fetchRange: async ({ store, start, end }) => buildRevenueSummaryResult(
+    await fetchSalesRange({ store, start, end, httpGet: posHttpGet })
+  ),
+  onRefreshError: (err, { storeId, start, end }) => {
+    console.warn(`[revenue-summary] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
+  },
+});
+app.locals.revenueSummaryCache = revenueSummaryCache;
 
 /**
  * GET /api/sales-range/:storeId/:start/:end
@@ -478,6 +493,62 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
   } catch (err) {
     // Log the message only — never the store token, firmaid or upstream body
     console.error('[sales-range] upstream error:', err.message);
+    return res.status(502).json({ error: 'Upstream data fetch failed' });
+  }
+});
+
+/**
+ * Compact revenue-only range for LY comparisons and budgets.
+ * `boundary` is optional and must be one date inside [start,end). The response
+ * includes second aggregates for that date only; raw timestamps and product,
+ * payment, order, customer, employee, token and firma fields are never exposed.
+ */
+app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, res) => {
+  const { storeId, start, end } = req.params;
+  const boundary = req.query.boundary || null;
+  const store = findStore(storeId);
+  if (!store) return res.status(404).json({ error: 'Unknown store' });
+  if (!isValidISODate(start)) {
+    return res.status(400).json({ error: 'start must be a valid YYYY-MM-DD date' });
+  }
+  if (!isValidISODate(end)) {
+    return res.status(400).json({ error: 'end must be a valid YYYY-MM-DD date' });
+  }
+  if (end <= start) {
+    return res.status(400).json({ error: 'end must be strictly after start' });
+  }
+  const diffDays = Math.round(
+    (new Date(end + 'T12:00:00Z') - new Date(start + 'T12:00:00Z')) / 86_400_000
+  );
+  if (diffDays > SALES_RANGE_MAX_DAYS) {
+    return res.status(400).json({
+      error: `Date range must not exceed ${SALES_RANGE_MAX_DAYS} days`
+    });
+  }
+  if (boundary !== null && (!isValidISODate(boundary) || boundary < start || boundary >= end)) {
+    return res.status(400).json({ error: 'boundary must be a valid date inside the range' });
+  }
+
+  try {
+    const cached = await revenueSummaryCache.get({ storeId, store, start, end });
+    const result = cached.result;
+    const meta = {
+      complete: result.meta.complete,
+      pages: result.meta.pages,
+      rawLineCount: result.meta.rawLineCount,
+      processedLineCount: result.meta.processedLineCount,
+      invalidCount: result.meta.invalidCount,
+      conflictCount: result.meta.conflicts.length,
+      start: result.meta.start,
+      end: result.meta.end,
+      storeId,
+      cacheStatus: cached.cacheStatus,
+      stale: cached.stale,
+      cacheAgeMs: cached.fetchedAt === null ? 0 : Math.max(0, Date.now() - cached.fetchedAt),
+    };
+    return res.json({ summary: publicRevenueSummary(result, boundary), meta });
+  } catch (err) {
+    console.error('[revenue-summary] upstream error:', err.message);
     return res.status(502).json({ error: 'Upstream data fetch failed' });
   }
 });
@@ -781,6 +852,11 @@ function cphWeekMonday(dateStr) {
   return date.toISOString().slice(0, 10);
 }
 
+function cphDateOffset(dateStr, days) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
 async function fetchLemonadeToday() {
   const today    = cphDateStr();
   const tomorrow = cphDateNextDay(today);   // exclusive end — today only
@@ -854,6 +930,67 @@ async function warmCurrentSalesRanges() {
 }
 app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 
+async function runBounded(tasks, concurrency) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const index = next++;
+      try {
+        results[index] = { status: 'fulfilled', value: await tasks[index]() };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }
+  await Promise.all(Array.from(
+    { length: Math.min(concurrency, tasks.length) }, () => worker()
+  ));
+  return results;
+}
+
+// Warm only the three common LY revenue ranges. The cache stores compact
+// summaries, so this is bounded to 18 entries and at most two concurrent
+// OnlinePOS exports. Current sales warming always completes before this starts.
+async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } = {}) {
+  const tomorrow = cphDateNextDay(today);
+  const ranges = [
+    { name: 'today', start: today, end: tomorrow },
+    { name: 'week', start: cphWeekMonday(today), end: tomorrow },
+    { name: 'month', start: `${today.slice(0, 7)}-01`, end: tomorrow },
+  ].map(range => ({
+    ...range,
+    start: cphDateOffset(range.start, -364),
+    end: cphDateOffset(range.end, -364),
+  }));
+
+  const tasks = ranges.flatMap(range => Object.entries(STORES).map(([storeId, store]) =>
+    () => revenueSummaryCache.get({ storeId, store, start: range.start, end: range.end })
+  ));
+  const results = await runBounded(tasks, concurrency);
+  const warmed = results.filter(result => (
+    result.status === 'fulfilled' && result.value.result.meta.complete
+  )).length;
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.warn('[revenue-summary] startup warm failed:', result.reason?.message || 'unknown error');
+    }
+  }
+  const stats = revenueSummaryCache.stats();
+  console.log(
+    `[revenue-summary] startup warm complete: ${warmed}/${tasks.length}, ` +
+    `concurrency ${concurrency}, ${stats.entries} entries, ${stats.estimatedBytes} estimated bytes`
+  );
+  return { warmed, attempted: tasks.length, concurrency };
+}
+
+async function warmStartupData() {
+  await warmCurrentSalesRanges();
+  await warmLyRevenueSummaries();
+}
+app.locals.warmLyRevenueSummaries = warmLyRevenueSummaries;
+app.locals.warmStartupData = warmStartupData;
+
 function loadLemonadeHistory() {
   try {
     if (fs.existsSync(LEMONADE_HISTORY_PATH))
@@ -897,7 +1034,7 @@ if (require.main === module) {
     console.log('\n  🔪  KILLER KALCULATOR');
     console.log('  ──────────────────────────────');
     console.log('  http://0.0.0.0:' + PORT + '\n');
-    void warmCurrentSalesRanges();
+    void warmStartupData();
   });
 
   // Scheduled lemonade save at 22:00 Copenhagen time.

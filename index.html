@@ -1376,33 +1376,36 @@ function cphNowParts(now = new Date()) {
   };
 }
 
-// Split a complete equivalent-LY range into two deliberately different bases:
-//   comparison — capped at the equivalent Copenhagen time when the current
-//                range contains today;
-//   full       — the complete LY range, used only as the budget basis.
-// Keeping both values prevents the point-in-time cutoff leaking into budgets.
-function lyRevenueBases(lines, currentStart, currentEnd, now = new Date()) {
-  const full = lines.reduce((sum, line) => sum + (line.priceexclvat || 0), 0);
+// Derive the two deliberately different LY bases from the compact summary:
+// comparison is capped to the equivalent CPH second; full is never capped and
+// remains the sole budget basis. Missing-time boundary lines stay excluded,
+// matching the established full-line behaviour.
+function lyRevenueBases(summary, currentStart, currentEnd, now = new Date()) {
+  const full = summary.completeRevenue;
   const cphNow = cphNowParts(now);
   if (!(currentStart <= cphNow.date && cphNow.date < currentEnd)) {
     return { comparison: full, full };
   }
 
   const cutoffDate = cphDateOffset(cphNow.date, -364);
-  const comparison = lines.reduce((sum, line) => {
-    if (line.date < cutoffDate) return sum + (line.priceexclvat || 0);
-    if (line.date > cutoffDate) return sum;
-    return line.secondOfDay != null && line.secondOfDay <= cphNow.secondOfDay
-      ? sum + (line.priceexclvat || 0)
-      : sum;
-  }, 0);
+  const completeDays = summary.dailyRevenue.reduce((sum, day) =>
+    day.date < cutoffDate ? sum + day.revenue : sum, 0);
+  const boundaryRevenue = summary.boundary?.date === cutoffDate
+    ? summary.boundary.seconds.reduce((sum, pair) =>
+      pair[0] <= cphNow.secondOfDay ? sum + pair[1] : sum, 0)
+    : 0;
+  const comparison = completeDays + boundaryRevenue;
   return { comparison, full };
 }
 
 async function apiLyRevenue(storeId, lyStart, lyEnd, currentStart, currentEnd) {
   try {
-    const lines = await apiSalesRange(storeId, lyStart, lyEnd);
-    return lyRevenueBases(lines, currentStart, currentEnd);
+    const now = new Date();
+    const cphNow = cphNowParts(now);
+    const boundary = currentStart <= cphNow.date && cphNow.date < currentEnd
+      ? cphDateOffset(cphNow.date, -364) : null;
+    const summary = await apiRevenueSummary(storeId, lyStart, lyEnd, boundary);
+    return lyRevenueBases(summary, currentStart, currentEnd, now);
   } catch(e) {
     console.warn(`[apiLyRevenue] ${storeId} ${lyStart}→${lyEnd}:`, e.message);
     return null;
@@ -1410,11 +1413,16 @@ async function apiLyRevenue(storeId, lyStart, lyEnd, currentStart, currentEnd) {
 }
 
 async function apiAllLyRevenue(lyStart, lyEnd, currentStart, currentEnd) {
+  const now = new Date();
+  const cphNow = cphNowParts(now);
+  const boundary = currentStart <= cphNow.date && cphNow.date < currentEnd
+    ? cphDateOffset(cphNow.date, -364) : null;
   const results = await Promise.allSettled(
     STORES.map(async store => ({
       id: store.id,
       ...lyRevenueBases(
-        await apiSalesRange(store.id, lyStart, lyEnd), currentStart, currentEnd,
+        await apiRevenueSummary(store.id, lyStart, lyEnd, boundary),
+        currentStart, currentEnd, now,
       ),
     }))
   );
@@ -1457,6 +1465,8 @@ async function apiAllRevenue(start, end) {
 // Entries are removed after settlement so a failed request can be retried.
 const _salesInFlight = new Map();
 const _salesCache = new Map();
+const _revenueSummaryInFlight = new Map();
+const _revenueSummaryCache = new Map();
 const SALES_CACHE_MAX_ENTRIES = 120;
 const SALES_CACHE_CURRENT_TTL_MS = 10 * 60 * 1000;
 const SALES_CACHE_HISTORICAL_TTL_MS = 15 * 60 * 1000;
@@ -1527,6 +1537,63 @@ async function apiSalesRange(storeId, start, endExcl) {
   })();
 
   _salesInFlight.set(key, promise);
+  return promise;
+}
+
+function readRevenueSummaryCache(key) {
+  const entry = _revenueSummaryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    _revenueSummaryCache.delete(key);
+    return null;
+  }
+  _revenueSummaryCache.delete(key);
+  _revenueSummaryCache.set(key, entry);
+  return entry.summary;
+}
+
+function writeRevenueSummaryCache(key, summary, serverCacheAgeMs, requestElapsedMs) {
+  const ttl = SALES_CACHE_HISTORICAL_TTL_MS
+    - Math.max(0, Number(serverCacheAgeMs) || 0)
+    - Math.max(0, requestElapsedMs);
+  if (ttl <= 0) return summary;
+  _revenueSummaryCache.delete(key);
+  _revenueSummaryCache.set(key, { summary, expiresAt: Date.now() + ttl });
+  while (_revenueSummaryCache.size > SALES_CACHE_MAX_ENTRIES) {
+    _revenueSummaryCache.delete(_revenueSummaryCache.keys().next().value);
+  }
+  return summary;
+}
+
+async function apiRevenueSummary(storeId, start, endExcl, boundary = null) {
+  const key = `revsum:${storeId}:${start}:${endExcl}:${boundary || ''}`;
+  const cached = readRevenueSummaryCache(key);
+  if (cached) return cached;
+  if (_revenueSummaryInFlight.has(key)) return _revenueSummaryInFlight.get(key);
+
+  const requestNonce = sessionNonce;
+  const requestStartedAt = Date.now();
+  const promise = (async () => {
+    try {
+      const query = boundary ? `?boundary=${encodeURIComponent(boundary)}` : '';
+      const res = await apiFetch(`/api/revenue-summary/${storeId}/${start}/${endExcl}${query}`);
+      if (!res) throw new Error('Session unavailable');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API error');
+      if (!data.meta?.complete || !data.summary || !Array.isArray(data.summary.dailyRevenue)) {
+        throw new Error('Incomplete revenue summary from server');
+      }
+      if (!sessionActive || sessionNonce !== requestNonce) {
+        throw new Error('Session changed while loading revenue summary');
+      }
+      return writeRevenueSummaryCache(
+        key, data.summary, data.meta.cacheAgeMs, Date.now() - requestStartedAt,
+      );
+    } finally {
+      if (_revenueSummaryInFlight.get(key) === promise) _revenueSummaryInFlight.delete(key);
+    }
+  })();
+  _revenueSummaryInFlight.set(key, promise);
   return promise;
 }
 
@@ -4115,6 +4182,8 @@ function onSessionExpired(message) {
   state.cache = {};
   _salesCache.clear();
   _salesInFlight.clear(); // Abandon all in-flight requests
+  _revenueSummaryCache.clear();
+  _revenueSummaryInFlight.clear();
   state.lemonadeToday = null;
   state.meat = [];
   if (lemonadeRefreshInterval) {

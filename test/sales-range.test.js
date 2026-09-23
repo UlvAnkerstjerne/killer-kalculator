@@ -44,13 +44,24 @@ const mockConfig = {
   pages:       [],
   pageIdx:     0,
   shouldThrow: null,
+  calls:       0,
+  delayMs:     0,
+  active:      0,
+  maxActive:   0,
 };
 
 function resetMock() {
   mockConfig.pages       = [];
   mockConfig.pageIdx     = 0;
   mockConfig.shouldThrow = null;
-  if (typeof app !== 'undefined') app.locals.salesRangeCache.clear();
+  mockConfig.calls       = 0;
+  mockConfig.delayMs     = 0;
+  mockConfig.active      = 0;
+  mockConfig.maxActive   = 0;
+  if (typeof app !== 'undefined') {
+    app.locals.salesRangeCache.clear();
+    app.locals.revenueSummaryCache.clear();
+  }
 }
 
 /** Build a single-page OnlinePOS envelope axios response. */
@@ -101,11 +112,21 @@ const axiosMock = {
   },
   get: async (url, config) => {
     if (url && url.includes('api.onlinepos.dk')) {
-      if (mockConfig.shouldThrow) throw mockConfig.shouldThrow;
-      const page = mockConfig.pages[mockConfig.pageIdx];
-      if (page !== undefined) mockConfig.pageIdx++;
-      // Default: empty single page if no pages configured
-      return page ?? mkPageResponse([]);
+      mockConfig.calls++;
+      mockConfig.active++;
+      mockConfig.maxActive = Math.max(mockConfig.maxActive, mockConfig.active);
+      try {
+        if (mockConfig.delayMs) {
+          await new Promise(resolve => setTimeout(resolve, mockConfig.delayMs));
+        }
+        if (mockConfig.shouldThrow) throw mockConfig.shouldThrow;
+        const page = mockConfig.pages[mockConfig.pageIdx];
+        if (page !== undefined) mockConfig.pageIdx++;
+        // Default: empty single page if no pages configured
+        return page ?? mkPageResponse([]);
+      } finally {
+        mockConfig.active--;
+      }
     }
     // All other GETs (Planday, etc.) return empty paginated response
     return { status: 200, data: { data: [], paging: { total: 0 } } };
@@ -353,6 +374,105 @@ describe('sales-range — response shape', () => {
 
     assert.equal(r.status, 200,   'incomplete result must still return 200, not 502');
     assert.equal(r.json.meta.complete, false, 'complete must be false when conflicts exist');
+  });
+});
+
+describe('revenue-summary — compact LY response', () => {
+  test('requires authentication', async () => {
+    resetMock();
+    const r = await request({
+      path: '/api/revenue-summary/vesterbro/2026-09-20/2026-09-21?boundary=2026-09-20'
+    });
+    assert.equal(r.status, 401);
+  });
+
+  test('returns complete revenue, daily totals and only boundary seconds', async () => {
+    resetMock();
+    mockConfig.pages = [mkPageResponse([
+      mkLine({ orderlineid: 'A', timestamp_pay: '2026-09-20 11:59:59', priceexclvat: 30000 }),
+      mkLine({ orderlineid: 'B', timestamp_pay: '2026-09-20 12:00:00', priceexclvat: 5000 }),
+      mkLine({ orderlineid: 'C', timestamp_pay: '2026-09-20 13:00:00', priceexclvat: 32254 }),
+    ])];
+    const { jar } = await doLogin();
+    const r = await authGet(
+      '/api/revenue-summary/vesterbro/2026-09-20/2026-09-21?boundary=2026-09-20', jar
+    );
+
+    assert.equal(r.status, 200);
+    assert.equal(r.json.summary.completeRevenue, 67254);
+    assert.deepEqual(r.json.summary.dailyRevenue, [{ date: '2026-09-20', revenue: 67254 }]);
+    assert.deepEqual(r.json.summary.boundary.seconds, [
+      [43199, 30000], [43200, 5000], [46800, 32254],
+    ]);
+    assert.equal(r.json.meta.complete, true);
+  });
+
+  test('does not expose raw timestamps, product, payment or sensitive fields', async () => {
+    resetMock();
+    mockConfig.pages = [mkPageResponse([mkLine({ orderlineid: 'SECRET-LINE' })])];
+    const { jar } = await doLogin();
+    const r = await authGet(
+      '/api/revenue-summary/vesterbro/2026-09-20/2026-09-21?boundary=2026-09-20', jar
+    );
+    assert.equal(r.status, 200);
+    for (const forbidden of [
+      'timestamp_pay', 'datetime', 'productid', 'productname', 'paymenttype',
+      'cardnumber', 'clerk', 'firmaid', 'debtorname', 'orderlineid', 'SECRET-LINE',
+    ]) {
+      assert.ok(!r.body.includes(forbidden), `${forbidden} leaked into compact response`);
+    }
+  });
+
+  test('coalesces identical concurrent misses and serves repeats without exports', async () => {
+    resetMock();
+    mockConfig.delayMs = 30;
+    mockConfig.pages = [mkPageResponse([mkLine()])];
+    const { jar } = await doLogin();
+    const path = '/api/revenue-summary/vesterbro/2026-09-20/2026-09-21?boundary=2026-09-20';
+    const [a, b] = await Promise.all([authGet(path, jar), authGet(path, jar)]);
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.equal(mockConfig.calls, 1);
+    const repeat = await authGet(path, jar);
+    assert.equal(repeat.status, 200);
+    assert.equal(mockConfig.calls, 1, 'cached recalculation makes no OnlinePOS request');
+  });
+
+  test('incomplete data is returned as incomplete and is never cached', async () => {
+    resetMock();
+    mockConfig.pages = [mkPageResponse([
+      mkLine({ orderlineid: 'CLASH', priceexclvat: 10 }),
+      mkLine({ orderlineid: 'CLASH', priceexclvat: 20 }),
+    ])];
+    const { jar } = await doLogin();
+    const path = '/api/revenue-summary/vesterbro/2026-09-20/2026-09-21?boundary=2026-09-20';
+    const first = await authGet(path, jar);
+    assert.equal(first.status, 200);
+    assert.equal(first.json.meta.complete, false);
+    mockConfig.pages = [mkPageResponse([])];
+    mockConfig.pageIdx = 0;
+    const retry = await authGet(path, jar);
+    assert.equal(retry.status, 200);
+    assert.equal(mockConfig.calls, 2);
+  });
+
+  test('startup warms 18 Today/week/month summaries with bounded concurrency', async () => {
+    resetMock();
+    mockConfig.delayMs = 5;
+    const result = await app.locals.warmLyRevenueSummaries({
+      today: '2026-09-23', concurrency: 2,
+    });
+    assert.deepEqual(result, { warmed: 18, attempted: 18, concurrency: 2 });
+    assert.equal(mockConfig.calls, 18, 'six stores × three ranges');
+    assert.ok(mockConfig.maxActive <= 2, `observed concurrency ${mockConfig.maxActive}`);
+    const stats = app.locals.revenueSummaryCache.stats();
+    assert.equal(stats.entries, 18);
+    assert.equal(stats.maxEntries, 120);
+    assert.equal(stats.maxBytes, 32 * 1024 * 1024);
+    assert.ok(stats.estimatedBytes < stats.maxBytes);
+
+    await app.locals.warmLyRevenueSummaries({ today: '2026-09-23', concurrency: 2 });
+    assert.equal(mockConfig.calls, 18, 'repeat warming uses cached summaries');
   });
 });
 

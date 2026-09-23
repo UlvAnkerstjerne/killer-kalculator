@@ -99,18 +99,28 @@ function lyDateRange(period, { todayStr } = {}) {
 }
 
 function lyRevenueBases_t(lines, currentStart, currentEnd, cphNow) {
-  const full = lines.reduce((sum, line) => sum + (line.priceexclvat || 0), 0);
+  const dailyMap = new Map();
+  for (const line of lines) {
+    dailyMap.set(line.date, (dailyMap.get(line.date) || 0) + (line.priceexclvat || 0));
+  }
+  const cutoffDate = cphDateOffset(cphNow.date, -364);
+  const summary = {
+    completeRevenue: lines.reduce((sum, line) => sum + (line.priceexclvat || 0), 0),
+    dailyRevenue: [...dailyMap].map(([date, revenue]) => ({ date, revenue })),
+    boundary: {
+      date: cutoffDate,
+      seconds: lines.filter(line => line.date === cutoffDate && line.secondOfDay != null)
+        .map(line => [line.secondOfDay, line.priceexclvat || 0]),
+    },
+  };
+  const full = summary.completeRevenue;
   if (!(currentStart <= cphNow.date && cphNow.date < currentEnd)) {
     return { comparison: full, full };
   }
-  const cutoffDate = cphDateOffset(cphNow.date, -364);
-  const comparison = lines.reduce((sum, line) => {
-    if (line.date < cutoffDate) return sum + (line.priceexclvat || 0);
-    if (line.date > cutoffDate) return sum;
-    return line.secondOfDay != null && line.secondOfDay <= cphNow.secondOfDay
-      ? sum + (line.priceexclvat || 0)
-      : sum;
-  }, 0);
+  const comparison = summary.dailyRevenue.reduce((sum, day) =>
+    day.date < cutoffDate ? sum + day.revenue : sum, 0)
+    + summary.boundary.seconds.reduce((sum, pair) =>
+      pair[0] <= cphNow.secondOfDay ? sum + pair[1] : sum, 0);
   return { comparison, full };
 }
 
@@ -358,6 +368,18 @@ describe('LY same-time comparison and complete-period budget', () => {
     assert.match(source, /budgetData\s*=\s*ly\.full/);
     assert.match(source, /const budget\s*=\s*totalBudgetBasis \* 1\.10/);
     assert.match(source, /const budget\s*=\s*fullLyRev \? fullLyRev \* 1\.10/);
+  });
+
+  test('chain, store and sidebar LY consumers use compact summaries, not full sales lines', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const lyFunction = source.slice(
+      source.indexOf('async function apiLyRevenue'),
+      source.indexOf('// Fetch revenue for all stores in parallel.'),
+    );
+    assert.match(lyFunction, /apiRevenueSummary\(/);
+    assert.doesNotMatch(lyFunction, /apiSalesRange\(/);
+    assert.match(source, /apiAllLyRevenue\(lyStart, lyEnd, start, end\)/);
+    assert.match(source, /const lyVals\s*=\s*STORES\.map\(s => lyData\[s\.id\] \|\| 0\)/);
   });
 });
 
