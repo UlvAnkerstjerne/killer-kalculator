@@ -13,6 +13,8 @@ const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
+const { createSalesRangeCache } = require('./lib/sales-range-cache');
+const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -361,6 +363,40 @@ async function posHttpGet(url, headers) {
   return axios.get(url, { headers, timeout: 20000 });
 }
 
+// Successful complete ranges are shared across sessions because they contain
+// the same allowlisted business data. Current/open data stays fresh for at most
+// 10 minutes and is refreshed once shortly before expiry when recently used;
+// closed historical ranges remain fresh for 6h. The weighted LRU is bounded to
+// 120 entries and 32 MiB of estimated serialized result data.
+let salesRangeCache;
+salesRangeCache = createSalesRangeCache({
+  fetchRange: ({ store, start, end }) => fetchSalesRange({
+    store, start, end, httpGet: posHttpGet,
+  }),
+  onRefreshError: (err, { storeId, start, end }) => {
+    console.warn(`[sales-range] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
+  },
+  onCacheWrite: ({ args, result, entry }) => {
+    const today = cphDateStr();
+    const tomorrow = cphDateNextDay(today);
+    if (args.start !== cphWeekMonday(today) || args.end !== tomorrow) return;
+
+    const derivedToday = deriveSalesSubrange(result, today, tomorrow);
+    if (!derivedToday) return;
+    salesRangeCache.prime({
+      storeId: args.storeId,
+      store: args.store,
+      start: today,
+      end: tomorrow,
+    }, derivedToday, {
+      fetchedAt: entry.fetchedAt,
+      lastAccessedAt: entry.lastAccessedAt,
+      refreshArgs: args,
+    });
+  },
+});
+app.locals.salesRangeCache = salesRangeCache;
+
 /**
  * GET /api/sales-range/:storeId/:start/:end
  *
@@ -403,7 +439,8 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
   }
 
   try {
-    const result = await fetchSalesRange({ store, start, end, httpGet: posHttpGet });
+    const cached = await salesRangeCache.get({ storeId, store, start, end });
+    const result = cached.result;
 
     const lines = result.lines.map(sanitiseSalesLine);
 
@@ -421,6 +458,9 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
       start:              result.meta.start,
       end:                result.meta.end,
       storeId,
+      cacheStatus:        cached.cacheStatus,
+      stale:              cached.stale,
+      cacheAgeMs:         cached.fetchedAt === null ? 0 : Math.max(0, Date.now() - cached.fetchedAt),
     };
 
     return res.json({ lines, meta });
@@ -723,14 +763,23 @@ function cphDateNextDay(dateStr) {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
+function cphWeekMonday(dateStr) {
+  const date = new Date(dateStr + 'T12:00:00Z');
+  const weekday = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - (weekday === 0 ? 6 : weekday - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 async function fetchLemonadeToday() {
   const today    = cphDateStr();
   const tomorrow = cphDateNextDay(today);   // exclusive end — today only
 
   const results = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
-      const result = await fetchSalesRange({
-        store, start: today, end: tomorrow, httpGet: posHttpGet,
+      // History snapshots must wait for a fresh result. This still shares any
+      // dashboard refresh already in flight for the identical range.
+      const { result } = await salesRangeCache.get({
+        storeId: id, store, start: today, end: tomorrow,
       });
       // Incomplete result (conflicts / invalids) must not corrupt totals.
       if (!result.meta.complete) {
@@ -760,6 +809,39 @@ async function fetchLemonadeToday() {
 
   return { date: today, stores, total, complete };
 }
+
+// Warm This Week without delaying server readiness. Every complete weekly
+// result safely primes Today from its CPH-dated lines, avoiding a second export.
+async function warmCurrentSalesRanges() {
+  const today = cphDateStr();
+  const tomorrow = cphDateNextDay(today);
+  const monday = cphWeekMonday(today);
+  const weeklyResults = await Promise.allSettled(
+    Object.entries(STORES).map(([storeId, store]) => salesRangeCache.get({
+      storeId, store, start: monday, end: tomorrow,
+    }))
+  );
+  // Complete weekly entries make these cache hits. Any weekly failure or
+  // incomplete result falls back to an explicit Today fetch, preserving safety.
+  const todayResults = await Promise.allSettled(
+    Object.entries(STORES).map(([storeId, store]) => salesRangeCache.get({
+      storeId, store, start: today, end: tomorrow,
+    }))
+  );
+  const warmedWeeks = weeklyResults.filter(
+    result => result.status === 'fulfilled' && result.value.result.meta.complete
+  ).length;
+  const warmedToday = todayResults.filter(
+    result => result.status === 'fulfilled' && result.value.result.meta.complete
+  ).length;
+  const stats = salesRangeCache.stats();
+  console.log(
+    `[sales-range] startup warm complete: week ${warmedWeeks}/${weeklyResults.length}, ` +
+    `today ${warmedToday}/${todayResults.length}, ` +
+    `${stats.entries} entries, ${stats.estimatedBytes} estimated bytes`
+  );
+}
+app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 
 function loadLemonadeHistory() {
   try {
@@ -804,6 +886,7 @@ if (require.main === module) {
     console.log('\n  🔪  KILLER KALCULATOR');
     console.log('  ──────────────────────────────');
     console.log('  http://0.0.0.0:' + PORT + '\n');
+    void warmCurrentSalesRanges();
   });
 
   // Scheduled lemonade save at 22:00 Copenhagen time.

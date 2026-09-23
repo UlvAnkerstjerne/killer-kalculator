@@ -54,6 +54,7 @@ const mockHandlers = {}; // token → () => Promise<response>
 
 function resetMock() {
   for (const k of Object.keys(mockHandlers)) delete mockHandlers[k];
+  if (typeof app !== 'undefined') app.locals.salesRangeCache.clear();
 }
 
 // Today in Copenhagen (used throughout tests)
