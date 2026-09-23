@@ -142,6 +142,121 @@ require.cache[axiosPath] = {
 
 // ── Load server ───────────────────────────────────────────────────────────────
 const app = require('../server');
+const { createSalesRangeCache } = require('../lib/sales-range-cache');
+const { sizedResult, simulateProductionAdmission } = require('./helpers/production-cache-admission');
+
+describe('sales-range — production byte budget', () => {
+  test('sales alone uses exactly 48 MiB; both entry limits and LY bytes are unchanged', () => {
+    assert.equal(app.locals.salesRangeCache.stats().maxBytes, 48 * 1024 * 1024);
+    assert.equal(app.locals.salesRangeCache.stats().maxEntries, 120);
+    assert.equal(app.locals.revenueSummaryCache.stats().maxBytes, 32 * 1024 * 1024);
+    assert.equal(app.locals.revenueSummaryCache.stats().maxEntries, 120);
+  });
+
+  test('measured production footprint admits all six month ranges and preserves Today/This Week', () => {
+    resetMock();
+    try {
+      const report = simulateProductionAdmission(app.locals.salesRangeCache);
+      assert.equal(report.entries, 30);
+      assert.equal(report.estimatedBytes, 41_767_495);
+      assert.equal(report.headroomBytes, 8_564_153);
+      assert.equal(report.allLastMonthAdmitted, true);
+      assert.equal(report.currentEntriesRetained, true);
+      assert.ok(report.outcomes.every(o => o.retained));
+      assert.equal(mockConfig.calls, 0);
+    } finally { resetMock(); }
+  });
+
+  test('the same size simulation reproduces the two production rejections at 32 MiB', () => {
+    const cache = createSalesRangeCache({ fetchRange: async () => { throw new Error('unexpected fetch'); } });
+    try {
+      const report = simulateProductionAdmission(cache);
+      assert.equal(report.entries, 28);
+      assert.equal(report.estimatedBytes, 30_459_173);
+      assert.deepEqual(report.outcomes.filter(o => !o.retained).map(o => [o.period, o.storeId, o.bytes]), [
+        ['last-month', 'fisketorvet', 7_796_599],
+        ['last-month', 'norrebro', 3_511_723],
+      ]);
+      assert.equal(report.currentEntriesRetained, true);
+    } finally { cache.clear(); }
+  });
+
+  test('the actual sales cache still enforces 120 entries with LRU eviction', async () => {
+    resetMock();
+    const cache = app.locals.salesRangeCache;
+    const keys = Array.from({ length: 121 }, (_, i) => ({ storeId: `entry-${i}`,
+      start: '2020-01-01', end: '2020-01-02' }));
+    try {
+      for (const args of keys.slice(0, 120)) assert.ok(cache.prime(args, sizedResult(args, 256)));
+      await cache.get(keys[0]); // Promote the oldest entry.
+      assert.ok(cache.prime(keys[120], sizedResult(keys[120], 256)));
+      assert.equal(cache.stats().entries, 120);
+      assert.ok(cache.inspect(keys[0]));
+      assert.equal(cache.inspect(keys[1]), null);
+      assert.ok(cache.inspect(keys[120]));
+      assert.equal(mockConfig.calls, 0);
+    } finally { resetMock(); }
+  });
+
+  test('48 MiB remains a hard non-evicting admission boundary', () => {
+    resetMock();
+    const cache = app.locals.salesRangeCache;
+    const a = { storeId: 'a', start: '2020-01-01', end: '2020-01-02' };
+    const b = { ...a, storeId: 'b' };
+    try {
+      assert.ok(cache.prime(a, sizedResult(a, 48 * 1024 * 1024 - 255)));
+      assert.equal(cache.prime(b, sizedResult(b, 256), { allowEviction: false }), false,
+        'one byte beyond the aggregate budget is rejected');
+      assert.ok(cache.inspect(a));
+      assert.equal(cache.inspect(b), null);
+      assert.ok(cache.prime(b, sizedResult(b, 255), { allowEviction: false }));
+      assert.equal(cache.stats().estimatedBytes, 48 * 1024 * 1024);
+    } finally { resetMock(); }
+  });
+
+  test('an individual result one byte over 48 MiB is returned without caching or eviction', async () => {
+    const args = { storeId: 'large', start: '2020-01-01', end: '2020-01-02' };
+    const oversized = sizedResult(args, 48 * 1024 * 1024 + 1);
+    const cache = createSalesRangeCache({ maxBytes: app.locals.salesRangeCache.stats().maxBytes,
+      fetchRange: async () => oversized });
+    const retained = { ...args, storeId: 'retained' };
+    try {
+      assert.ok(cache.prime(retained, sizedResult(retained, 256)));
+      const response = await cache.get(args);
+      assert.equal(response.result, oversized);
+      assert.equal(response.cacheStatus, 'uncached-oversized');
+      assert.equal(cache.inspect(args), null);
+      assert.ok(cache.inspect(retained));
+      assert.equal(cache.stats().entries, 1);
+      assert.equal(cache.stats().estimatedBytes, 256);
+    } finally { cache.clear(); }
+  });
+
+  test('byte-pressure LRU skips protected Today/This Week and evicts only the oldest history', async () => {
+    resetMock();
+    const cache = app.locals.salesRangeCache;
+    const today = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date());
+    const date = new Date(today + 'T12:00:00Z');
+    const offset = days => new Date(date.getTime() + days * 86400000).toISOString().slice(0, 10);
+    const current = [
+      { storeId: 'today', start: today, end: offset(1) },
+      { storeId: 'week', start: offset(-((date.getUTCDay() + 6) % 7)), end: offset(1) },
+    ];
+    const history = ['a', 'b', 'c'].map(storeId => ({ storeId, start: '2020-01-01', end: '2020-01-02' }));
+    try {
+      for (const args of current) assert.ok(cache.prime(args, sizedResult(args, 2 * 1024 * 1024)));
+      for (const args of history.slice(0, 2)) assert.ok(cache.prime(args, sizedResult(args, 22 * 1024 * 1024)));
+      await cache.get(history[0]);
+      assert.ok(cache.prime(history[2], sizedResult(history[2], 22 * 1024 * 1024)));
+      assert.ok(current.every(args => cache.inspect(args)), 'oldest current entries remain protected');
+      assert.ok(cache.inspect(history[0]));
+      assert.equal(cache.inspect(history[1]), null);
+      assert.ok(cache.inspect(history[2]));
+      assert.equal(cache.stats().estimatedBytes, 48 * 1024 * 1024);
+      assert.equal(mockConfig.calls, 0);
+    } finally { resetMock(); }
+  });
+});
 
 // ── HTTP test helpers ─────────────────────────────────────────────────────────
 
