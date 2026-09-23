@@ -9,6 +9,7 @@
  *  • Fixture regression  — 13,143.68 DKK ex VAT from norrebro-2026-09-20
  *  • Daily grouping      — uses line.date field, not parsed datetime
  *  • Timezone safety     — cphDateOffset + itemBucket use UTC math; no local-TZ
+ *  • LY cutoff/budget    — comparison is same-time; budget always uses full LY
  *  • Request counts      — 1 range-request per store regardless of bucket count
  *  • Incomplete/failed   — never cached or rendered as revenue
  *  • Removed routes      — /api/revenue and /api/all-revenue return 404
@@ -95,6 +96,22 @@ function getCphDateRange(period, { todayStr } = {}) {
 function lyDateRange(period, { todayStr } = {}) {
   const { start, end } = getCphDateRange(period, { todayStr });
   return { start: cphDateOffset(start, -364), end: cphDateOffset(end, -364) };
+}
+
+function lyRevenueBases_t(lines, currentStart, currentEnd, cphNow) {
+  const full = lines.reduce((sum, line) => sum + (line.priceexclvat || 0), 0);
+  if (!(currentStart <= cphNow.date && cphNow.date < currentEnd)) {
+    return { comparison: full, full };
+  }
+  const cutoffDate = cphDateOffset(cphNow.date, -364);
+  const comparison = lines.reduce((sum, line) => {
+    if (line.date < cutoffDate) return sum + (line.priceexclvat || 0);
+    if (line.date > cutoffDate) return sum;
+    return line.secondOfDay != null && line.secondOfDay <= cphNow.secondOfDay
+      ? sum + (line.priceexclvat || 0)
+      : sum;
+  }, 0);
+  return { comparison, full };
 }
 
 // itemBucket — extract from frontend-sales.test.js (identical copy)
@@ -266,6 +283,81 @@ describe('lyDateRange — same-period-last-year', () => {
     // Results don't depend on whether the host is in UTC, CPH, or LA — same calculation
     assert.equal(a, cphDateOffset('2026-03-29', -364));
     assert.equal(b, cphDateOffset('2026-10-25', -364));
+  });
+});
+
+describe('LY same-time comparison and complete-period budget', () => {
+  const NOW = { date: '2026-09-23', secondOfDay: 12 * 3600 };
+
+  test('active-day comparison is cut off at equivalent Copenhagen time', () => {
+    const bases = lyRevenueBases_t([
+      { date: '2025-09-24', secondOfDay: 11 * 3600, priceexclvat: 30000 },
+      { date: '2025-09-24', secondOfDay: 12 * 3600, priceexclvat: 5000 },
+      { date: '2025-09-24', secondOfDay: 12 * 3600 + 1, priceexclvat: 32254 },
+    ], '2026-09-23', '2026-09-24', NOW);
+
+    assert.equal(bases.comparison, 35000, 'LY comparison stops at 12:00:00 CPH');
+    assert.equal(bases.full, 67254, 'full LY day remains available for budget');
+  });
+
+  test('production regression: 67,254 DKK full LY day keeps 73,979.40 DKK budget', () => {
+    const bases = lyRevenueBases_t([
+      { date: '2025-09-24', secondOfDay: 11 * 3600, priceexclvat: 30000 },
+      { date: '2025-09-24', secondOfDay: 13 * 3600, priceexclvat: 37254 },
+    ], '2026-09-23', '2026-09-24', NOW);
+
+    const budget = bases.full * 1.10;
+    assert.equal(bases.comparison, 30000);
+    assert.ok(Math.abs(budget - 73979.40) < 0.001);
+    assert.notEqual(budget, bases.comparison * 1.10, 'cutoff LY must never become budget basis');
+  });
+
+  test('vs LY uses cutoff revenue while vs budget uses the complete-period target', () => {
+    const currentRevenue = 40000;
+    const bases = { comparison: 35000, full: 67254 };
+    const budget = bases.full * 1.10;
+    const vsLy = (currentRevenue - bases.comparison) / bases.comparison * 100;
+    const vsBudget = (currentRevenue - budget) / budget * 100;
+
+    assert.ok(Math.abs(vsLy - 14.285714) < 0.00001);
+    assert.ok(Math.abs(vsBudget - -45.930896) < 0.00001);
+  });
+
+  test('multi-day active period includes prior LY days and cuts only the equivalent current day', () => {
+    const bases = lyRevenueBases_t([
+      { date: '2025-09-22', secondOfDay: 20 * 3600, priceexclvat: 10000 },
+      { date: '2025-09-23', secondOfDay: 20 * 3600, priceexclvat: 20000 },
+      { date: '2025-09-24', secondOfDay: 11 * 3600, priceexclvat: 30000 },
+      { date: '2025-09-24', secondOfDay: 13 * 3600, priceexclvat: 40000 },
+      { date: '2025-09-25', secondOfDay: 10 * 3600, priceexclvat: 50000 },
+    ], '2026-09-21', '2026-09-26', NOW);
+
+    assert.equal(bases.comparison, 60000);
+    assert.equal(bases.full, 150000);
+  });
+
+  test('completed periods use the complete LY value for both comparison and budget basis', () => {
+    const bases = lyRevenueBases_t([
+      { date: '2025-09-15', secondOfDay: 23 * 3600, priceexclvat: 67254 },
+    ], '2026-09-14', '2026-09-15', NOW);
+
+    assert.deepEqual(bases, { comparison: 67254, full: 67254 });
+  });
+
+  test('lines without precise time are excluded from an active-day comparison, not from budget', () => {
+    const bases = lyRevenueBases_t([
+      { date: '2025-09-24', secondOfDay: null, priceexclvat: 100 },
+    ], '2026-09-23', '2026-09-24', NOW);
+
+    assert.deepEqual(bases, { comparison: 0, full: 100 });
+  });
+
+  test('implementation keeps separate comparison and full-budget maps for chain consumers', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.match(source, /lyData\s*=\s*ly\.comparison/);
+    assert.match(source, /budgetData\s*=\s*ly\.full/);
+    assert.match(source, /const budget\s*=\s*totalBudgetBasis \* 1\.10/);
+    assert.match(source, /const budget\s*=\s*fullLyRev \? fullLyRev \* 1\.10/);
   });
 });
 

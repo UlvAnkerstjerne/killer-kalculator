@@ -1360,6 +1360,78 @@ async function apiRevenue(storeId, start, end) {
   }
 }
 
+// Copenhagen-local calendar date and seconds since midnight for a point in
+// time. formatToParts keeps this independent of the browser's own timezone.
+function cphNowParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Copenhagen', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now).reduce((out, part) => {
+    if (part.type !== 'literal') out[part.type] = part.value;
+    return out;
+  }, {});
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    secondOfDay: Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second),
+  };
+}
+
+// Split a complete equivalent-LY range into two deliberately different bases:
+//   comparison — capped at the equivalent Copenhagen time when the current
+//                range contains today;
+//   full       — the complete LY range, used only as the budget basis.
+// Keeping both values prevents the point-in-time cutoff leaking into budgets.
+function lyRevenueBases(lines, currentStart, currentEnd, now = new Date()) {
+  const full = lines.reduce((sum, line) => sum + (line.priceexclvat || 0), 0);
+  const cphNow = cphNowParts(now);
+  if (!(currentStart <= cphNow.date && cphNow.date < currentEnd)) {
+    return { comparison: full, full };
+  }
+
+  const cutoffDate = cphDateOffset(cphNow.date, -364);
+  const comparison = lines.reduce((sum, line) => {
+    if (line.date < cutoffDate) return sum + (line.priceexclvat || 0);
+    if (line.date > cutoffDate) return sum;
+    return line.secondOfDay != null && line.secondOfDay <= cphNow.secondOfDay
+      ? sum + (line.priceexclvat || 0)
+      : sum;
+  }, 0);
+  return { comparison, full };
+}
+
+async function apiLyRevenue(storeId, lyStart, lyEnd, currentStart, currentEnd) {
+  try {
+    const lines = await apiSalesRange(storeId, lyStart, lyEnd);
+    return lyRevenueBases(lines, currentStart, currentEnd);
+  } catch(e) {
+    console.warn(`[apiLyRevenue] ${storeId} ${lyStart}→${lyEnd}:`, e.message);
+    return null;
+  }
+}
+
+async function apiAllLyRevenue(lyStart, lyEnd, currentStart, currentEnd) {
+  const results = await Promise.allSettled(
+    STORES.map(async store => ({
+      id: store.id,
+      ...lyRevenueBases(
+        await apiSalesRange(store.id, lyStart, lyEnd), currentStart, currentEnd,
+      ),
+    }))
+  );
+  const failed = results.filter(result => result.status === 'rejected');
+  if (failed.length > 0) {
+    throw new Error(`Revenue unavailable: ${failed.length} store(s) failed — ` +
+      failed.map(result => result.reason?.message || 'unknown').join('; '));
+  }
+  const comparison = {};
+  const full = {};
+  for (const result of results) {
+    comparison[result.value.id] = result.value.comparison;
+    full[result.value.id] = result.value.full;
+  }
+  return { comparison, full };
+}
+
 // Fetch revenue for all stores in parallel.
 // Each store delegates to apiSalesRange — shares its cache with sales metrics.
 // Throws if any store fails — callers must handle the error (fail closed).
@@ -1707,7 +1779,7 @@ async function loadSidebar() {
   const [results, salaries] = await Promise.all([
     Promise.all(STORES.map(s => Promise.all([
       apiRevenue(s.id, start, end),
-      apiRevenue(s.id, lyStart, lyEnd)
+      apiLyRevenue(s.id, lyStart, lyEnd, start, end)
     ]))),
     apiPlandaySalaries(from, to)
   ]);
@@ -1716,7 +1788,8 @@ async function loadSidebar() {
     const el = document.getElementById(`si-${s.id}`);
     if (!el) return;
 
-    const [rev, lyRev] = results[i];
+    const [rev, lyBases] = results[i];
+    const lyRev = lyBases?.comparison ?? null;
     const change   = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
     const cost     = invoicesFor(s.id, from, to);
     const costP    = (rev && cost) ? (cost / rev * 100) : null;
@@ -1830,15 +1903,16 @@ let _chainRenderGen = 0;
 
 // Render (or re-render) the store breakdown table.
 // lyData and salaries may be null while they are still loading.
-function _renderChainBreakdown(curData, lyData, salaries, from, to) {
+function _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to) {
   const el = document.getElementById('chain-stores-card');
   if (!el) return;
 
   const totalRev    = STORES.reduce((s, st) => s + (curData[st.id] || 0), 0);
   const totalLY     = lyData   ? STORES.reduce((s, st) => s + (lyData[st.id]    || 0), 0) : null;
+  const totalBudgetBasis = budgetData ? STORES.reduce((s, st) => s + (budgetData[st.id] || 0), 0) : null;
   const totalCost   = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
   const totalSalary = salaries ? STORES.reduce((s, st) => s + (salaries[st.id]  || 0), 0) : null;
-  const budget      = totalLY != null ? totalLY * 1.10 : null;
+  const budget      = totalBudgetBasis != null ? totalBudgetBasis * 1.10 : null;
   const vsLY        = (totalLY != null && totalLY) ? ((totalRev - totalLY) / totalLY * 100) : null;
   const vsBudget    = budget ? ((totalRev - budget) / budget * 100) : null;
   const chainCostP  = (totalRev && totalCost)   ? (totalCost   / totalRev * 100) : null;
@@ -1857,7 +1931,8 @@ function _renderChainBreakdown(curData, lyData, salaries, from, to) {
   for (const s of STORES) {
     const rev  = curData[s.id] || 0;
     const ly   = lyData   ? (lyData[s.id]   || 0) : null;
-    const bgt  = ly != null ? ly * 1.10 : null;
+    const budgetBasis = budgetData ? (budgetData[s.id] || 0) : null;
+    const bgt  = budgetBasis != null ? budgetBasis * 1.10 : null;
     const chg  = (ly != null && ly) ? ((rev - ly) / ly * 100) : null;
     const chgB = bgt ? ((rev - bgt) / bgt * 100) : null;
     const cost = invoicesFor(s.id, from, to);
@@ -2013,7 +2088,7 @@ async function renderChainView() {
   _renderChainBarChart(periodLabel(state.period), curVals, STORES.map(() => 0));
 
   // Breakdown table: LY and salary columns show — until Phase 2 resolves.
-  _renderChainBreakdown(curData, null, null, from, to);
+  _renderChainBreakdown(curData, null, null, null, from, to);
 
   // Snapshot so a later failed re-render can restore current progress.
   _chainLastRender = main.innerHTML;
@@ -2083,14 +2158,17 @@ async function renderChainView() {
   // Both callbacks share closure state so the breakdown table can be re-rendered
   // with whatever has resolved so far.
   let lyData   = null;
+  let budgetData = null;
   let salaries = null;
 
-  apiAllRevenue(lyStart, lyEnd).then(ly => {
+  apiAllLyRevenue(lyStart, lyEnd, start, end).then(ly => {
     if (_chainRenderGen !== gen) return;
-    lyData = ly;
+    lyData = ly.comparison;
+    budgetData = ly.full;
 
     const totalLY  = STORES.reduce((s, st) => s + (lyData[st.id] || 0), 0);
-    const budget   = totalLY * 1.10;
+    const totalBudgetBasis = STORES.reduce((s, st) => s + (budgetData[st.id] || 0), 0);
+    const budget   = totalBudgetBasis * 1.10;
     const vsLY     = totalLY ? ((totalRev - totalLY) / totalLY * 100) : null;
     const vsBudget = budget  ? ((totalRev - budget)  / budget  * 100) : null;
     const lyVals   = STORES.map(s => lyData[s.id] || 0);
@@ -2109,7 +2187,7 @@ async function renderChainView() {
       <div class="metric-sub">${badge(vsBudget)} &nbsp; Budget: ${kr(budget)}</div>
     </div>`;
 
-    _renderChainBreakdown(curData, lyData, salaries, from, to);
+    _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to);
     _renderChainBarChart(periodLabel(state.period), curVals, lyVals);
     _chainLastRender = main.innerHTML;
   }).catch(err => {
@@ -2145,7 +2223,7 @@ async function renderChainView() {
       ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
     </div>`;
 
-    _renderChainBreakdown(curData, lyData, salaries, from, to);
+    _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to);
     _chainLastRender = main.innerHTML;
   }).catch(err => {
     if (_chainRenderGen !== gen) return;
@@ -2314,10 +2392,12 @@ async function renderStoreView(storeId) {
   }
 
   // ── Phase 2: LY comparison + Planday salaries (non-blocking) ─────────────────
-  apiRevenue(storeId, lyStart, lyEnd).then(lyRev => {
+  apiLyRevenue(storeId, lyStart, lyEnd, start, end).then(lyBases => {
     if (_storeRenderGen !== gen) return;
 
-    const budget   = lyRev ? lyRev * 1.10 : null;
+    const lyRev    = lyBases?.comparison ?? null;
+    const fullLyRev = lyBases?.full ?? null;
+    const budget   = fullLyRev ? fullLyRev * 1.10 : null;
     const vsLY     = (rev && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
     const vsBudget = (rev && budget) ? ((rev - budget) / budget * 100) : null;
 
