@@ -256,9 +256,6 @@ describe('Credential logging', () => {
 // ── 4. Unauthenticated access is denied ───────────────────────────────────────
 describe('Unauthenticated access to business routes is denied', () => {
   const protectedGets = [
-    '/api/revenue/vesterbro/1700000000/1700086400',
-    '/api/all-revenue/1700000000/1700086400',
-    '/api/sales/vesterbro/1700000000',
     '/api/planday/salaries/2026-01-01/2026-01-07',
     '/api/katering-recipes',
     '/api/meat',
@@ -495,7 +492,7 @@ describe('Per-store token isolation', () => {
   // Run all 6 stores sequentially inside one test to avoid concurrent-capture races.
   // Uses isolationJar (pre-established session) to avoid racing with the env-var
   // deletion in the "Missing auth configuration" suite.
-  test('each store revenue request uses its own configured env token', async () => {
+  test('each store sales-range request uses its own configured env token', async () => {
     const storeTokens = [
       ['indre-by',       TEST_TOKEN_INDRE_BY],
       ['vesterbro',      TEST_TOKEN_VESTERBRO],
@@ -507,7 +504,7 @@ describe('Per-store token isolation', () => {
 
     for (const [storeId, expectedToken] of storeTokens) {
       const startIdx = capturedAxiosCalls.length;
-      await authGet(`/api/revenue/${storeId}/1700000000/1700086400`, isolationJar);
+      await authGet(`/api/sales-range/${storeId}/2026-09-20/2026-09-21`, isolationJar);
 
       const calls = capturedAxiosCalls.slice(startIdx);
       const posCall = calls.find(c => c.type === 'get' && c.url.includes('onlinepos.dk'));
@@ -594,10 +591,10 @@ describe('No credentials in frontend or API responses', () => {
     assert.ok(!found, `Session response contains token value: ${found}`);
   });
 
-  test('revenue API response contains no provider tokens', async () => {
+  test('sales-range API response contains no provider tokens', async () => {
     const { jar } = await doLogin();
-    const r = await authGet('/api/revenue/vesterbro/1700000000/1700086400', jar);
+    const r = await authGet('/api/sales-range/vesterbro/2026-09-20/2026-09-21', jar);
     const found = containsAnyToken(r.body);
-    assert.ok(!found, `Revenue response contains token value: ${found}`);
+    assert.ok(!found, `Sales-range response contains token value: ${found}`);
   });
 });
