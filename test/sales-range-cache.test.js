@@ -395,7 +395,9 @@ describe('server sales range cache', () => {
   test('production server starts a coalesced warm of the default current range', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(source, /async function warmCurrentSalesRanges\(\)/);
-    assert.match(source, /void warmCurrentSalesRanges\(\)/);
+    assert.match(source, /async function warmStartupData\(\)/);
+    assert.match(source, /await warmCurrentSalesRanges\(\);\s*await warmLyRevenueSummaries\(\);/);
+    assert.match(source, /void warmStartupData\(\)/);
     assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: monday, end: tomorrow/);
     assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: today, end: tomorrow/);
     assert.match(source, /deriveSalesSubrange\(result, today, tomorrow\)/);
