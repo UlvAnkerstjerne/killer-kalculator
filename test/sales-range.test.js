@@ -224,7 +224,7 @@ describe('sales-range — response shape', () => {
     assert.ok(r.json.meta && typeof r.json.meta === 'object', 'response.meta must be an object');
   });
 
-  test('each line contains exactly the 11 allowlisted fields and nothing else', async () => {
+  test('each line contains exactly the 12 allowlisted fields and nothing else', async () => {
     resetMock();
     mockConfig.pages = [mkPageResponse([mkLine()])];
 
@@ -237,7 +237,7 @@ describe('sales-range — response shape', () => {
     const want = [
       'count', 'date', 'hour', 'paymenttype', 'paymenttypecode',
       'price', 'priceexclvat', 'productgroup', 'productgroupid',
-      'productid', 'productname',
+      'productid', 'productname', 'secondOfDay',
     ].sort();
     assert.deepEqual(got, want, `Line keys mismatch: ${JSON.stringify(got)}`);
   });
@@ -376,10 +376,10 @@ describe('sales-range — value semantics', () => {
     assert.equal(line.priceexclvat, -71.2, 'priceexclvat must remain -71.2');
   });
 
-  test('date field is the YYYY-MM-DD CPH calendar date, hour is 0–23 integer', async () => {
+  test('date, hour, and secondOfDay preserve Copenhagen-local comparison time', async () => {
     resetMock();
     mockConfig.pages = [mkPageResponse([
-      mkLine({ timestamp_pay: '2026-09-20 21:45:00', orderlineid: 'L1' }),
+      mkLine({ timestamp_pay: '2026-09-20 21:45:37', orderlineid: 'L1' }),
     ])];
 
     const { jar } = await doLogin();
@@ -391,6 +391,7 @@ describe('sales-range — value semantics', () => {
     assert.equal(line.date, '2026-09-20', 'date must be the CPH calendar date');
     assert.equal(line.hour, 21,           'hour must be 21 (read from CPH-local string)');
     assert.equal(typeof line.hour, 'number');
+    assert.equal(line.secondOfDay, 21 * 3600 + 45 * 60 + 37);
   });
 
   test('invalidCount is reflected when upstream lines have no valid timestamp', async () => {

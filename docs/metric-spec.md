@@ -216,6 +216,22 @@ the selected Europe/Copenhagen calendar date.
 Refund lines (count < 0) have a signed negative `priceexclvat`; they
 subtract automatically from the sum.
 
+### Last-year comparison and budget bases
+
+For a selected period that contains the current Copenhagen day, the “vs same
+period last year” value uses LY revenue only through the equivalent Copenhagen
+date and clock time. The LY bars and all LY comparison percentages use this
+same cutoff. Completed periods use their complete LY equivalent.
+
+Budget deliberately uses a different base and is never point-in-time filtered:
+
+`budget = complete equivalent LY period revenue × 1.10`
+
+“Vs budget” compares current revenue so far with that complete-period target.
+Store and chain budgets both follow this rule. Regression example: a complete
+LY day of 67,254 DKK produces a budget of 73,979.40 DKK, even while the LY
+comparison value for that day is filtered to the current Copenhagen time.
+
 ---
 
 ## Kombo units

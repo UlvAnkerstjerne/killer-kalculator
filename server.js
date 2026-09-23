@@ -332,6 +332,16 @@ function cphHourFromLine(line) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// Seconds since Copenhagen-local midnight. This retains enough precision for
+// point-in-time LY comparisons without exposing the original sale timestamp.
+function cphSecondOfDayFromLine(line) {
+  const tsStr = line.timestamp_pay || line.datetime || null;
+  if (!tsStr || typeof tsStr !== 'string') return null;
+  const m = /[ T](\d{2}):(\d{2}):(\d{2})/.exec(tsStr.trim());
+  if (!m) return null;
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+}
+
 /**
  * Return only the allowlisted fields from a processed sales line.
  * All raw upstream fields not on this list — cardnumber, clerk, orderlineid,
@@ -351,6 +361,7 @@ function sanitiseSalesLine(line) {
     paymenttypecode: line.paymenttypecode ?? null,
     date:            line._cphDate        ?? null,
     hour:            cphHourFromLine(line),
+    secondOfDay:     cphSecondOfDayFromLine(line),
   };
 }
 
