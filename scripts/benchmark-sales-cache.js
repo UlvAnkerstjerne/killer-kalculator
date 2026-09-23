@@ -49,10 +49,11 @@ async function timed(fn) {
   return performance.now() - start;
 }
 
-async function runScenario(useCache, steps) {
+async function runScenario(useCache, steps, warmSteps = []) {
   const upstream = makeUpstream();
   const cache = useCache ? createSalesRangeCache({ fetchRange: upstream.fetch }) : null;
   const get = args => cache ? cache.get(args) : upstream.fetch(args);
+  for (const step of warmSteps) await step(get);
   const times = [];
   for (const step of steps) times.push(await timed(() => step(get)));
   return { times, calls: upstream.calls() };
@@ -74,9 +75,20 @@ async function compare(name, steps, labels) {
   console.log(`  after:  ${fmt(after.times)}; upstream calls=${after.calls}`);
 }
 
+async function compareStartupWarm() {
+  const step = allStores(today, tomorrow);
+  const before = await runScenario(false, [step]);
+  const after = await runScenario(true, [step], [step]);
+  console.log('Normal first visit after startup warming');
+  console.log(`  before: first=${before.times[0].toFixed(1)}ms; upstream calls=${before.calls}`);
+  console.log(`  after:  first=${after.times[0].toFixed(1)}ms; upstream calls=${after.calls} (during warm-up)`);
+}
+
 async function main() {
   console.log(`Mock OnlinePOS delay: ${delayMs}ms per range`);
+  console.log('Current/open TTL: 10 minutes; one refresh-ahead attempt at 9 minutes for active keys');
   await compare('Cold initial view', [allStores(today, tomorrow)], ['cold']);
+  await compareStartupWarm();
   await compare('Repeated same view', [allStores(today, tomorrow), allStores(today, tomorrow)], ['cold', 'repeat']);
   await compare('Today → This Week → Today', [
     allStores(today, tomorrow), allStores(monday, tomorrow), allStores(today, tomorrow),

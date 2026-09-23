@@ -363,7 +363,8 @@ async function posHttpGet(url, headers) {
 }
 
 // Successful complete ranges are shared across sessions because they contain
-// the same allowlisted business data. Current-day data stays fresh for 30s;
+// the same allowlisted business data. Current/open data stays fresh for at most
+// 10 minutes and is refreshed once shortly before expiry when recently used;
 // closed historical ranges remain fresh for 6h. The cache is LRU-bounded.
 const salesRangeCache = createSalesRangeCache({
   fetchRange: ({ store, start, end }) => fetchSalesRange({
@@ -438,6 +439,7 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
       storeId,
       cacheStatus:        cached.cacheStatus,
       stale:              cached.stale,
+      cacheAgeMs:         cached.fetchedAt === null ? 0 : Math.max(0, Date.now() - cached.fetchedAt),
     };
 
     return res.json({ lines, meta });
@@ -750,7 +752,7 @@ async function fetchLemonadeToday() {
       // dashboard refresh already in flight for the identical range.
       const { result } = await salesRangeCache.get({
         storeId: id, store, start: today, end: tomorrow,
-      }, { allowStale: false });
+      });
       // Incomplete result (conflicts / invalids) must not corrupt totals.
       if (!result.meta.complete) {
         throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);
@@ -778,6 +780,20 @@ async function fetchLemonadeToday() {
   }
 
   return { date: today, stores, total, complete };
+}
+
+// Warm the default dashboard range without delaying server readiness. Requests
+// arriving during warm-up share these exact in-flight OnlinePOS calls.
+async function warmCurrentSalesRanges() {
+  const today = cphDateStr();
+  const tomorrow = cphDateNextDay(today);
+  const results = await Promise.allSettled(
+    Object.entries(STORES).map(([storeId, store]) => salesRangeCache.get({
+      storeId, store, start: today, end: tomorrow,
+    }))
+  );
+  const warmed = results.filter(result => result.status === 'fulfilled' && result.value.result.meta.complete).length;
+  console.log(`[sales-range] startup warm complete: ${warmed}/${results.length} stores`);
 }
 
 function loadLemonadeHistory() {
@@ -823,6 +839,7 @@ if (require.main === module) {
     console.log('\n  🔪  KILLER KALCULATOR');
     console.log('  ──────────────────────────────');
     console.log('  http://0.0.0.0:' + PORT + '\n');
+    void warmCurrentSalesRanges();
   });
 
   // Scheduled lemonade save at 22:00 Copenhagen time.

@@ -7,13 +7,13 @@ const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-function createFrontendSalesClient({ fetchRange, maxEntries = 120, ttlMs = 60_000, now = Date.now }) {
+function createFrontendSalesClient({ fetchRange, maxEntries = 120, ttlMs = 10 * 60 * 1000, now = Date.now }) {
   const cache = new Map();
   const inFlight = new Map();
 
-  function write(key, lines) {
+  function write(key, lines, ttl = ttlMs) {
     cache.delete(key);
-    cache.set(key, { lines, expiresAt: now() + ttlMs });
+    cache.set(key, { lines, expiresAt: now() + ttl });
     while (cache.size > maxEntries) cache.delete(cache.keys().next().value);
   }
 
@@ -34,7 +34,9 @@ function createFrontendSalesClient({ fetchRange, maxEntries = 120, ttlMs = 60_00
         if (!data?.meta?.complete || !Array.isArray(data.lines)) {
           throw new Error('Incomplete sales data from server');
         }
-        write(key, data.lines);
+        const remaining = ttlMs - Math.max(0, Number(data.meta.cacheAgeMs) || 0);
+        if (remaining <= 0) throw new Error('Current sales data exceeded the ten-minute freshness limit');
+        write(key, data.lines, remaining);
         return data.lines;
       } finally {
         inFlight.delete(key);
@@ -118,6 +120,40 @@ describe('frontend bounded sales caching', () => {
     assert.deepEqual(client.sizes(), { cache: 0, inFlight: 0 });
   });
 
+  test('current frontend entries expire at ten minutes, never later', async () => {
+    let nowMs = 0;
+    let calls = 0;
+    const client = createFrontendSalesClient({
+      now: () => nowMs,
+      fetchRange: async () => { calls++; return ok([{ call: calls }]); },
+    });
+    await client.get('norrebro', '2026-09-23', '2026-09-24');
+    nowMs = 10 * 60 * 1000 - 1;
+    const fresh = await client.get('norrebro', '2026-09-23', '2026-09-24');
+    assert.equal(fresh[0].call, 1);
+    nowMs++;
+    const refreshed = await client.get('norrebro', '2026-09-23', '2026-09-24');
+    assert.equal(refreshed[0].call, 2);
+    assert.equal(calls, 2);
+  });
+
+  test('browser TTL includes server cache age instead of restarting at ten minutes', async () => {
+    let nowMs = 0;
+    let calls = 0;
+    const client = createFrontendSalesClient({
+      now: () => nowMs,
+      fetchRange: async () => {
+        calls++;
+        return { lines: [{ call: calls }], meta: { complete: true, cacheAgeMs: calls === 1 ? 9 * 60 * 1000 : 0 } };
+      },
+    });
+    await client.get('norrebro', '2026-09-23', '2026-09-24');
+    nowMs = 60 * 1000;
+    const refreshed = await client.get('norrebro', '2026-09-23', '2026-09-24');
+    assert.equal(refreshed[0].call, 2);
+    assert.equal(calls, 2);
+  });
+
   test('production period switching preserves cache and session expiry clears business caches', () => {
     const setPeriod = html.slice(html.indexOf('function setPeriod('), html.indexOf('function updateNav('));
     const expired = html.slice(html.indexOf('function onSessionExpired('), html.indexOf('// ── Auth ──'));
@@ -129,5 +165,8 @@ describe('frontend bounded sales caching', () => {
     assert.match(expired, /state\.meat\s*=\s*\[\]/);
     assert.match(html, /if \(!res\) throw new Error\('Session unavailable'\)/);
     assert.match(html, /if \(_salesInFlight\.get\(key\) === promise\) _salesInFlight\.delete\(key\)/);
+    assert.match(html, /SALES_CACHE_CURRENT_TTL_MS = 10 \* 60 \* 1000/);
+    assert.match(html, /data\.meta\.cacheAgeMs/);
+    assert.match(html, /Current sales data exceeded the ten-minute freshness limit/);
   });
 });

@@ -308,7 +308,7 @@ describe('sales-range — response shape', () => {
     const requiredKeys = [
       'complete', 'pages', 'rawLineCount', 'processedLineCount',
       'outOfRange', 'duplicatesRemoved', 'invalidCount', 'conflictCount',
-      'start', 'end', 'storeId',
+      'start', 'end', 'storeId', 'cacheStatus', 'stale', 'cacheAgeMs',
     ];
     for (const key of requiredKeys) {
       assert.ok(key in meta, `meta missing required key: ${key}`);
@@ -316,6 +316,8 @@ describe('sales-range — response shape', () => {
 
     // conflictCount is a number, not an array
     assert.equal(typeof meta.conflictCount, 'number');
+    assert.equal(typeof meta.cacheAgeMs, 'number');
+    assert.ok(meta.cacheAgeMs >= 0);
 
     // No 'conflicts' array exposed
     assert.ok(!('conflicts' in meta), 'meta must not expose raw conflicts array');

@@ -1386,7 +1386,7 @@ async function apiAllRevenue(start, end) {
 const _salesInFlight = new Map();
 const _salesCache = new Map();
 const SALES_CACHE_MAX_ENTRIES = 120;
-const SALES_CACHE_CURRENT_TTL_MS = 30 * 1000;
+const SALES_CACHE_CURRENT_TTL_MS = 10 * 60 * 1000;
 const SALES_CACHE_HISTORICAL_TTL_MS = 15 * 60 * 1000;
 
 function readSalesCache(key) {
@@ -1402,11 +1402,15 @@ function readSalesCache(key) {
   return entry.lines;
 }
 
-function writeSalesCache(key, lines, start, endExcl) {
+function writeSalesCache(key, lines, start, endExcl, serverCacheAgeMs = 0, requestElapsedMs = 0) {
   const today = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date());
-  const ttl = endExcl <= today
+  let ttl = endExcl <= today
     ? SALES_CACHE_HISTORICAL_TTL_MS
     : SALES_CACHE_CURRENT_TTL_MS;
+  if (endExcl > today) {
+    ttl -= Math.max(0, Number(serverCacheAgeMs) || 0) + Math.max(0, requestElapsedMs);
+    if (ttl <= 0) throw new Error('Current sales data exceeded the ten-minute freshness limit');
+  }
   _salesCache.delete(key);
   _salesCache.set(key, { lines, expiresAt: Date.now() + ttl });
   while (_salesCache.size > SALES_CACHE_MAX_ENTRIES) {
@@ -1424,6 +1428,7 @@ async function apiSalesRange(storeId, start, endExcl) {
   if (_salesInFlight.has(key)) return _salesInFlight.get(key);
 
   const requestNonce = sessionNonce;
+  const requestStartedAt = Date.now();
   const promise = (async () => {
     try {
       const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
@@ -1439,7 +1444,9 @@ async function apiSalesRange(storeId, start, endExcl) {
         throw new Error('Session changed while loading sales data');
       }
       // Only cache successful, complete results.
-      return writeSalesCache(key, data.lines, start, endExcl);
+      return writeSalesCache(
+        key, data.lines, start, endExcl, data.meta.cacheAgeMs, Date.now() - requestStartedAt,
+      );
     } finally {
       // Remove in-flight entry after settlement so failures can be retried.
       // Do not delete a newer request for the same key after logout/re-login.
