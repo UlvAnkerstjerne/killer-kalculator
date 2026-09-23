@@ -1465,6 +1465,7 @@ async function apiAllRevenue(start, end) {
 // Entries are removed after settlement so a failed request can be retried.
 const _salesInFlight = new Map();
 const _salesCache = new Map();
+const _salesSnapshotTimes = new WeakMap();
 const _revenueSummaryInFlight = new Map();
 const _revenueSummaryCache = new Map();
 const SALES_CACHE_MAX_ENTRIES = 120;
@@ -1525,6 +1526,9 @@ async function apiSalesRange(storeId, start, endExcl) {
       if (!sessionActive || sessionNonce !== requestNonce) {
         throw new Error('Session changed while loading sales data');
       }
+      // Salary's denominator uses a conservative shared snapshot boundary.
+      // This metadata does not change sales values, TTL, admission, or warming.
+      _salesSnapshotTimes.set(data.lines, requestStartedAt - Math.max(0, Number(data.meta.cacheAgeMs) || 0));
       // Only cache successful, complete results.
       return writeSalesCache(
         key, data.lines, start, endExcl, data.meta.cacheAgeMs, Date.now() - requestStartedAt,
@@ -1598,54 +1602,111 @@ async function apiRevenueSummary(storeId, start, endExcl, boundary = null) {
 }
 
 // ── Planday helpers ────────────────────────────────────────────────────────────
-function normalizeName(str) {
-  return String(str).toLowerCase()
-    .replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/å/g, 'aa')
-    .replace(/[^a-z0-9]/g, '');
-}
+const _salaryCache = new Map();
+const _salaryInFlight = new Map();
+let _sidebarSalaryGen = 0;
 
-function deptToStoreId(deptName) {
-  const norm = normalizeName(deptName);
-  for (const s of STORES) {
-    if (norm.includes(normalizeName(s.name))) return s.id;
-  }
-  return null;
+function salaryPercent(result, revenueExVat) {
+  return result?.complete === true && Number.isFinite(result.cost) && Number.isFinite(revenueExVat) && revenueExVat > 0
+    ? result.cost / revenueExVat * 100 : null;
 }
-
-function unixToDateStr(unixTs) {
-  return new Date(unixTs * 1000).toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
+function salaryResult(data, storeId = null) {
+  return storeId ? data?.stores?.[storeId] : data?.chain;
 }
-
-async function apiPlandaySalaries(from, to) {
-  const key = `planday:${from}:${to}`;
-  if (key in state.cache) {
-    console.log('[Planday] salaries cache hit:', state.cache[key]);
-    return state.cache[key];
+function salaryLabel(result, active = false) {
+  if (!result?.complete) return 'Unavailable';
+  const time = active && result.cutoff ? ' through ' + new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(new Date(result.cutoff)) : '';
+  return (result.source === 'actual' ? (active ? 'Actual' : 'Approved actual')
+    : result.source === 'scheduled' ? 'Scheduled estimate' : 'Estimated allocation') + time;
+}
+function salaryCell(data, storeId = null) {
+  const result = salaryResult(data, storeId);
+  const value = salaryPercent(result, result?.revenueExVat);
+  return (value === null ? '—' : value.toFixed(1) + '%') +
+    '<div class="metric-sub">' + salaryLabel(result, data?.period?.active) + '</div>';
+}
+function salaryCard(data, storeId = null) {
+  const result = salaryResult(data, storeId);
+  const value = salaryPercent(result, result?.revenueExVat);
+  return `<div class="card-title">Salary %${storeId ? '' : ' (Chain)'}</div>
+    <div class="metric-val ${value !== null ? (value > 35 ? 'down' : value < 20 ? 'up' : '') : ''}">${value === null ? '—' : value.toFixed(1) + '%'}</div>
+    <div class="metric-sub">${salaryLabel(result, data?.period?.active)}</div>
+    ${result?.complete ? `<div class="metric-sub">Salary: ${kr(result.cost)} · Revenue basis ex VAT: ${kr(result.revenueExVat)}</div>`
+      : '<div class="metric-sub">Salary data unavailable · <button class="pb" onclick="retrySalaries()">Retry</button></div>'}`;
+}
+function retrySalaries() {
+  _salaryCache.clear();
+  renderMain();
+  loadSidebar();
+}
+function alignedSalaryRevenue(lines, cutoff, start, end) {
+  const instant = new Date(cutoff);
+  const point = cphNowParts(instant);
+  // OnlinePOS wall-clock seconds cannot distinguish the two autumn 02:xx hours.
+  // Do not pretend that a partial repeated hour can be aligned exactly.
+  if ([-3600000, 3600000].some(offset => {
+    const other = cphNowParts(new Date(instant.getTime() + offset));
+    return other.date === point.date && other.secondOfDay === point.secondOfDay;
+  })) throw new Error('Salary revenue alignment unavailable');
+  let total = 0;
+  for (const line of lines) {
+    if (line.date < start || line.date >= end || line.date > point.date) continue;
+    if (line.date === point.date) {
+      if (!Number.isInteger(line.secondOfDay)) throw new Error('Salary revenue alignment unavailable');
+      if (line.secondOfDay >= point.secondOfDay) continue;
+    }
+    if (!Number.isFinite(line.priceexclvat)) throw new Error('Salary revenue alignment unavailable');
+    total += line.priceexclvat;
   }
-  try {
-    const fromStr = unixToDateStr(from);
-    const toStr   = unixToDateStr(to);
-    const url = `/api/planday/salaries/${fromStr}/${toStr}`;
-    console.log('[Planday] fetching salaries:', url);
-    const res  = await apiFetch(url);
-    if (!res) return null;
-    const data = await res.json();
-    console.log('[Planday] salaries HTTP status:', res.status);
-    console.log('[Planday] salaries raw response:', JSON.stringify(data));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    // Verify each store ID matches what we expect
-    const knownIds = STORES.map(s => s.id);
-    const returnedIds = Object.keys(data);
-    console.log('[Planday] known store IDs:', knownIds);
-    console.log('[Planday] returned store IDs:', returnedIds);
-    const matched = returnedIds.filter(id => knownIds.includes(id));
-    console.log('[Planday] matched store IDs:', matched, '— unmatched:', returnedIds.filter(id => !knownIds.includes(id)));
-    state.cache[key] = data;
-  } catch(e) {
-    console.warn('[Planday] salaries error:', e.message);
-    state.cache[key] = {};
-  }
-  return state.cache[key];
+  return total;
+}
+async function apiPlandaySalaries(start, end) {
+  // ISO dates only. Every view, including the sidebar, uses this same result.
+  const key = `${start}:${end}`;
+  const hit = _salaryCache.get(key);
+  if (hit && hit.expiresAt > Date.now() && hit.result.period.active === (end > cphNowParts().date)) return hit.result;
+  _salaryCache.delete(key);
+  if (_salaryInFlight.has(key)) return _salaryInFlight.get(key);
+  const nonce = sessionNonce;
+  const requestStartedAt = Date.now();
+  const promise = (async () => {
+    try {
+      const sales = await Promise.all(STORES.map(st => apiSalesRange(st.id, start, end)));
+      const active = end > cphNowParts().date;
+      let cutoff;
+      if (active) {
+        const snapshots = sales.map(lines => _salesSnapshotTimes.get(lines));
+        if (snapshots.some(ms => !Number.isFinite(ms))) throw new Error('Salary revenue alignment unavailable');
+        cutoff = new Date(Math.floor(Math.min(requestStartedAt, ...snapshots) / 1000) * 1000).toISOString();
+      }
+      const query = cutoff ? '?cutoff=' + encodeURIComponent(cutoff) : '';
+      const response = await apiFetch(`/api/planday/salaries/${start}/${end}${query}`);
+      if (!response?.ok) throw new Error('Salary data unavailable');
+      const data = await response.json();
+      if (!data?.stores || !data.chain || data.period?.start !== start || data.period?.end !== end ||
+          (cutoff && data.period.cutoff !== cutoff)) throw new Error('Salary data unavailable');
+      if (!sessionActive || sessionNonce !== nonce) throw new Error('Session changed');
+      for (const [i, st] of STORES.entries()) {
+        if (!data.stores[st.id]) throw new Error('Salary data unavailable');
+        data.stores[st.id].revenueExVat = alignedSalaryRevenue(sales[i], data.period.cutoff, start, end);
+      }
+      data.chain.revenueExVat = STORES.reduce((sum, st) => sum + data.stores[st.id].revenueExVat, 0);
+      if (data.chain.complete) {
+        const ttl = active ? 10 * 60000 : 6 * 3600000;
+        const serverRemaining = ttl - Math.max(0, Number(data.meta?.cacheAgeMs) || 0);
+        const expiresAt = Math.min(requestStartedAt + serverRemaining, active ? Date.parse(data.period.cutoff) + ttl : Infinity);
+        _salaryCache.set(key, { result: data, expiresAt });
+        while (_salaryCache.size > 64) _salaryCache.delete(_salaryCache.keys().next().value);
+      }
+      return data;
+    } finally {
+      if (_salaryInFlight.get(key) === promise) _salaryInFlight.delete(key);
+    }
+  })();
+  _salaryInFlight.set(key, promise);
+  return promise;
 }
 
 // ── Invoice helpers ────────────────────────────────────────────────────────────
@@ -1838,44 +1899,36 @@ function renderSidebarSkeleton() {
 }
 
 async function loadSidebar() {
+  const gen = ++_sidebarSalaryGen, nonce = sessionNonce;
   const { from, to } = getDateRange(state.period);
   const { start, end } = getCphDateRange(state.period);
   const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
-
-  // Kick off all fetches in parallel (revenue + planday)
-  const [results, salaries] = await Promise.all([
-    Promise.all(STORES.map(s => Promise.all([
-      apiRevenue(s.id, start, end),
-      apiLyRevenue(s.id, lyStart, lyEnd, start, end)
-    ]))),
-    apiPlandaySalaries(from, to)
-  ]);
-
-  STORES.forEach((s, i) => {
+  const current = () => gen === _sidebarSalaryGen && sessionActive && nonce === sessionNonce;
+  const salaryPromise = apiPlandaySalaries(start, end).catch(() => null);
+  await Promise.all(STORES.map(async s => {
+    const [rev, lyBases] = await Promise.all([
+      apiRevenue(s.id, start, end), apiLyRevenue(s.id, lyStart, lyEnd, start, end),
+    ]);
+    if (!current()) return;
     const el = document.getElementById(`si-${s.id}`);
     if (!el) return;
-
-    const [rev, lyBases] = results[i];
     const lyRev = lyBases?.comparison ?? null;
-    const change   = (rev !== null && lyRev) ? ((rev - lyRev) / lyRev * 100) : null;
-    const cost     = invoicesFor(s.id, from, to);
-    const costP    = (rev && cost) ? (cost / rev * 100) : null;
-    const salary   = salaries[s.id] || null;
-    const salaryP  = (rev && salary) ? (salary / rev * 100) : null;
-
-    const isActive = state.view === `store:${s.id}`;
-    el.className = `store-item${isActive ? ' active' : ''}`;
-
-    el.innerHTML = `
-      <div class="si-name">${s.name}</div>
-      <div class="si-row">
-        <span class="si-rev">${rev !== null ? kr(rev) : '—'}</span>
-        ${change !== null ? `<span class="si-ly ${updown(change)}">${pct(change)}</span>` : ''}
-      </div>
-      ${costP   !== null ? `<div class="si-cost">Cost: ${costP.toFixed(1)}%</div>` : ''}
-      ${salaryP !== null ? `<div class="si-cost">Salary: ${salaryP.toFixed(1)}%</div>` : ''}
-    `;
-  });
+    const change = rev !== null && lyRev ? (rev - lyRev) / lyRev * 100 : null;
+    const cost = invoicesFor(s.id, from, to);
+    const costP = rev && cost ? cost / rev * 100 : null;
+    el.className = `store-item${state.view === `store:${s.id}` ? ' active' : ''}`;
+    el.innerHTML = `<div class="si-name">${s.name}</div>
+      <div class="si-row"><span class="si-rev">${rev !== null ? kr(rev) : '—'}</span>
+      ${change !== null ? `<span class="si-ly ${updown(change)}">${pct(change)}</span>` : ''}</div>
+      ${costP !== null ? `<div class="si-cost">Cost: ${costP.toFixed(1)}%</div>` : ''}
+      <div class="si-cost" id="si-salary-${s.id}">Salary: Loading…</div>`;
+    // Salary never gates rendering this store's revenue.
+    salaryPromise.then(data => {
+      if (!current()) return;
+      const target = document.getElementById(`si-salary-${s.id}`);
+      if (target) target.innerHTML = 'Salary: ' + salaryCell(data, s.id);
+    });
+  }));
 }
 
 // ── Product mix helpers ────────────────────────────────────────────────────────
@@ -1978,12 +2031,10 @@ function _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to) 
   const totalLY     = lyData   ? STORES.reduce((s, st) => s + (lyData[st.id]    || 0), 0) : null;
   const totalBudgetBasis = budgetData ? STORES.reduce((s, st) => s + (budgetData[st.id] || 0), 0) : null;
   const totalCost   = STORES.reduce((s, st) => s + invoicesFor(st.id, from, to), 0);
-  const totalSalary = salaries ? STORES.reduce((s, st) => s + (salaries[st.id]  || 0), 0) : null;
   const budget      = totalBudgetBasis != null ? totalBudgetBasis * 1.10 : null;
   const vsLY        = (totalLY != null && totalLY) ? ((totalRev - totalLY) / totalLY * 100) : null;
   const vsBudget    = budget ? ((totalRev - budget) / budget * 100) : null;
   const chainCostP  = (totalRev && totalCost)   ? (totalCost   / totalRev * 100) : null;
-  const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
 
   let html = `<table>
     <thead><tr>
@@ -2004,8 +2055,7 @@ function _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to) 
     const chgB = bgt ? ((rev - bgt) / bgt * 100) : null;
     const cost = invoicesFor(s.id, from, to);
     const costP = rev && cost ? (cost / rev * 100) : null;
-    const sal  = salaries ? (salaries[s.id] || null) : null;
-    const salP = (rev && sal) ? (sal / rev * 100) : null;
+
 
     html += `<tr>
       <td style="font-weight:600;cursor:pointer;color:var(--red)" onclick="setView('store:${s.id}')">${s.name}</td>
@@ -2013,7 +2063,7 @@ function _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to) 
       <td class="td-num ${updown(chg)}">${pct(chg)}</td>
       <td class="td-num ${updown(chgB)}">${pct(chgB)}</td>
       <td class="td-num">${costP !== null ? costP.toFixed(1) + '%' : '—'}</td>
-      <td class="td-num">${salP  !== null ? salP.toFixed(1)  + '%' : '—'}</td>
+      <td class="td-num">${salaryCell(salaries, s.id)}</td>
     </tr>`;
   }
 
@@ -2023,7 +2073,7 @@ function _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to) 
     <td class="td-num ${updown(vsLY)}">${pct(vsLY)}</td>
     <td class="td-num ${updown(vsBudget)}">${pct(vsBudget)}</td>
     <td class="td-num">${chainCostP !== null ? chainCostP.toFixed(1) + '%' : '—'}</td>
-    <td class="td-num">${chainSalP  !== null ? chainSalP.toFixed(1)  + '%' : '—'}</td>
+    <td class="td-num">${salaryCell(salaries)}</td>
   </tr>`;
 
   html += '</tbody></table>';
@@ -2275,32 +2325,18 @@ async function renderChainView() {
     _chainLastRender = main.innerHTML;
   });
 
-  apiPlandaySalaries(from, to).then(sal => {
+  apiPlandaySalaries(start, end).then(sal => {
     if (_chainRenderGen !== gen) return;
     salaries = sal;
-
-    const totalSalary = STORES.reduce((s, st) => s + (salaries[st.id] || 0), 0);
-    const chainSalP   = (totalRev && totalSalary) ? (totalSalary / totalRev * 100) : null;
-
     const salEl = document.getElementById('chain-kpi-sal');
-    if (salEl) salEl.outerHTML = `<div class="card" id="chain-kpi-sal">
-      <div class="card-title">Salary % (Chain)</div>
-      <div class="metric-val ${chainSalP !== null ? (chainSalP > 35 ? 'down' : chainSalP < 20 ? 'up' : '') : ''}">${chainSalP !== null ? chainSalP.toFixed(1) + '%' : '—'}</div>
-      <div class="metric-sub">${totalSalary ? 'Salary: ' + kr(totalSalary) : 'No Planday data'}</div>
-      ${chainSalP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,chainSalP)}%"></div></div>` : ''}
-    </div>`;
-
+    if (salEl) salEl.innerHTML = salaryCard(sal);
     _renderChainBreakdown(curData, lyData, budgetData, salaries, from, to);
     _chainLastRender = main.innerHTML;
-  }).catch(err => {
+  }).catch(() => {
     if (_chainRenderGen !== gen) return;
-    console.warn('[renderChainView] Planday fetch failed:', err.message);
     const salEl = document.getElementById('chain-kpi-sal');
-    if (salEl) salEl.outerHTML = `<div class="card" id="chain-kpi-sal">
-      <div class="card-title">Salary % (Chain)</div>
-      <div class="metric-val" style="font-size:14px;color:var(--muted)">Wage data unavailable</div>
-      <div class="metric-sub">${err.message}</div>
-    </div>`;
+    if (salEl) salEl.innerHTML = salaryCard(null);
+    _renderChainBreakdown(curData, lyData, budgetData, null, from, to);
     _chainLastRender = main.innerHTML;
   });
 }
@@ -2498,27 +2534,14 @@ async function renderStoreView(storeId) {
     </div>`;
   });
 
-  apiPlandaySalaries(from, to).then(salaries => {
+  apiPlandaySalaries(start, end).then(salaries => {
     if (_storeRenderGen !== gen) return;
-    const salary  = salaries[storeId] || null;
-    const salaryP = (rev && salary) ? (salary / rev * 100) : null;
-
     const salEl = document.getElementById('store-kpi-sal');
-    if (salEl) salEl.outerHTML = `<div class="card" id="store-kpi-sal">
-      <div class="card-title">Salary %</div>
-      <div class="metric-val ${salaryP !== null ? (salaryP > 35 ? 'down' : salaryP < 20 ? 'up' : '') : ''}">${salaryP !== null ? salaryP.toFixed(1) + '%' : '—'}</div>
-      <div class="metric-sub">${salary ? 'Salary cost: ' + kr(salary) : 'No Planday data'}</div>
-      ${salaryP !== null ? `<div class="cost-track"><div class="cost-fill" style="width:${Math.min(100,salaryP)}%"></div></div>` : ''}
-    </div>`;
-  }).catch(err => {
+    if (salEl) salEl.innerHTML = salaryCard(salaries, storeId);
+  }).catch(() => {
     if (_storeRenderGen !== gen) return;
-    console.warn('[renderStoreView] Planday fetch failed:', err.message);
     const salEl = document.getElementById('store-kpi-sal');
-    if (salEl) salEl.outerHTML = `<div class="card" id="store-kpi-sal">
-      <div class="card-title">Salary %</div>
-      <div class="metric-val" style="font-size:14px;color:var(--muted)">Wage data unavailable</div>
-      <div class="metric-sub">${err.message}</div>
-    </div>`;
+    if (salEl) salEl.innerHTML = salaryCard(null, storeId);
   });
 }
 
@@ -3392,7 +3415,9 @@ function formatBucketLabel(key, interval) {
 }
 
 
+let _graphSalaryGen = 0;
 async function loadGraphData() {
+  const graphGen = ++_graphSalaryGen;
   const card = document.getElementById('graph-chart-card');
   if (!card || state.view !== 'graphs') return;
   card.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Loading…</div>';
@@ -3439,13 +3464,18 @@ async function loadGraphData() {
   const bucketSalaries = {}; // bucketKey → { storeId: cost }
   if (state.graphMetric === 'salary') {
     await Promise.all(bucketKeys.map(async key => {
-      const { from: bkF, to: bkT } = bucketTimestamps(key, state.graphInterval);
-      try { bucketSalaries[key] = await apiPlandaySalaries(bkF, bkT); }
-      catch(e) { bucketSalaries[key] = {}; }
+      const bucketStart = state.graphInterval === 'weekly' ? key : key + '-01';
+      const bucketEnd = state.graphInterval === 'weekly' ? cphDateOffset(key, 7)
+        : new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)), 1)).toISOString().slice(0, 10);
+      const rangeStart = bucketStart > state.graphFrom ? bucketStart : state.graphFrom;
+      const selectionEnd = cphDateNextDay(state.graphTo);
+      const rangeEnd = bucketEnd < selectionEnd ? bucketEnd : selectionEnd;
+      try { bucketSalaries[key] = await apiPlandaySalaries(rangeStart, rangeEnd); }
+      catch(e) { bucketSalaries[key] = null; }
     }));
   }
 
-  if (state.view !== 'graphs') return; // navigated away while fetching
+  if (state.view !== 'graphs' || graphGen !== _graphSalaryGen) return; // superseded selection
 
   // ── Build Chart.js datasets ─────────────────────────────────────────────────
   const isLine = state.graphType === 'line';
@@ -3518,9 +3548,8 @@ async function loadGraphData() {
 
       } else if (state.graphMetric === 'salary') {
         data = bucketKeys.map(k => {
-          const sal = (bucketSalaries[k] || {})[storeId] || 0;
-          const rev = revMap[k] || 0;
-          return rev > 0 && sal > 0 ? sal / rev * 100 : null;
+          const result = salaryResult(bucketSalaries[k], storeId);
+          return salaryPercent(result, result?.revenueExVat);
         });
 
       } else if (state.graphMetric === 'rolls') {
@@ -3555,7 +3584,7 @@ async function loadGraphData() {
     });
   }
 
-  card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
+  card.innerHTML = (state.graphMetric === 'salary' ? '<div class="metric-sub">Salary source: ' + [...new Set(Object.values(bucketSalaries).flatMap(data => selectedStores.map(id => salaryLabel(salaryResult(data, id), data?.period?.active))))].join(' · ') + '</div>' : '') + '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
 
   makeChart('graph-canvas', {
     type: state.graphType,
@@ -3627,6 +3656,7 @@ function closeSidebar() {
 }
 
 function setView(view) {
+  _chainRenderGen++; _storeRenderGen++; _graphSalaryGen++;
   state.view = view;
   closeSidebar(); // close on mobile after navigation
   updateNav();
@@ -3634,6 +3664,7 @@ function setView(view) {
 }
 
 function setPeriod(period) {
+  _chainRenderGen++; _storeRenderGen++; _graphSalaryGen++; _sidebarSalaryGen++;
   state.period = period;
   _chainLastRender = null; // Stale rollback would show wrong period
 
@@ -4181,6 +4212,9 @@ function onSessionExpired(message) {
   csrfToken = null;
   state.cache = {};
   _salesCache.clear();
+  _salaryCache.clear();
+  _salaryInFlight.clear();
+  _chainRenderGen++; _storeRenderGen++; _graphSalaryGen++; _sidebarSalaryGen++;
   _salesInFlight.clear(); // Abandon all in-flight requests
   _revenueSummaryCache.clear();
   _revenueSummaryInFlight.clear();

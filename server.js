@@ -183,91 +183,13 @@ app.get('/api/auth/session', requireAuth, (req, res) => {
 // ── Health (unprotected — used by uptime monitors) ───────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// ── Planday credentials (from environment) ────────────────────────────────────
-const PLANDAY_APP_ID        = process.env.PLANDAY_APP_ID;
-const PLANDAY_REFRESH_TOKEN = process.env.PLANDAY_REFRESH_TOKEN;
-
-// In-memory token cache — refreshed automatically when expired
-let plandayToken = null; // { accessToken, expiresAt }
-
-async function getPlandayToken() {
-  if (plandayToken && Date.now() < plandayToken.expiresAt - 60_000) {
-    return plandayToken.accessToken;
-  }
-
-  const body = new URLSearchParams({
-    grant_type:    'refresh_token',
-    refresh_token: PLANDAY_REFRESH_TOKEN,
-    client_id:     PLANDAY_APP_ID
-  });
-
-  console.log('[Planday] Requesting token from https://id.planday.com/connect/token');
-
-  let res;
-  try {
-    res = await axios.post('https://id.planday.com/connect/token', body, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 10000
-    });
-  } catch (err) {
-    console.error('[Planday] Token request failed, HTTP', err.response?.status ?? '(no response)');
-    throw err;
-  }
-
-  console.log('[Planday] Token response status:', res.status);
-
-  plandayToken = {
-    accessToken: res.data.access_token,
-    expiresAt:   Date.now() + res.data.expires_in * 1000
-  };
-
-  console.log('[Planday] Token refreshed, expires in', res.data.expires_in, 's');
-  return plandayToken.accessToken;
-}
-
-// Authenticated GET against the Planday OpenAPI
-function plandayGet(path, token, params = {}) {
-  return axios.get('https://openapi.planday.com' + path, {
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'X-ClientId':    PLANDAY_APP_ID,
-      'Accept':        'application/json'
-    },
-    params,
-    timeout: 15000
-  });
-}
-
-// Fetch ALL pages of a paginated Planday endpoint
-async function plandayGetAll(endpoint, token, params = {}) {
-  const all   = [];
-  let offset  = 0;
-  const limit = 100;
-
-  while (true) {
-    const r    = await plandayGet(endpoint, token, { ...params, limit, offset });
-    const data = r.data.data || [];
-    all.push(...data);
-
-    const total = r.data.paging?.total ?? 0;
-    offset += data.length;
-    if (data.length === 0 || offset >= total) break;
-  }
-
-  return all;
-}
-
-// Hardcoded Planday department ID → store ID mapping
-const DEPT_TO_STORE = {
-  148561: 'vesterbro',
-  149668: 'indre-by',
-  149700: 'norrebro',
-  149715: 'frederiksberg',
-  149725: 'fisketorvet',
-  149748: 'christianshavn'
-};
-
-const HOURLY_RATE = 160; // DKK/hr fixed rate for all employees
+// Planday credentials remain exclusively in the server-side client.
+const { createPlandayClient } = require('./lib/planday-client');
+const { createPayrollService } = require('./lib/planday-service');
+const { STORE_IDS: PAYROLL_STORE_IDS } = require('./lib/planday-payroll');
+const payrollService = createPayrollService({ client: createPlandayClient({
+  http: axios, appId: process.env.PLANDAY_APP_ID, refreshToken: process.env.PLANDAY_REFRESH_TOKEN,
+}) });
 
 // ── Store configuration (tokens from environment) ─────────────────────────────
 const STORES = {
@@ -608,112 +530,21 @@ app.post('/api/scan-invoice', requireAuth, requireCsrf, async (req, res) => {
   }
 });
 
-// All 6 department IDs as a comma-separated string for the payroll endpoint
-const ALL_DEPT_IDS = Object.keys(DEPT_TO_STORE).join(',');
-
-// Hybrid salary calculation:
-// - Salaried employees: cost comes from payroll/v1/payroll (their actual wage for the day)
-// - Hourly employees (not in payroll): shifts x HOURLY_RATE
-// Both groups are mapped to stores via shift departmentId
-async function fetchPayrollByStore(from, to, token) {
-  // Fetch payroll and shifts in parallel.
-  // Payroll endpoint does NOT support limit/offset — call plandayGet directly.
-  const [payrollRes, shifts] = await Promise.all([
-    plandayGet('/payroll/v1/payroll', token, { departmentIds: ALL_DEPT_IDS, from, to }),
-    plandayGetAll('/scheduling/v1/shifts', token, { from, to })
-  ]);
-
-  const payrollRows = payrollRes.data.data || [];
-  console.log('[Planday] payroll rows: ' + payrollRows.length + ', shifts: ' + shifts.length);
-
-  // Build set of employee IDs covered by payroll (salaried)
-  // and a map of empId → total payroll cost for the period
-  const payrollCost = {};
-  for (const row of payrollRows) {
-    const empId = row.employeeId ?? row.EmployeeId;
-    if (empId == null) continue;
-    const cost = row.totalCost ?? row.total ?? row.amount ?? row.salaryAmount
-               ?? row.cost    ?? row.salary ?? row.wage   ?? 0;
-    payrollCost[empId] = (payrollCost[empId] || 0) + cost;
-  }
-  console.log('[Planday] salaried employees with cost data: ' + Object.keys(payrollCost).length);
-
-  // Build empId → [{departmentId, hours}] from shifts
-  const empShifts = {};
-  for (const s of shifts) {
-    const empId = s.employeeId;
-    if (empId == null) continue;
-    const hours = (s.startDateTime && s.endDateTime)
-      ? (new Date(s.endDateTime) - new Date(s.startDateTime)) / 3600000
-      : 0;
-    if (!empShifts[empId]) empShifts[empId] = [];
-    empShifts[empId].push({ departmentId: s.departmentId, hours });
-  }
-
-  const byStore = {};
-  let salariedCount = 0, hourlyCount = 0, unmatchedCount = 0;
-
-  // All employees with shifts get processed
-  for (const [empId, depts] of Object.entries(empShifts)) {
-    const totalHours = depts.reduce((s, d) => s + d.hours, 0);
-
-    // Determine cost: use payroll wage if available, else hours x rate
-    let cost;
-    if (payrollCost[empId] != null) {
-      cost = payrollCost[empId];
-      salariedCount++;
-    } else {
-      cost = totalHours * HOURLY_RATE;
-      hourlyCount++;
-    }
-
-    // Distribute cost across departments proportional to hours
-    for (const { departmentId, hours } of depts) {
-      const storeId = DEPT_TO_STORE[departmentId];
-      if (!storeId) { unmatchedCount++; continue; }
-      const share = totalHours > 0 ? hours / totalHours : 1 / depts.length;
-      byStore[storeId] = (byStore[storeId] || 0) + cost * share;
-    }
-  }
-
-  for (const k of Object.keys(byStore)) byStore[k] = Math.round(byStore[k]);
-
-  console.log('[Planday] salaried: ' + salariedCount + ', hourly (' + HOURLY_RATE + ' DKK/hr): ' + hourlyCount + ', unmatched depts: ' + unmatchedCount);
-  console.log('[Planday] byStore:', JSON.stringify(byStore));
-  return { byStore, payrollRows, shifts };
-}
-
-// ── Planday: scheduled salary costs grouped by department ─────────────────────
-// :from and :to are YYYY-MM-DD strings
+// Public dates are Copenhagen calendar dates: inclusive start, exclusive end.
 app.get('/api/planday/salaries/:from/:to', requireAuth, async (req, res) => {
-  const { from, to } = req.params;
-  const token = await getPlandayToken();
-  // Primary: payroll endpoint cross-referenced with shifts for department mapping
-  try {
-    const { byStore } = await fetchPayrollByStore(from, to, token);
-    console.log('[Planday] salaries (payroll) result:', byStore);
-    return res.json(byStore);
-  } catch (err) {
-    console.warn('[Planday] payroll endpoint failed (' + err.response?.status + '), falling back to shift hours');
+  res.setHeader('Cache-Control', 'no-store');
+  if (Object.keys(req.query).some(k => !['cutoff', 'store'].includes(k)) ||
+      (req.query.store !== undefined && !PAYROLL_STORE_IDS.includes(req.query.store)) ||
+      (req.query.cutoff !== undefined && typeof req.query.cutoff !== 'string')) {
+    return res.status(400).json({ error: 'Invalid salary request' });
   }
-  // Fallback: shifts x fixed hourly rate
   try {
-    const shifts  = await plandayGetAll('/scheduling/v1/shifts', token, { from, to });
-    const byStore = {};
-    let skipped   = 0;
-    for (const shift of shifts) {
-      const storeId = DEPT_TO_STORE[shift.departmentId];
-      if (!storeId) { skipped++; continue; }
-      const hours = (shift.startDateTime && shift.endDateTime)
-        ? (new Date(shift.endDateTime) - new Date(shift.startDateTime)) / 3600000
-        : 0;
-      byStore[storeId] = (byStore[storeId] || 0) + Math.round(hours * HOURLY_RATE);
-    }
-    console.log('[Planday] salaries fallback: ' + shifts.length + ' shifts, ' + skipped + ' skipped');
-    return res.json(byStore);
-  } catch (err) {
-    console.error('[Planday] salaries fallback also failed:', err.response?.status, err.message);
-    return res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+    const result = await payrollService.get({ start: req.params.from, end: req.params.to, cutoff: req.query.cutoff });
+    // All stores use one calculation. A store query selects no employee data and
+    // cannot conceal an incomplete chain. Upstream failures remain safe codes.
+    return res.json(result);
+  } catch {
+    return res.status(400).json({ error: 'Invalid salary period or cutoff' });
   }
 });
 

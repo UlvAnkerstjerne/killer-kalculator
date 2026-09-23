@@ -365,3 +365,45 @@ Rounded to 4 decimal places for display.
 | count = 2 lines                 | 22               |
 | count = 3 lines                 | 4                |
 | count < 0 lines (refunds)       | 0                |
+
+---
+
+## Salary cost and salary percentage
+
+Salary is an aggregate Planday Payroll calculation; wages have **no VAT adjustment**.
+
+`salary_pct = complete salary cost in DKK / corresponding revenue excluding VAT in DKK × 100`
+
+Dates are **Europe/Copenhagen**, with inclusive start and exclusive end. Current Today,
+Week and Month stop at the salary card's effective Copenhagen cutoff; historical periods
+use the full interval. Future scheduled work never enters the current salary percentage.
+The displayed **Revenue basis ex VAT** is filtered to exactly that same cutoff. It uses
+the earliest of the corresponding cached sales snapshots; the main revenue card keeps
+its existing refresh policy and can be newer. Missing cutoff timestamps invalidate the
+salary calculation instead of creating a mismatched denominator.
+
+The source labels are **Approved actual** (approved provider shift cost), **Scheduled
+estimate** (unapproved provider shift cost), and **Estimated allocation** (clipped hourly
+work, salaried allocation, or daily signed adjustment allocation). A mixed result takes
+the least authoritative applicable source. None is silently substituted for another.
+
+Monthly salary is counted once and shared using date-effective configured department
+weights, otherwise the documented proportional-shift rule where supported. Calendar
+accrual and intraday adjustment sharing are explicitly estimates. A salary that cannot
+be assigned, an unknown department, an incomplete provider response, conflicting records
+or unverified break/supplement semantics produces **Unavailable**, never a guessed rate.
+
+A complete genuine zero is 0 DKK / 0% with positive revenue. Unavailable is null and
+`complete:false`. A chain result requires all six stores, sums their costs and aligned
+revenue, and never averages store percentages or drops a failed store. Nonpositive
+revenue produces no percentage. Money rounds at store-component øre boundaries;
+shared allocations conserve signed integer øre. Browser card/table currency formatting
+can round visually to DKK without changing percentage arithmetic.
+
+Cards, sidebar, store breakdown and salary graphs use one result and provenance model.
+Salary loads progressively and failure leaves other metrics intact. Successful payroll
+cache TTLs are at most 10 minutes current / 6 hours historical; failures are not cached
+as success. There is no flat 160 DKK/hour fallback and no employee-level browser output.
+
+See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, unresolved
+allocation/coverage gates, exact fields, security verification and production checks.
