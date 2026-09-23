@@ -474,11 +474,84 @@ describe('revenue-summary — compact LY response', () => {
     await app.locals.warmLyRevenueSummaries({ today: '2026-09-23', concurrency: 2 });
     assert.equal(mockConfig.calls, 18, 'repeat warming uses cached summaries');
   });
+
+  test('startup finishes current then existing LY before completed warming, without blocking readiness', async () => {
+    resetMock();
+    mockConfig.delayMs = 5;
+    const sales = app.locals.salesRangeCache;
+    const summaries = app.locals.revenueSummaryCache;
+    const salesGet = sales.get;
+    const summaryGet = summaries.get;
+    const events = [];
+    sales.get = async (args, options) => {
+      const kind = options?.allowEviction === false ? 'completed' : 'current';
+      events.push({ kind, event: 'start', args });
+      const response = await salesGet(args, options);
+      events.push({ kind, event: 'finish', args });
+      return response;
+    };
+    summaries.get = async (args, options) => {
+      const kind = options?.allowEviction === false ? 'completed' : 'ly';
+      events.push({ kind, event: 'start', args });
+      const response = await summaryGet(args, options);
+      events.push({ kind, event: 'finish', args });
+      return response;
+    };
+    try {
+      let done = false;
+      const warming = app.locals.warmStartupData().then(report => { done = true; return report; });
+      const health = await fetch(baseUrl + '/api/health');
+      assert.equal(health.status, 200);
+      assert.equal(done, false, 'HTTP readiness does not await warming');
+      const report = await warming;
+      const firstLY = events.findIndex(e => e.kind === 'ly');
+      const firstCompleted = events.findIndex(e => e.kind === 'completed');
+      assert.equal(events.slice(0, firstLY).filter(e => e.kind === 'current' && e.event === 'finish').length, 12);
+      assert.equal(events.slice(0, firstCompleted).filter(e => e.kind === 'ly' && e.event === 'finish').length, 18);
+      assert.ok(mockConfig.maxActive <= 2);
+      assert.equal(report.completed.outcomes.length, 36);
+      assert.ok(report.completed.outcomes.every(o => o.retained));
+      for (const event of events.filter(e => e.kind === 'current')) {
+        assert.ok(sales.inspect(event.args), 'high-priority entry remains cached');
+      }
+      assert.equal(summaries.stats().refreshTimers, 0);
+      const count = mockConfig.calls;
+      await app.locals.warmStartupData();
+      assert.equal(mockConfig.calls, count, 'repeat startup and visits reuse all entries');
+    } finally {
+      sales.get = salesGet;
+      summaries.get = summaryGet;
+      resetMock();
+    }
+  });
 });
 
 // ── 3. Value semantics preserved ──────────────────────────────────────────────
 
 describe('sales-range — value semantics', () => {
+  test('cached lines retain every public metric field without unused raw identity fields', async () => {
+    resetMock();
+    const raw = mkLine({ productid: 27242208, count: -2, price: -178, priceexclvat: -142.4 });
+    mockConfig.pages = [mkPageResponse([raw])];
+    const { jar } = await doLogin();
+    const args = { storeId: 'norrebro', start: '2026-09-20', end: '2026-09-21' };
+    const route = '/api/sales-range/norrebro/2026-09-20/2026-09-21';
+    const initial = await authGet(route, jar);
+    const repeated = await authGet(route, jar);
+    assert.deepEqual(initial.json.lines, repeated.json.lines);
+    const cached = app.locals.salesRangeCache.inspect(args).result.lines;
+    const { computeMetrics } = require('../lib/product-metrics');
+    assert.deepEqual(computeMetrics(cached), computeMetrics([raw]));
+    assert.equal(computeMetrics(cached).komboUnits, -2);
+    assert.deepEqual(Object.keys(cached[0]).sort(), [
+      'productid', 'productname', 'productgroupid', 'productgroup', 'count', 'price',
+      'priceexclvat', 'paymenttype', 'paymenttypecode', '_cphDate', 'timestamp_pay',
+    ].sort());
+    assert.equal(cached[0].count, -2);
+    assert.equal(cached[0].priceexclvat, -142.4);
+    assert.equal(mockConfig.calls, 1);
+  });
+
   test('count=-1 (refund) remains negative in response', async () => {
     resetMock();
     mockConfig.pages = [mkPageResponse([
