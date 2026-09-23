@@ -382,12 +382,14 @@ async function posHttpGet(url, headers) {
 // the same allowlisted business data. Current/open data stays fresh for at most
 // 10 minutes and is refreshed once shortly before expiry when recently used;
 // closed historical ranges remain fresh for 6h. The weighted LRU is bounded to
-// 120 entries and 32 MiB of estimated serialized result data.
+// 120 entries and 48 MiB of estimated serialized result data. The compact LY
+// cache retains the shared cache's independent 32 MiB default.
 let salesRangeCache;
 const sharedSalesFetch = createSharedSalesFetcher(({ store, start, end }) =>
   fetchSalesRange({ store, start, end, httpGet: posHttpGet })
 );
 salesRangeCache = createSalesRangeCache({
+  maxBytes: 48 * 1024 * 1024,
   fetchRange: async args => {
     const result = await sharedSalesFetch(args);
     // Deduplication/conflict detection has already used the raw identity fields.
