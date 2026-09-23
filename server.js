@@ -13,6 +13,7 @@ const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
+const { createSalesRangeCache } = require('./lib/sales-range-cache');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -361,6 +362,19 @@ async function posHttpGet(url, headers) {
   return axios.get(url, { headers, timeout: 20000 });
 }
 
+// Successful complete ranges are shared across sessions because they contain
+// the same allowlisted business data. Current-day data stays fresh for 30s;
+// closed historical ranges remain fresh for 6h. The cache is LRU-bounded.
+const salesRangeCache = createSalesRangeCache({
+  fetchRange: ({ store, start, end }) => fetchSalesRange({
+    store, start, end, httpGet: posHttpGet,
+  }),
+  onRefreshError: (err, { storeId, start, end }) => {
+    console.warn(`[sales-range] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
+  },
+});
+app.locals.salesRangeCache = salesRangeCache;
+
 /**
  * GET /api/sales-range/:storeId/:start/:end
  *
@@ -403,7 +417,8 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
   }
 
   try {
-    const result = await fetchSalesRange({ store, start, end, httpGet: posHttpGet });
+    const cached = await salesRangeCache.get({ storeId, store, start, end });
+    const result = cached.result;
 
     const lines = result.lines.map(sanitiseSalesLine);
 
@@ -421,6 +436,8 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
       start:              result.meta.start,
       end:                result.meta.end,
       storeId,
+      cacheStatus:        cached.cacheStatus,
+      stale:              cached.stale,
     };
 
     return res.json({ lines, meta });
@@ -729,9 +746,11 @@ async function fetchLemonadeToday() {
 
   const results = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
-      const result = await fetchSalesRange({
-        store, start: today, end: tomorrow, httpGet: posHttpGet,
-      });
+      // History snapshots must wait for a fresh result. This still shares any
+      // dashboard refresh already in flight for the identical range.
+      const { result } = await salesRangeCache.get({
+        storeId: id, store, start: today, end: tomorrow,
+      }, { allowStale: false });
       // Incomplete result (conflicts / invalids) must not corrupt totals.
       if (!result.meta.complete) {
         throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);

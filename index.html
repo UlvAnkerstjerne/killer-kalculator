@@ -1384,30 +1384,66 @@ async function apiAllRevenue(start, end) {
 // In-flight map: concurrent calls with the same key share one Promise.
 // Entries are removed after settlement so a failed request can be retried.
 const _salesInFlight = new Map();
+const _salesCache = new Map();
+const SALES_CACHE_MAX_ENTRIES = 120;
+const SALES_CACHE_CURRENT_TTL_MS = 30 * 1000;
+const SALES_CACHE_HISTORICAL_TTL_MS = 15 * 60 * 1000;
+
+function readSalesCache(key) {
+  const entry = _salesCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    _salesCache.delete(key);
+    return null;
+  }
+  // Map insertion order is used as a tiny LRU: promote every cache hit.
+  _salesCache.delete(key);
+  _salesCache.set(key, entry);
+  return entry.lines;
+}
+
+function writeSalesCache(key, lines, start, endExcl) {
+  const today = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date());
+  const ttl = endExcl <= today
+    ? SALES_CACHE_HISTORICAL_TTL_MS
+    : SALES_CACHE_CURRENT_TTL_MS;
+  _salesCache.delete(key);
+  _salesCache.set(key, { lines, expiresAt: Date.now() + ttl });
+  while (_salesCache.size > SALES_CACHE_MAX_ENTRIES) {
+    _salesCache.delete(_salesCache.keys().next().value);
+  }
+  return lines;
+}
 
 async function apiSalesRange(storeId, start, endExcl) {
   const key = `srange:${storeId}:${start}:${endExcl}`;
-  if (key in state.cache) return state.cache[key];
+  const cached = readSalesCache(key);
+  if (cached) return cached;
 
   // Coalesce: if a request for this key is already in-flight, share its Promise.
   if (_salesInFlight.has(key)) return _salesInFlight.get(key);
 
+  const requestNonce = sessionNonce;
   const promise = (async () => {
     try {
       const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
-      if (!res) return []; // session expired — page will reload
+      if (!res) throw new Error('Session unavailable');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'API error');
       if (!data.meta || !data.meta.complete) {
         console.warn(`[apiSalesRange] incomplete data for ${storeId} ${start}→${endExcl}`, data.meta);
         throw new Error('Incomplete sales data from server');
       }
+      if (!Array.isArray(data.lines)) throw new Error('Invalid sales data from server');
+      if (!sessionActive || sessionNonce !== requestNonce) {
+        throw new Error('Session changed while loading sales data');
+      }
       // Only cache successful, complete results.
-      state.cache[key] = data.lines;
-      return state.cache[key];
+      return writeSalesCache(key, data.lines, start, endExcl);
     } finally {
       // Remove in-flight entry after settlement so failures can be retried.
-      _salesInFlight.delete(key);
+      // Do not delete a newer request for the same key after logout/re-login.
+      if (_salesInFlight.get(key) === promise) _salesInFlight.delete(key);
     }
   })();
 
@@ -3445,8 +3481,6 @@ function setView(view) {
 
 function setPeriod(period) {
   state.period = period;
-  state.cache  = {}; // Clear cache on period change
-  _salesInFlight.clear(); // Drop any in-flight requests for the old period
   _chainLastRender = null; // Stale rollback would show wrong period
 
   // Update period buttons
@@ -3992,7 +4026,10 @@ function onSessionExpired(message) {
   sessionActive = false;
   csrfToken = null;
   state.cache = {};
+  _salesCache.clear();
   _salesInFlight.clear(); // Abandon all in-flight requests
+  state.lemonadeToday = null;
+  state.meat = [];
   if (lemonadeRefreshInterval) {
     clearInterval(lemonadeRefreshInterval);
     lemonadeRefreshInterval = null;

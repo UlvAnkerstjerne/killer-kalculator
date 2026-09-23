@@ -50,6 +50,7 @@ function resetMock() {
   mockConfig.pages       = [];
   mockConfig.pageIdx     = 0;
   mockConfig.shouldThrow = null;
+  if (typeof app !== 'undefined') app.locals.salesRangeCache.clear();
 }
 
 /** Build a single-page OnlinePOS envelope axios response. */
