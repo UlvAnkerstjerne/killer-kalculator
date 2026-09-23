@@ -396,7 +396,7 @@ describe('server sales range cache', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(source, /async function warmCurrentSalesRanges\(\)/);
     assert.match(source, /async function warmStartupData\(\)/);
-    assert.match(source, /await warmCurrentSalesRanges\(\);\s*await warmLyRevenueSummaries\(\);/);
+    assert.match(source, /await warmCurrentSalesRanges\(\);[\s\S]*await warmLyRevenueSummaries\(\);[\s\S]*await warmCompletedSalesRanges\(\);/);
     assert.match(source, /void warmStartupData\(\)/);
     assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: monday, end: tomorrow/);
     assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: today, end: tomorrow/);

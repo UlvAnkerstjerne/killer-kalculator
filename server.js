@@ -15,10 +15,13 @@ const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
 const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
+const { createSharedSalesFetcher } = require('./lib/shared-sales-fetcher');
+const { runBounded, warmCompletedPeriods } = require('./lib/completed-period-warming');
 const {
   secondOfDayFromLine,
   buildRevenueSummaryResult,
   publicRevenueSummary,
+  deriveRevenueSummarySubrange,
 } = require('./lib/revenue-summary');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
@@ -381,10 +384,27 @@ async function posHttpGet(url, headers) {
 // closed historical ranges remain fresh for 6h. The weighted LRU is bounded to
 // 120 entries and 32 MiB of estimated serialized result data.
 let salesRangeCache;
+const sharedSalesFetch = createSharedSalesFetcher(({ store, start, end }) =>
+  fetchSalesRange({ store, start, end, httpGet: posHttpGet })
+);
 salesRangeCache = createSalesRangeCache({
-  fetchRange: ({ store, start, end }) => fetchSalesRange({
-    store, start, end, httpGet: posHttpGet,
-  }),
+  fetchRange: async args => {
+    const result = await sharedSalesFetch(args);
+    // Deduplication/conflict detection has already used the raw identity fields.
+    // Retain every public metric field plus the CPH timestamp needed by the
+    // existing sanitizer/derivation. Discard unused order/customer/employee data
+    // instead of spending the bounded cache budget on it for an entire month.
+    return { ...result, lines: result.lines.map(line => {
+      const { date, hour, secondOfDay, ...fields } = sanitiseSalesLine(line);
+      return { ...fields, _cphDate: date, timestamp_pay: line.timestamp_pay,
+        ...(line.datetime === undefined ? {} : { datetime: line.datetime }) };
+    }) };
+  },
+  deriveRange: deriveSalesSubrange,
+  isProtected: ({ start, end }) => {
+    const today = cphDateStr();
+    return end === cphDateNextDay(today) && (start === today || start === cphWeekMonday(today));
+  },
   onRefreshError: (err, { storeId, start, end }) => {
     console.warn(`[sales-range] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
   },
@@ -414,9 +434,8 @@ app.locals.salesRangeCache = salesRangeCache;
 // used at the active comparison boundary. Cache/coalescing/freshness semantics
 // match the proven sales-range cache, including fail-closed incomplete results.
 const revenueSummaryCache = createSalesRangeCache({
-  fetchRange: async ({ store, start, end }) => buildRevenueSummaryResult(
-    await fetchSalesRange({ store, start, end, httpGet: posHttpGet })
-  ),
+  fetchRange: async args => buildRevenueSummaryResult(await sharedSalesFetch(args)),
+  deriveRange: deriveRevenueSummarySubrange,
   onRefreshError: (err, { storeId, start, end }) => {
     console.warn(`[revenue-summary] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
   },
@@ -930,25 +949,6 @@ async function warmCurrentSalesRanges() {
 }
 app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 
-async function runBounded(tasks, concurrency) {
-  const results = new Array(tasks.length);
-  let next = 0;
-  async function worker() {
-    while (next < tasks.length) {
-      const index = next++;
-      try {
-        results[index] = { status: 'fulfilled', value: await tasks[index]() };
-      } catch (reason) {
-        results[index] = { status: 'rejected', reason };
-      }
-    }
-  }
-  await Promise.all(Array.from(
-    { length: Math.min(concurrency, tasks.length) }, () => worker()
-  ));
-  return results;
-}
-
 // Warm only the three common LY revenue ranges. The cache stores compact
 // summaries, so this is bounded to 18 entries and at most two concurrent
 // OnlinePOS exports. Current sales warming always completes before this starts.
@@ -973,7 +973,7 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
   )).length;
   for (const result of results) {
     if (result.status === 'rejected') {
-      console.warn('[revenue-summary] startup warm failed:', result.reason?.message || 'unknown error');
+      console.warn('[revenue-summary] startup warm failed: upstream unavailable');
     }
   }
   const stats = revenueSummaryCache.stats();
@@ -985,9 +985,20 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
 }
 
 async function warmStartupData() {
+  const started = performance.now();
   await warmCurrentSalesRanges();
+  const currentFinished = performance.now();
   await warmLyRevenueSummaries();
+  const lyFinished = performance.now();
+  const completed = await warmCompletedSalesRanges();
+  return { currentMs: currentFinished - started, lyMs: lyFinished - currentFinished,
+    completedMs: performance.now() - lyFinished, totalMs: performance.now() - started, completed };
 }
+async function warmCompletedSalesRanges({ today = cphDateStr() } = {}) {
+  return warmCompletedPeriods({ today, stores: STORES,
+    salesCache: salesRangeCache, summaryCache: revenueSummaryCache });
+}
+app.locals.warmCompletedSalesRanges = warmCompletedSalesRanges;
 app.locals.warmLyRevenueSummaries = warmLyRevenueSummaries;
 app.locals.warmStartupData = warmStartupData;
 
@@ -1034,7 +1045,7 @@ if (require.main === module) {
     console.log('\n  🔪  KILLER KALCULATOR');
     console.log('  ──────────────────────────────');
     console.log('  http://0.0.0.0:' + PORT + '\n');
-    void warmStartupData();
+    void warmStartupData().catch(() => console.warn('[startup-warm] failed; requests can retry'));
   });
 
   // Scheduled lemonade save at 22:00 Copenhagen time.
