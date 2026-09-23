@@ -73,3 +73,52 @@ test('payroll LRU is bounded and evicts the oldest range', async () => {
   await f.service.get(args); await f.service.get({ start: '2026-09-21', end: '2026-09-23' }); await f.service.get({ start: '2026-09-20', end: '2026-09-23' });
   assert.equal(f.service.sizes().cache, 2); const calls = f.calls(); await f.service.get(args); assert.equal(f.calls(), calls + 4);
 });
+
+test('50-row endpoints use their documented page limit without truncating', async () => {
+  const limits = [];
+  const c = createPlandayClient({ ...auth, http: { post: async () => token(), get: async (_url, { params }) => {
+    limits.push(params.limit); return { data: { data: Array.from({ length: Math.min(50, 73 - params.offset) }, (_, i) => ({ id: params.offset + i })), paging: { offset: params.offset, total: 73 } } };
+  } } });
+  assert.equal((await c.all('/hr/v1/employees/fixture/history', {}, 50)).length, 73); assert.deepEqual(limits, [50, 50]);
+});
+const { loadPayrollSources } = require('../lib/planday-service');
+const { period } = require('../lib/planday-payroll');
+const { addSalary } = require('./fixtures/planday.fixture');
+test('Payroll requests split calendar months and keep overnight lookup out of salary dates', async () => {
+  const f = fixture(), payrollRanges = [], scheduleRanges = [];
+  const c = { all: async (path, params) => { if (path.includes('departments')) return f.departments; scheduleRanges.push(params); return []; },
+    get: async (_path, params) => { payrollRanges.push(params); return { ...f.payroll, shiftsPayroll: [] }; } };
+  const w = period({ start: '2026-08-31', end: '2026-09-02' }, Date.parse('2026-09-23T12:00Z'));
+  await loadPayrollSources({ client: c, window: w });
+  assert.deepEqual(scheduleRanges, [{ from: '2026-08-30', to: '2026-09-01' }]);
+  assert.deepEqual(payrollRanges.map(x => [x.from, x.to]), [
+    ['2026-08-31', '2026-08-31'], ['2026-08-31', '2026-08-31'], ['2026-09-01', '2026-09-01'], ['2026-09-01', '2026-09-01'],
+  ]);
+});
+test('a real overnight shift triggers prior-day payroll without importing prior-day salaries', async () => {
+  const f = fixture(), shift = { ...f.shifts[0], date: '2026-09-21', startDateTime: '2026-09-21T23:00', endDateTime: '2026-09-22T01:00' };
+  const c = { all: async path => path.includes('departments') ? f.departments : [shift], get: async (_path, params) => {
+    if (params.from === '2026-09-21') return { ...f.payroll, salariedPayroll: [{ employeeId: 'fixture-prior-day', salary: 99999 }] };
+    return { ...f.payroll, shiftsPayroll: [] };
+  } };
+  const data = await loadPayrollSources({ client: c, window: period(args, Date.parse('2026-09-24T00:00Z')) });
+  assert.equal(data.payroll.shiftsPayroll.length, 1); assert.deepEqual(data.payroll.salariedPayroll, []);
+});
+test('source loader requests the entire salary month and projects only proven membership', async () => {
+  for (const changed of [false, true]) {
+    const f = addSalary(fixture()), ranges = [], historyLimits = [];
+    const c = { all: async (path, params, limit) => {
+      if (path.includes('departments')) return f.departments;
+      if (path.endsWith('/history')) { historyLimits.push(limit); return changed ? [{ path: '/departments', modificationDateTime: '2026-09-23' }] : []; }
+      ranges.push(params); return f.shifts;
+    }, get: async (path, params) => {
+      if (path.includes('/allocations/')) return { data: f.allocations.get('fixture-hourly') };
+      if (path.includes('/hr/')) return { data: { departments: [149700], hiredFrom: '2020-01-01', dateTimeModified: '2026-09-23T01:00:00Z', firstName: 'fixture-private', email: 'fixture-private' } };
+      return params.shiftStatus ? f.approved : f.payroll;
+    } };
+    const data = await loadPayrollSources({ client: c, window: period(args, Date.parse('2026-09-24T00:00Z')), now: () => Date.parse('2026-09-24T00:00Z') });
+    assert.deepEqual(ranges[1], { from: '2026-09-01', to: '2026-09-30' });
+    assert.deepEqual(historyLimits, [50]); assert.equal(data.memberships.size, changed ? 0 : 1);
+    assert.ok(!JSON.stringify([...data.memberships]).includes('fixture-private'));
+  }
+});

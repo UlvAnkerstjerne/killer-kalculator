@@ -94,7 +94,7 @@ test('salaried allocation sums once across stores and preserves signed øre', ()
 });
 test('unallocated monthly salary cannot silently disappear', () => {
   const f = addSalary(fixture(), { employeeId: 'fixture-no-shifts' }); const r = calculate(f);
-  assert.equal(r.chain.cost, null); assert.ok(r.warnings.includes('UNALLOCATED_SALARY'));
+  assert.equal(r.chain.cost, null); assert.ok(r.warnings.includes('SALARY_HOURS_UNAVAILABLE'));
 });
 test('negative corrections keep their sign; same-valued separate adjustments are retained', () => {
   const f = fixture(); const correction = { employeeId: 'fixture-hourly', salary: -35, start: '2026-09-22T00:00:00', end: '2026-09-23T00:00:00' };
@@ -154,4 +154,103 @@ test('unknown prototype-like department identifiers fail closed safely', () => {
 });
 test('unverified normalized break payment flags are rejected', () => {
   assert.throws(() => p.reconstructHourly({ start: 0, end: 3600000, rates: [{ start: 0, end: 3600000, rate: 150 }], breaks: [{ start: 0, end: 1000 }] }), /UNVERIFIED_BREAK/);
+});
+
+test('verified Parken, Festival and Office schedules do not invalidate six-store payroll', () => {
+  const f = fixture();
+  for (const departmentId of Object.keys(p.EXCLUDED_DEPARTMENTS).map(Number)) f.shifts.push({ ...f.shifts[0], id: departmentId, departmentId });
+  assert.equal(calculate(f).chain.cost, 1200);
+  f.shifts.push({ ...f.shifts[0], id: 42, departmentId: 42 });
+  assert.equal(calculate(f).chain.complete, false);
+});
+test('NoAllocation with broad membership cannot allocate a chain salary from one incidental shift', () => {
+  const f = addSalary(fixture()); f.allocations.get('fixture-hourly')[0].costAllocation = 'NoAllocation';
+  f.memberships = new Map([['fixture-hourly', { validFrom: '2020-01-01', departmentIds: [149700, 149750] }]]);
+  const r = calculate(f); assert.equal(r.chain.complete, false); assert.ok(r.warnings.includes('SALARY_SCOPE_UNDECIDED'));
+});
+test('sole historically verified store membership allocates salary on a day without shifts', () => {
+  const f = addSalary(fixture(), { employeeId: 'fixture-manager' });
+  f.allocations.get('fixture-manager')[0].costAllocation = 'NoAllocation';
+  f.memberships = new Map([['fixture-manager', { validFrom: '2026-01-01', validTo: '2026-09-22', departmentIds: [148561] }]]);
+  assert.equal(calculate(f).stores.vesterbro.components.salaried, 1000);
+  f.memberships.get('fixture-manager').validFrom = '2026-09-23';
+  assert.equal(calculate(f).chain.complete, false);
+});
+test('sole verified Office assignment excludes its salary without assigning it to stores', () => {
+  const f = addSalary(fixture(), { employeeId: 'fixture-office' });
+  f.memberships = new Map([['fixture-office', { validFrom: '2020-01-01', departmentIds: [149750] }]]);
+  assert.equal(calculate(f).chain.cost, 1200);
+});
+function monthlySalaryFixture() {
+  const f = addSalary(fixture(), { employeeId: 'fixture-manager', amount: 900 });
+  f.allocationShifts = [
+    { ...f.shifts[0], id: 2, employeeId: 'fixture-manager', departmentId: 148561, startDateTime: '2026-09-01T10:00:00', endDateTime: '2026-09-01T16:00:00' },
+    { ...f.shifts[0], id: 3, employeeId: 'fixture-manager', departmentId: 149750, startDateTime: '2026-09-02T10:00:00', endDateTime: '2026-09-02T13:00:00' },
+  ];
+  f.allocationCoverage = { from: '2026-09-01', end: '2026-10-01' }; return f;
+}
+test('complete month hours support off-day accrual and retain outside-operation shares', () => {
+  const r = calculate(monthlySalaryFixture()); assert.equal(r.chain.cost, 1800);
+  assert.equal(r.stores.vesterbro.components.salaried, 600); assert.equal(r.chain.source, 'estimated');
+});
+test('incomplete month, unknown department or overlapping salary hours cannot establish a share', () => {
+  for (const kind of ['truncated', 'unknown', 'overlap']) {
+    const f = monthlySalaryFixture();
+    if (kind === 'truncated') f.allocationCoverage.end = '2026-09-23';
+    if (kind === 'unknown') f.allocationShifts[1].departmentId = 42;
+    if (kind === 'overlap') f.allocationShifts[1] = { ...f.allocationShifts[0], id: 4, departmentId: 149750 };
+    assert.equal(calculate(f).chain.complete, false, kind);
+    assert.ok(calculate(f).warnings.includes('SALARY_HOURS_UNAVAILABLE'), kind);
+  }
+});
+test('the preceding overnight lookup day cannot bias period salary sharing', () => {
+  const f = addSalary(fixture(), { amount: 2000 }); f.payroll.salariedPayroll[0].start = '2026-09-21';
+  f.shifts.push({ ...f.shifts[0], id: 2, departmentId: 148561, date: '2026-09-21', startDateTime: '2026-09-21T10:00', endDateTime: '2026-09-21T18:00' });
+  const r = calculate(f); assert.equal(r.stores.norrebro.components.salaried, 1000); assert.equal(r.stores.vesterbro.components.salaried, 0);
+});
+test('effective weekday distributions select the current weekday before weekly fallback', () => {
+  const f = addSalary(fixture()); f.allocations.get('fixture-hourly')[0].departmentDistributions = [
+    { department: { id: 148561 }, departmentWeight: 0, weekDaysWeight: { monday: 1, tuesday: 0 } },
+    { department: { id: 149700 }, departmentWeight: 0, weekDaysWeight: { monday: 0, tuesday: 1 } },
+  ]; assert.equal(calculate(f).stores.norrebro.components.salaried, 1000); assert.equal(calculate(f).stores.vesterbro.components.salaried, 0);
+});
+test('zero nested monetary effect and zero unallocated salary are nonblocking', () => {
+  const f = addSalary(fixture(), { employeeId: 'fixture-no-shifts', amount: 0 }); f.allocations.clear();
+  f.payroll.shiftsPayroll[0].supplements = [{ duration: 2, modification: 0 }];
+  f.payroll.shiftsPayroll[0].breaks = [{ duration: 0, amount: 0, isPaid: false }];
+  f.approved.shiftsPayroll = structuredClone(f.payroll.shiftsPayroll);
+  assert.equal(calculate(f).chain.cost, 1200);
+});
+test('outside-operation deductions retain their share and later shifts constrain active accrual', () => {
+  const f = fixture(); f.shifts[0].endDateTime = '2026-09-22T14:00:00';
+  f.payroll.shiftsPayroll[0].end = f.shifts[0].endDateTime; f.payroll.shiftsPayroll[0].salary = 600;
+  f.approved.shiftsPayroll = structuredClone(f.payroll.shiftsPayroll);
+  f.shifts.push({ ...f.shifts[0], id: 2, departmentId: 149750, startDateTime: '2026-09-22T16:00:00', endDateTime: '2026-09-22T20:00:00' });
+  f.payroll.supplementsPayroll = [{ employeeId: 'fixture-hourly', salary: -40, start: '2026-09-22T00:00:00', end: '2026-09-23T00:00:00' }];
+  const w = p.period({ start: '2026-09-22', end: '2026-09-23', cutoff: '2026-09-22T12:00:00Z' }, Date.parse('2026-09-22T13:00:00Z'));
+  assert.equal(calculate(f, w).stores.norrebro.components.adjustments, -20);
+  assert.equal(calculate(f).stores.norrebro.components.adjustments, -20);
+});
+test('store-specific failure reasons are not attached to unrelated store responses', () => {
+  const r = p.processPayroll({ failures: [{ code: 'SOURCE_COVERAGE_INCOMPLETE', departmentId: 149748 }] }, day);
+  assert.ok(!r.stores.vesterbro.warnings.includes('SOURCE_COVERAGE_INCOMPLETE'));
+  assert.ok(r.stores.christianshavn.warnings.includes('SOURCE_COVERAGE_INCOMPLETE'));
+  assert.ok(r.warnings.includes('SOURCE_COVERAGE_INCOMPLETE'));
+});
+test('one minute of location overlap uses a bounded estimate; excessive monetary impact fails', () => {
+  const f = monthlySalaryFixture();
+  f.allocationShifts[1].startDateTime = '2026-09-01T15:59:00'; f.allocationShifts[1].endDateTime = '2026-09-01T19:00:00';
+  // 27,000 DKK/month * one minute / nine hours = 50 DKK: too material.
+  assert.equal(calculate(f).chain.complete, false);
+  f.payroll.salariedPayroll[0].salary = 30;
+  const r = calculate(f); assert.equal(r.chain.complete, true); assert.equal(r.chain.source, 'estimated');
+  assert.ok(r.warnings.includes('MINUTE_OVERLAP_ESTIMATE')); assert.equal(r.stores.vesterbro.components.salaried, 19.97);
+  f.allocationShifts[1].startDateTime = '2026-09-01T15:58:00'; assert.equal(calculate(f).chain.complete, false);
+});
+test('shift-based sharing does not use hours after the next allocation rule takes effect', () => {
+  const f = monthlySalaryFixture();
+  f.allocationShifts[0].startDateTime = '2026-09-21T10:00:00'; f.allocationShifts[0].endDateTime = '2026-09-21T16:00:00';
+  f.allocationShifts[1].startDateTime = '2026-09-24T10:00:00'; f.allocationShifts[1].endDateTime = '2026-09-24T13:00:00';
+  f.allocations.get('fixture-manager').push({ validFrom: '2026-09-23', costAllocation: 'BusinessDays', departmentDistributions: [{ department: { id: 149700 }, departmentWeight: 1 }] });
+  assert.equal(calculate(f).stores.vesterbro.components.salaried, 900);
 });

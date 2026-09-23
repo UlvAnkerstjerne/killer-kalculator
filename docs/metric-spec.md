@@ -387,11 +387,24 @@ estimate** (unapproved provider shift cost), and **Estimated allocation** (clipp
 work, salaried allocation, or daily signed adjustment allocation). A mixed result takes
 the least authoritative applicable source. None is silently substituted for another.
 
-Monthly salary is counted once and shared using date-effective configured department
-weights, otherwise the documented proportional-shift rule where supported. Calendar
-accrual and intraday adjustment sharing are explicitly estimates. A salary that cannot
-be assigned, an unknown department, an incomplete provider response, conflicting records
-or unverified break/supplement semantics produces **Unavailable**, never a guessed rate.
+Monthly salary is requested separately for each calendar month and counted once. Use
+date-effective configured weights first, then a sole historically verified assignment.
+Configured `ScheduledHours`/`MonthlySalary` sharing uses complete calendar-month shift
+hours, including Parken, Festival and Office; their shares stay outside the six stores.
+Future planned hours may affect these estimated **shares**, but future cost does not
+accrue. Multi-department `NoAllocation` salaries require an explicit business scope rule.
+A day without shifts does not erase salary accrual or invalidate a complete month allocation.
+
+Calendar accrual and daily signed adjustment sharing are explicitly estimates. One minute
+of overlapping salary shifts may be shared equally only if its conservative monthly
+allocation uncertainty is at most 5 DKK; larger overlaps remain unavailable. The estimate
+has an explicit warning. This tolerance does not forgive missing payroll or unknown rates.
+
+Verified independent departments are excluded; new unknown departments, incomplete pages,
+conflicting records, missing salary scope or nonzero unverified break/supplement semantics
+produce **Unavailable**, never a guessed rate. Zero-effect nested details are nonblocking.
+Missing approval alone does not invalidate a complete scheduled estimate. Missing monetary
+coverage (including an unexplained excluded absence) remains incomplete for the affected store.
 
 A complete genuine zero is 0 DKK / 0% with positive revenue. Unavailable is null and
 `complete:false`. A chain result requires all six stores, sums their costs and aligned
