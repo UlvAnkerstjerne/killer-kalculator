@@ -167,18 +167,30 @@ function categorizeItems(items) {
   return out;
 }
 
-// Testable apiSalesRange: injectable fetch + shared cache object
-async function apiSalesRange(storeId, start, endExcl, mockFetch, cache) {
+// Testable apiSalesRange: injectable fetch + shared cache + optional in-flight map.
+// Pass a Map as inFlight to enable request coalescing (concurrent calls share one Promise).
+async function apiSalesRange(storeId, start, endExcl, mockFetch, cache, inFlight = null) {
   const key = `srange:${storeId}:${start}:${endExcl}`;
   if (key in cache) return cache[key];
 
-  const res = await mockFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
-  if (!res) return [];
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'API error');
-  if (!data.meta || !data.meta.complete) throw new Error('Incomplete sales data from server');
-  cache[key] = data.lines;
-  return cache[key];
+  if (inFlight && inFlight.has(key)) return inFlight.get(key);
+
+  const promise = (async () => {
+    try {
+      const res = await mockFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
+      if (!res) return [];
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API error');
+      if (!data.meta || !data.meta.complete) throw new Error('Incomplete sales data from server');
+      cache[key] = data.lines;
+      return cache[key];
+    } finally {
+      if (inFlight) inFlight.delete(key);
+    }
+  })();
+
+  if (inFlight) inFlight.set(key, promise);
+  return promise;
 }
 
 // Helper: build a complete valid mock response
@@ -993,5 +1005,287 @@ describe('no extra requests — buildChannelKpis and lineChannel are synchronous
     const ch    = buildChannelKpis(lines, 'norrebro');
     assert.equal(calls, 1, 'only 1 request should have been made');
     assert.ok(Math.abs(ch.wolt - 100) < 0.001);
+  });
+});
+
+// ── apiSalesRange — in-flight request coalescing ──────────────────────────────
+describe('apiSalesRange — in-flight coalescing', () => {
+  test('two concurrent identical calls make exactly one HTTP request', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    const [a, b] = await Promise.all([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'two concurrent callers share one HTTP request');
+    assert.deepEqual(a, b, 'both callers receive identical result');
+  });
+
+  test('three concurrent callers for the same key make exactly one request', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    const results = await Promise.all([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'three concurrent callers share one HTTP request');
+    assert.deepEqual(results[0], results[1]);
+    assert.deepEqual(results[0], results[2]);
+  });
+
+  test('different stores remain independent: two stores make two requests', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    await Promise.all([
+      apiSalesRange('norrebro',  '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('indre-by',  '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 2, 'different stores always get independent requests');
+  });
+
+  test('in-flight entry is removed after success so a resolved cache is used next', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight);
+
+    assert.equal(inFlight.size, 0, 'in-flight entry removed after settlement');
+    // Subsequent call hits cache, not inFlight
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight);
+    assert.equal(calls, 1, 'second call served from resolved cache');
+  });
+
+  test('failure is shared: concurrent callers all reject', async () => {
+    let calls = 0;
+    const fetch = async () => {
+      calls++;
+      return { ok: false, json: async () => ({ error: 'upstream error' }) };
+    };
+    const cache = {};
+    const inFlight = new Map();
+
+    const [r1, r2] = await Promise.allSettled([
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache, inFlight),
+    ]);
+
+    assert.equal(calls, 1, 'one shared request made');
+    assert.equal(r1.status, 'rejected', 'first caller rejects');
+    assert.equal(r2.status, 'rejected', 'second caller also rejects');
+  });
+
+  test('failure is not cached: retry after failure makes a new request', async () => {
+    let calls = 0;
+    const fetchFail = async () => ({
+      ok: false, json: async () => ({ error: 'server error' }),
+    });
+    const fetchOk = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+    const inFlight = new Map();
+
+    // First attempt fails
+    await assert.rejects(
+      apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetchFail, cache, inFlight),
+    );
+    assert.equal(inFlight.size, 0, 'in-flight cleared after failure');
+    assert.ok(!('srange:norrebro:2026-09-20:2026-09-21' in cache), 'failure not cached');
+
+    // Second attempt succeeds
+    const lines = await apiSalesRange(
+      'norrebro', '2026-09-20', '2026-09-21', fetchOk, cache, inFlight,
+    );
+    assert.equal(calls, 1, 'retry made exactly one new request');
+    assert.ok(Array.isArray(lines), 'successful retry returns lines');
+  });
+
+  test('without inFlight map, sequential behaviour is unchanged', async () => {
+    let calls = 0;
+    const fetch = async () => { calls++; return mkOkResponse(); };
+    const cache = {};
+
+    // Two sequential calls (not concurrent) without inFlight — second uses cache
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache);
+    await apiSalesRange('norrebro', '2026-09-20', '2026-09-21', fetch, cache);
+    assert.equal(calls, 1, 'cache still works without inFlight map');
+  });
+});
+
+// ── Progressive rendering — generation guard ───────────────────────────────────
+//
+// Verifies the mechanism that prevents stale Phase-2 callbacks (LY comparison,
+// Planday salary) from overwriting a later render when the user switches view
+// or period before the slow requests resolve.
+//
+// All tests use pure logic — no DOM required.
+describe('progressive rendering — generation guard', () => {
+  // Minimal guard object mirroring the module-level counters in index.html.
+  // next() = ++gen (called once per renderChainView/renderStoreView invocation)
+  // bump() = simulates a new render superseding the current one
+  function makeGuard() {
+    let _gen = 0;
+    return { next: () => ++_gen, current: () => _gen, bump: () => { _gen++; } };
+  }
+
+  test('Phase-2 callback fires when gen is current', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    let fired = false;
+    await Promise.resolve().then(() => { if (guard.current() === myGen) fired = true; });
+    assert.ok(fired, 'callback fires when gen has not changed');
+  });
+
+  test('Phase-2 callback is suppressed when view switches away (gen bumped)', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    guard.bump(); // new renderChainView() call supersedes this render
+    let fired = false;
+    await Promise.resolve().then(() => { if (guard.current() === myGen) fired = true; });
+    assert.ok(!fired, 'stale callback is suppressed');
+  });
+
+  test('only the latest render receives Phase-2 updates', async () => {
+    const guard = makeGuard();
+    const gen1 = guard.next();
+    const gen2 = guard.next(); // supersedes gen1
+
+    const updates = [];
+    await Promise.all([
+      Promise.resolve().then(() => { if (guard.current() === gen1) updates.push('gen1'); }),
+      Promise.resolve().then(() => { if (guard.current() === gen2) updates.push('gen2'); }),
+    ]);
+    assert.deepEqual(updates, ['gen2'], 'only the latest render gets updates');
+  });
+
+  test('LY failure callback is also gen-guarded: stale error does not run', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    guard.bump(); // supersede before LY resolves
+    let handled = false;
+    await Promise.reject(new Error('LY unavailable')).catch(() => {
+      if (guard.current() === myGen) handled = true;
+    });
+    assert.ok(!handled, 'stale LY error callback suppressed');
+  });
+
+  test('LY and Planday Phase-2 callbacks fire independently for the same gen', async () => {
+    const guard = makeGuard();
+    const myGen = guard.next();
+    let lyFired = false, salFired = false;
+    await Promise.all([
+      Promise.resolve().then(() => { if (guard.current() === myGen) lyFired = true; }),
+      Promise.resolve().then(() => { if (guard.current() === myGen) salFired = true; }),
+    ]);
+    assert.ok(lyFired,  'LY update fires');
+    assert.ok(salFired, 'salary update fires');
+  });
+});
+
+// ── apiRevenue — testable wrapper ──────────────────────────────────────────────
+//
+// apiRevenue in index.html wraps apiSalesRange and sums priceexclvat.
+// The testable version accepts a salesRangeFn instead of the global apiSalesRange.
+describe('apiRevenue — revenue sum wrapper', () => {
+  async function apiRevenue(storeId, start, end, salesRangeFn) {
+    try {
+      const lines = await salesRangeFn(storeId, start, end);
+      return lines.reduce((s, l) => s + (l.priceexclvat || 0), 0);
+    } catch(e) {
+      return null;
+    }
+  }
+
+  test('sums priceexclvat across all lines', async () => {
+    const lines = [{ priceexclvat: 100 }, { priceexclvat: 200 }, { priceexclvat: 50 }];
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21', async () => lines);
+    assert.equal(rev, 350);
+  });
+
+  test('returns 0 for empty lines array', async () => {
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21', async () => []);
+    assert.equal(rev, 0);
+  });
+
+  test('returns null when salesRange throws — does not block current data', async () => {
+    const rev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21',
+      async () => { throw new Error('network error'); });
+    assert.equal(rev, null, 'null returned on failure; caller decides what to display');
+  });
+
+  test('current revenue resolves before LY, which is still pending', async () => {
+    // Simulates Phase 1 (current) completing while Phase 2 (LY) is still in flight.
+    let lyResolve;
+    const lyPromise = new Promise(res => { lyResolve = res; });
+
+    // Phase 1: current resolves immediately
+    const curRev = await apiRevenue('norrebro', '2026-09-20', '2026-09-21',
+      async () => [{ priceexclvat: 500 }]);
+    assert.equal(curRev, 500, 'current revenue available before LY resolves');
+
+    // Phase 2: LY still pending
+    const lyTask = apiRevenue('norrebro', '2025-09-21', '2025-09-22',
+      () => lyPromise.then(() => [{ priceexclvat: 450 }]));
+
+    // curRev is already available — no waiting on lyTask
+    assert.equal(curRev, 500, 'current revenue unchanged while LY pending');
+
+    lyResolve(); // now resolve LY
+    const lyRev = await lyTask;
+    assert.equal(lyRev, 450, 'LY revenue resolves correctly');
+  });
+});
+
+// ── lyDateRange — 364-day shift ────────────────────────────────────────────────
+//
+// Same-period-last-year range: 364 days = 52 weeks back so the weekday pattern
+// matches (2026-09-23 Wednesday → 2025-09-24 Wednesday).
+describe('lyDateRange — 364-day shift', () => {
+  function cphDateOffset(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  }
+  function lyDateRange(start, end) {
+    return { start: cphDateOffset(start, -364), end: cphDateOffset(end, -364) };
+  }
+
+  test('today 2026-09-23 maps LY start to 2025-09-24 (52 weeks earlier)', () => {
+    const { start, end } = lyDateRange('2026-09-23', '2026-09-24');
+    assert.equal(start, '2025-09-24');
+    assert.equal(end,   '2025-09-25');
+  });
+
+  test('shifted range has the same day-span as the original', () => {
+    const origStart = '2026-09-01', origEnd = '2026-09-24';
+    const { start, end } = lyDateRange(origStart, origEnd);
+    const orig = (new Date(origEnd   + 'T12:00:00Z') - new Date(origStart + 'T12:00:00Z')) / 86400000;
+    const ly   = (new Date(end       + 'T12:00:00Z') - new Date(start     + 'T12:00:00Z')) / 86400000;
+    assert.equal(ly, orig, 'LY range has same day count');
+  });
+
+  test('LY start is exactly 364 days before current start for several periods', () => {
+    const ranges = [
+      ['2026-09-21', '2026-09-24'], // this week
+      ['2026-09-01', '2026-10-01'], // last month
+      ['2026-01-01', '2026-10-01'], // YTD
+    ];
+    for (const [start, end] of ranges) {
+      const ly = lyDateRange(start, end);
+      const diffDays = (new Date(start + 'T12:00:00Z') - new Date(ly.start + 'T12:00:00Z')) / 86400000;
+      assert.equal(diffDays, 364, `${start}: shift is exactly 364 days`);
+    }
   });
 });
