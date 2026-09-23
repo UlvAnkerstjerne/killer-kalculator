@@ -9,6 +9,8 @@ const {
   DEFAULT_CURRENT_TTL_MS,
   DEFAULT_HISTORICAL_TTL_MS,
   DEFAULT_REFRESH_AHEAD_MS,
+  DEFAULT_MAX_BYTES,
+  estimateSerializedBytes,
 } = require('../lib/sales-range-cache');
 
 function completeResult(start, end, revenue = 100) {
@@ -177,6 +179,82 @@ describe('server sales range cache', () => {
     assert.equal(cache.stats().refreshTimers, 0);
   });
 
+  test('refresh lifecycle remains coalesced and bounded across thirty minutes', async () => {
+    let nowMs = Date.parse('2026-09-23T12:00:00Z');
+    let calls = 0;
+    let finishFirstRefresh;
+    let finishRecovery;
+    const scheduler = fakeScheduler();
+    const cache = createSalesRangeCache({
+      now: () => nowMs,
+      setTimer: scheduler.setTimer,
+      clearTimer: scheduler.clearTimer,
+      fetchRange: async ({ start, end }) => {
+        calls++;
+        if (calls === 1) return completeResult(start, end, 100);
+        if (calls === 2) return new Promise(resolve => {
+          finishFirstRefresh = () => resolve(completeResult(start, end, 200));
+        });
+        if (calls === 3) throw new Error('scheduled refresh failed');
+        if (calls === 4) return new Promise(resolve => {
+          finishRecovery = () => resolve(completeResult(start, end, 300));
+        });
+        return completeResult(start, end, 400);
+      },
+    });
+
+    await cache.get(TODAY); // minute 0: startup warm
+    assert.equal(calls, 1);
+    assert.equal(cache.stats().refreshTimers, 1);
+
+    nowMs += 9 * 60 * 1000;
+    scheduler.fire([...scheduler.scheduled.keys()][0]); // minute 9 refresh
+    assert.equal(calls, 2);
+
+    nowMs += 30 * 1000; // user request during refresh, still under ten minutes
+    const duringRefresh = await cache.get(TODAY);
+    assert.equal(duringRefresh.result.lines[0].priceexclvat, 100);
+    assert.equal(calls, 2, 'user request shares the scheduled refresh');
+    finishFirstRefresh();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(cache.inspect(TODAY).result.lines[0].priceexclvat, 200);
+    assert.equal(cache.stats().refreshTimers, 0);
+
+    await cache.get(TODAY); // recent access schedules the next cycle
+    assert.equal(cache.stats().refreshTimers, 1);
+    nowMs += 9 * 60 * 1000;
+    scheduler.fire([...scheduler.scheduled.keys()][0]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 3);
+    assert.equal(cache.inspect(TODAY).lastRefreshError, 'scheduled refresh failed');
+    assert.equal(cache.stats().refreshTimers, 0);
+
+    nowMs += 60 * 1000 + 1; // cached result is now older than ten minutes
+    let settled = false;
+    const recovery = cache.get(TODAY).then(value => { settled = true; return value; });
+    const sameRecovery = cache.get(TODAY);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, 'over-age data is not shown after refresh failure');
+    assert.equal(calls, 4, 'expired callers coalesce onto one recovery request');
+    finishRecovery();
+    const recovered = await Promise.all([recovery, sameRecovery]);
+    assert.equal(recovered[0].result.lines[0].priceexclvat, 300);
+    assert.equal(recovered[1].result.lines[0].priceexclvat, 300);
+    assert.equal(cache.stats().refreshTimers, 1);
+
+    nowMs += 9 * 60 * 1000;
+    scheduler.fire([...scheduler.scheduled.keys()][0]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 5);
+    assert.equal(cache.inspect(TODAY).result.lines[0].priceexclvat, 400);
+    assert.equal(cache.stats().refreshTimers, 0);
+
+    nowMs += 90 * 1000; // beyond minute 30, latest result is still fresh
+    const minuteThirty = await cache.get(TODAY);
+    assert.equal(minuteThirty.result.lines[0].priceexclvat, 400);
+    assert.ok(cache.stats().refreshTimers <= 1, 'refresh timers do not accumulate');
+  });
+
   test('failed and incomplete initial results are not cached', async () => {
     let calls = 0;
     const cache = createSalesRangeCache({
@@ -222,6 +300,81 @@ describe('server sales range cache', () => {
     assert.ok(cache.inspect(c));
   });
 
+  test('cache statistics report exact serialized byte accounting without sales data', async () => {
+    const result = completeResult(HISTORY.start, HISTORY.end, 123);
+    const expectedBytes = estimateSerializedBytes(result);
+    const cache = createSalesRangeCache({ fetchRange: async () => result });
+    await cache.get(HISTORY);
+    const stats = cache.stats();
+    assert.equal(stats.entries, 1);
+    assert.equal(stats.estimatedBytes, expectedBytes);
+    assert.equal(stats.maxBytes, DEFAULT_MAX_BYTES);
+    assert.ok(!('result' in stats));
+    assert.ok(!JSON.stringify(stats).includes('priceexclvat'));
+  });
+
+  test('byte budget evicts least-recently-used entries', async () => {
+    const result = completeResult(HISTORY.start, HISTORY.end, 100);
+    const bytes = estimateSerializedBytes(result);
+    const cache = createSalesRangeCache({
+      maxEntries: 10,
+      maxBytes: bytes * 2,
+      fetchRange: async () => result,
+    });
+    const a = { ...HISTORY, storeId: 'a' };
+    const b = { ...HISTORY, storeId: 'b' };
+    const c = { ...HISTORY, storeId: 'c' };
+    await cache.get(a);
+    await cache.get(b);
+    await cache.get(a);
+    await cache.get(c);
+    assert.equal(cache.stats().entries, 2);
+    assert.equal(cache.stats().estimatedBytes, bytes * 2);
+    assert.ok(cache.inspect(a));
+    assert.equal(cache.inspect(b), null);
+    assert.ok(cache.inspect(c));
+  });
+
+  test('a result larger than the byte budget is returned but not cached', async () => {
+    const oversized = completeResult(TODAY.start, TODAY.end, 999);
+    oversized.lines[0].payload = 'x'.repeat(2048);
+    const cache = createSalesRangeCache({
+      maxBytes: estimateSerializedBytes(oversized) - 1,
+      fetchRange: async () => oversized,
+    });
+    const response = await cache.get(TODAY);
+    assert.equal(response.result.lines[0].priceexclvat, 999);
+    assert.equal(response.cacheStatus, 'uncached-oversized');
+    assert.equal(cache.stats().entries, 0);
+    assert.equal(cache.stats().estimatedBytes, 0);
+    assert.equal(cache.stats().refreshTimers, 0);
+  });
+
+  test('byte-based eviction cancels the evicted entry refresh timer', async () => {
+    const scheduler = fakeScheduler();
+    const result = completeResult(TODAY.start, TODAY.end, 100);
+    const bytes = estimateSerializedBytes(result);
+    const cache = createSalesRangeCache({
+      maxEntries: 10,
+      maxBytes: bytes * 2,
+      now: () => Date.parse('2026-09-23T12:00:00Z'),
+      setTimer: scheduler.setTimer,
+      clearTimer: scheduler.clearTimer,
+      fetchRange: async () => result,
+    });
+    const a = { ...TODAY, storeId: 'a' };
+    const b = { ...TODAY, storeId: 'b' };
+    const c = { ...TODAY, storeId: 'c' };
+    await cache.get(a);
+    await cache.get(b);
+    await cache.get(a);
+    await cache.get(c);
+    assert.equal(cache.inspect(b), null);
+    assert.equal(cache.stats().entries, 2);
+    assert.equal(cache.stats().refreshTimers, 2);
+    assert.equal(scheduler.scheduled.size, 2);
+  });
+
   test('proactive refresh timers are bounded with current-range cache entries', async () => {
     const scheduler = fakeScheduler();
     const cache = createSalesRangeCache({
@@ -243,6 +396,8 @@ describe('server sales range cache', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(source, /async function warmCurrentSalesRanges\(\)/);
     assert.match(source, /void warmCurrentSalesRanges\(\)/);
+    assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: monday, end: tomorrow/);
     assert.match(source, /salesRangeCache\.get\(\{\s*storeId, store, start: today, end: tomorrow/);
+    assert.match(source, /deriveSalesSubrange\(result, today, tomorrow\)/);
   });
 });

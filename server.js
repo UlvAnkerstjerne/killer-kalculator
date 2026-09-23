@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
+const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
 // Require all three auth env vars.  In the test environment they are set
@@ -365,13 +366,33 @@ async function posHttpGet(url, headers) {
 // Successful complete ranges are shared across sessions because they contain
 // the same allowlisted business data. Current/open data stays fresh for at most
 // 10 minutes and is refreshed once shortly before expiry when recently used;
-// closed historical ranges remain fresh for 6h. The cache is LRU-bounded.
-const salesRangeCache = createSalesRangeCache({
+// closed historical ranges remain fresh for 6h. The weighted LRU is bounded to
+// 120 entries and 32 MiB of estimated serialized result data.
+let salesRangeCache;
+salesRangeCache = createSalesRangeCache({
   fetchRange: ({ store, start, end }) => fetchSalesRange({
     store, start, end, httpGet: posHttpGet,
   }),
   onRefreshError: (err, { storeId, start, end }) => {
     console.warn(`[sales-range] background refresh failed for ${storeId} ${start}→${end}:`, err.message);
+  },
+  onCacheWrite: ({ args, result, entry }) => {
+    const today = cphDateStr();
+    const tomorrow = cphDateNextDay(today);
+    if (args.start !== cphWeekMonday(today) || args.end !== tomorrow) return;
+
+    const derivedToday = deriveSalesSubrange(result, today, tomorrow);
+    if (!derivedToday) return;
+    salesRangeCache.prime({
+      storeId: args.storeId,
+      store: args.store,
+      start: today,
+      end: tomorrow,
+    }, derivedToday, {
+      fetchedAt: entry.fetchedAt,
+      lastAccessedAt: entry.lastAccessedAt,
+      refreshArgs: args,
+    });
   },
 });
 app.locals.salesRangeCache = salesRangeCache;
@@ -742,6 +763,13 @@ function cphDateNextDay(dateStr) {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
+function cphWeekMonday(dateStr) {
+  const date = new Date(dateStr + 'T12:00:00Z');
+  const weekday = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - (weekday === 0 ? 6 : weekday - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 async function fetchLemonadeToday() {
   const today    = cphDateStr();
   const tomorrow = cphDateNextDay(today);   // exclusive end — today only
@@ -782,19 +810,38 @@ async function fetchLemonadeToday() {
   return { date: today, stores, total, complete };
 }
 
-// Warm the default dashboard range without delaying server readiness. Requests
-// arriving during warm-up share these exact in-flight OnlinePOS calls.
+// Warm This Week without delaying server readiness. Every complete weekly
+// result safely primes Today from its CPH-dated lines, avoiding a second export.
 async function warmCurrentSalesRanges() {
   const today = cphDateStr();
   const tomorrow = cphDateNextDay(today);
-  const results = await Promise.allSettled(
+  const monday = cphWeekMonday(today);
+  const weeklyResults = await Promise.allSettled(
+    Object.entries(STORES).map(([storeId, store]) => salesRangeCache.get({
+      storeId, store, start: monday, end: tomorrow,
+    }))
+  );
+  // Complete weekly entries make these cache hits. Any weekly failure or
+  // incomplete result falls back to an explicit Today fetch, preserving safety.
+  const todayResults = await Promise.allSettled(
     Object.entries(STORES).map(([storeId, store]) => salesRangeCache.get({
       storeId, store, start: today, end: tomorrow,
     }))
   );
-  const warmed = results.filter(result => result.status === 'fulfilled' && result.value.result.meta.complete).length;
-  console.log(`[sales-range] startup warm complete: ${warmed}/${results.length} stores`);
+  const warmedWeeks = weeklyResults.filter(
+    result => result.status === 'fulfilled' && result.value.result.meta.complete
+  ).length;
+  const warmedToday = todayResults.filter(
+    result => result.status === 'fulfilled' && result.value.result.meta.complete
+  ).length;
+  const stats = salesRangeCache.stats();
+  console.log(
+    `[sales-range] startup warm complete: week ${warmedWeeks}/${weeklyResults.length}, ` +
+    `today ${warmedToday}/${todayResults.length}, ` +
+    `${stats.entries} entries, ${stats.estimatedBytes} estimated bytes`
+  );
 }
+app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 
 function loadLemonadeHistory() {
   try {

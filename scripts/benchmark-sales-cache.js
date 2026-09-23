@@ -1,104 +1,133 @@
 'use strict';
 
-// Deterministic local benchmark: no credentials and no network calls.
+// Deterministic end-to-end benchmark: mocked OnlinePOS, real Express routes.
 // Usage: node scripts/benchmark-sales-cache.js [mock-delay-ms]
 
 const { performance } = require('node:perf_hooks');
-const { createSalesRangeCache } = require('../lib/sales-range-cache');
+const crypto = require('node:crypto');
+const bcrypt = require('bcryptjs');
 
 const delayMs = Number(process.argv[2] || 250);
 const stores = ['indre-by', 'vesterbro', 'christianshavn', 'fisketorvet', 'frederiksberg', 'norrebro'];
+const tokens = Object.fromEntries(stores.map(store => [store, `benchmark-${store}`]));
+let upstreamCalls = 0;
 
-function nextDay(dateStr) {
+function nextDay(dateStr, offset = 1) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1, d + offset)).toISOString().slice(0, 10);
 }
 
 const today = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Copenhagen' }).format(new Date());
 const tomorrow = nextDay(today);
+const yesterday = nextDay(today, -1);
 const todayDate = new Date(today + 'T12:00:00Z');
 const weekday = todayDate.getUTCDay();
 const mondayDate = new Date(todayDate);
 mondayDate.setUTCDate(todayDate.getUTCDate() - (weekday === 0 ? 6 : weekday - 1));
 const monday = mondayDate.toISOString().slice(0, 10);
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const resultFor = (start, end) => ({
-  lines: [{ priceexclvat: 100 }],
-  meta: {
-    complete: true, pages: 1, rawLineCount: 1, processedLineCount: 1,
-    conflicts: [], start, end,
-  },
-});
-
-function makeUpstream() {
-  let calls = 0;
-  return {
-    fetch: async ({ start, end }) => {
-      calls++;
-      await sleep(delayMs);
-      return resultFor(start, end);
-    },
-    calls: () => calls,
-  };
+process.env.NODE_ENV = 'test';
+process.env.KK_USERNAME = 'benchmark-user';
+process.env.KK_PASSWORD_HASH = bcrypt.hashSync('benchmark-password', 4);
+process.env.KK_SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+process.env.PLANDAY_APP_ID = 'benchmark-planday';
+process.env.PLANDAY_REFRESH_TOKEN = 'benchmark-refresh';
+for (const store of stores) {
+  const envName = 'ONLINEPOS_TOKEN_' + store.toUpperCase().replace(/-/g, '_');
+  process.env[envName] = tokens[store];
 }
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const axiosMock = {
+  get: async (_url, config) => {
+    upstreamCalls++;
+    await sleep(delayMs);
+    const token = config?.headers?.token || 'unknown';
+    return {
+      status: 200,
+      data: {
+        current_page: 1,
+        next_page_url: null,
+        data: [{
+          orderlineid: `line-${token}`,
+          timestamp_pay: `${today} 12:00:00`,
+          productid: 27242336,
+          productname: 'Killer Kebab',
+          count: 1,
+          price: 89,
+          priceexclvat: 71.2,
+          paymenttype: 'Dankort',
+        }],
+      },
+    };
+  },
+  post: async () => ({ status: 200, data: { access_token: 'benchmark', expires_in: 3600 } }),
+  create() { return this; },
+  defaults: { headers: { common: {} } },
+};
+const axiosPath = require.resolve('axios');
+require.cache[axiosPath] = { id: axiosPath, filename: axiosPath, loaded: true, exports: axiosMock };
+
+const app = require('../server');
 
 async function timed(fn) {
   const start = performance.now();
-  await fn();
-  return performance.now() - start;
-}
-
-async function runScenario(useCache, steps, warmSteps = []) {
-  const upstream = makeUpstream();
-  const cache = useCache ? createSalesRangeCache({ fetchRange: upstream.fetch }) : null;
-  const get = args => cache ? cache.get(args) : upstream.fetch(args);
-  for (const step of warmSteps) await step(get);
-  const times = [];
-  for (const step of steps) times.push(await timed(() => step(get)));
-  return { times, calls: upstream.calls() };
-}
-
-const allStores = (start, end) => get => Promise.all(
-  stores.map(storeId => get({ storeId, store: {}, start, end }))
-);
-const oneStore = (storeId, start, end) => get => get({ storeId, store: {}, start, end });
-const concurrentSame = get => Promise.all(
-  Array.from({ length: 5 }, () => get({ storeId: 'norrebro', store: {}, start: today, end: tomorrow }))
-);
-
-async function compare(name, steps, labels) {
-  const before = await runScenario(false, steps);
-  const after = await runScenario(true, steps);
-  const fmt = values => values.map((v, i) => `${labels[i]}=${v.toFixed(1)}ms`).join(', ');
-  console.log(`${name}\n  before: ${fmt(before.times)}; upstream calls=${before.calls}`);
-  console.log(`  after:  ${fmt(after.times)}; upstream calls=${after.calls}`);
-}
-
-async function compareStartupWarm() {
-  const step = allStores(today, tomorrow);
-  const before = await runScenario(false, [step]);
-  const after = await runScenario(true, [step], [step]);
-  console.log('Normal first visit after startup warming');
-  console.log(`  before: first=${before.times[0].toFixed(1)}ms; upstream calls=${before.calls}`);
-  console.log(`  after:  first=${after.times[0].toFixed(1)}ms; upstream calls=${after.calls} (during warm-up)`);
+  const value = await fn();
+  return { ms: performance.now() - start, value };
 }
 
 async function main() {
-  console.log(`Mock OnlinePOS delay: ${delayMs}ms per range`);
-  console.log('Current/open TTL: 10 minutes; one refresh-ahead attempt at 9 minutes for active keys');
-  await compare('Cold initial view', [allStores(today, tomorrow)], ['cold']);
-  await compareStartupWarm();
-  await compare('Repeated same view', [allStores(today, tomorrow), allStores(today, tomorrow)], ['cold', 'repeat']);
-  await compare('Today → This Week → Today', [
-    allStores(today, tomorrow), allStores(monday, tomorrow), allStores(today, tomorrow),
-  ], ['today', 'week', 'today-again']);
-  await compare('Switch stores and return', [
-    oneStore('norrebro', today, tomorrow),
-    oneStore('vesterbro', today, tomorrow),
-    oneStore('norrebro', today, tomorrow),
-  ], ['norrebro', 'vesterbro', 'norrebro-again']);
-  await compare('Simultaneous identical requests', [concurrentSame], ['five-call burst']);
+  const server = await new Promise(resolve => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const warming = timed(() => app.locals.warmCurrentSalesRanges());
+    const health = await timed(async () => {
+      const response = await fetch(base + '/api/health');
+      if (!response.ok) throw new Error(`health returned ${response.status}`);
+      return response.json();
+    });
+    const warm = await warming;
+    const warmingCalls = upstreamCalls;
+    const warmStats = app.locals.salesRangeCache.stats();
+
+    const login = await fetch(base + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'benchmark-user', password: 'benchmark-password' }),
+    });
+    if (!login.ok) throw new Error(`login returned ${login.status}`);
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+
+    const loadRange = (start, end) => Promise.all(stores.map(async store => {
+      const response = await fetch(`${base}/api/sales-range/${store}/${start}/${end}`, {
+        headers: { Cookie: cookie },
+      });
+      if (!response.ok) throw new Error(`${store} returned ${response.status}`);
+      return response.json();
+    }));
+
+    const todayView = await timed(() => loadRange(today, tomorrow));
+    const weekView = await timed(() => loadRange(monday, tomorrow));
+    const unseen = await timed(() => loadRange(yesterday, today));
+    const repeat = await timed(() => loadRange(today, tomorrow));
+
+    console.log(`Mock OnlinePOS delay: ${delayMs}ms per export`);
+    console.log(`Health while warming: ${health.ms.toFixed(1)}ms (HTTP 200)`);
+    console.log(`Startup warming: ${warm.ms.toFixed(1)}ms`);
+    console.log(`Startup upstream requests: ${warmingCalls}`);
+    console.log(`First Today view after warming: ${todayView.ms.toFixed(1)}ms`);
+    console.log(`First This Week view after warming: ${weekView.ms.toFixed(1)}ms`);
+    console.log(`First unseen range: ${unseen.ms.toFixed(1)}ms`);
+    console.log(`Repeat navigation: ${repeat.ms.toFixed(1)}ms`);
+    console.log(`Cache after warming: ${warmStats.entries} entries, ${warmStats.estimatedBytes} estimated bytes`);
+    console.log(`Total upstream requests after all scenarios: ${upstreamCalls}`);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    app.locals.salesRangeCache.clear();
+  }
 }
 
 main().catch(err => {
