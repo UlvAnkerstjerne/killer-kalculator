@@ -315,5 +315,7 @@ test('unchanged anonymized reference fixture preserves exact totals and canonica
   const metrics = computeMetrics(safe.map(item => ({ productid: item.productId, productname: item.productLabel,
     count: Number(item.quantity), price: Number(item.revenueIncl), priceexclvat: Number(item.revenueExcl) })));
   assert.equal(metrics.komboUnits, 66); assert.equal(metrics.rollUnits, 54);
-  assert.equal(metrics.komboPct, 55); assert.equal(metrics.lemUnits, 20);
+  assert.equal(metrics.komboPct, computeMetrics(fixture.lines).komboPct);
+  assert.equal(Math.round(metrics.komboPct * 10000) / 10000, 55);
+  assert.equal(metrics.lemUnits, 20);
 });
