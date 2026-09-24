@@ -69,6 +69,17 @@ test('unavailable and complete zero are visually distinct; labels use Copenhagen
   assert.match(b.run("salaryCell({stores:{norrebro:{cost:0,complete:true,source:'actual',revenueExVat:100,cutoff:'2026-09-23T12:32:00Z'}},period:{active:true}},'norrebro')"), /0.0%.*Actual through 14:32/);
   assert.match(b.run('salaryCard(null)'), /Unavailable/); assert.match(b.run('salaryCard(null)'), /Retry/);
 });
+test('attendance gaps and excluded unsupported sickness have safe visible labels', () => {
+  const b = browser();
+  assert.match(b.run("salaryLabel({complete:false,warnings:['ACTUAL_HOURS_MISSING']})"), /attendance incomplete/);
+  assert.match(b.run("salaryLabel({complete:true,source:'estimated',warnings:['SICK_LEAVE_WITHOUT_MONETARY_PAY']})"), /Sick leave excluded: no payroll amount/);
+});
+test('month transition invalidates a cached completed day that used scheduled salary hours', async () => {
+  const b = browser();
+  b.run("_salaryCache.set('2026-08-22:2026-08-23',{result:{period:{active:false}},expiresAt:Infinity,month:'2026-08'}); apiSalesRange=async()=>{throw Error('must reconcile actual month')};");
+  await assert.rejects(b.run("apiPlandaySalaries('2026-08-22','2026-08-23')"), /must reconcile actual month/);
+  assert.equal(b.run('_salaryCache.size'), 0);
+});
 test('sidebar revenue renders while salary is pending and stale salary cannot update a new period', async () => {
   const b = browser(); let release; b.context.salaryWait = new Promise(r => { release = r; });
   b.run('apiPlandaySalaries = () => salaryWait; apiRevenue = async () => 400; apiLyRevenue = async () => ({comparison: 200});');

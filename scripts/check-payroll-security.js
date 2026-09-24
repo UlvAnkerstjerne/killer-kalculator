@@ -16,7 +16,9 @@ function inspect(value) {
   }
 }
 inspect(f);
-const codeFiles = ['lib/planday-client.js', 'lib/planday-service.js', 'lib/planday-normalize.js', 'lib/planday-payroll.js'];
+inspect(require('../test/fixtures/planday-confirmed.fixture').confirmedFixture());
+const codeFiles = ['lib/planday-client.js', 'lib/planday-service.js', 'lib/planday-normalize.js', 'lib/planday-payroll.js',
+  'lib/planday-attendance.js', 'lib/planday-confirmed.js', 'lib/planday-worker-rules.js'];
 for (const file of codeFiles) {
   const text = fs.readFileSync(path.join(root, file), 'utf8');
   assert.ok(!/console\.(?:log|warn|error)\s*\(/.test(text), 'payroll source must not log upstream values');

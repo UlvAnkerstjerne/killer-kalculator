@@ -61,7 +61,8 @@ test('failed and incomplete salary responses are never cached as success', async
   assert.equal(f.service.sizes().cache, 0); f.failure(false); assert.equal((await f.service.get(args)).chain.cost, 1200);
 });
 for (const [name, date, range, ttl] of [
-  ['historical', '2026-09-24T12:00:00Z', args, 6 * 3600000],
+  ['historical', '2026-10-24T12:00:00Z', args, 6 * 3600000],
+  ['completed day in active month', '2026-09-24T12:00:00Z', args, 10 * 60000],
   ['current', '2026-09-22T19:00:00Z', { ...args, cutoff: '2026-09-22T18:00:00Z' }, 10 * 60000],
 ]) test(`${name} TTL expires on the boundary`, async () => {
   let now = Date.parse(date); const f = serviceFixture({ now: () => now });
@@ -121,4 +122,27 @@ test('source loader requests the entire salary month and projects only proven me
     assert.deepEqual(historyLimits, [50]); assert.equal(data.memberships.size, changed ? 0 : 1);
     assert.ok(!JSON.stringify([...data.memberships]).includes('fixture-private'));
   }
+});
+
+test('429 retries once only after the provider counter reset, keeping errors private', async () => {
+  const waits = []; let attempts = 0;
+  const c = createPlandayClient({ ...auth, minIntervalMs: 0, wait: async ms => waits.push(ms), http: {
+    post: async () => token(), get: async () => {
+      if (++attempts === 1) throw Object.assign(Error('fixture-private'), { response: { status: 429, headers: { 'x-ratelimit-reset': '2' } } });
+      return { data: { data: [] } };
+    },
+  } });
+  await c.get('/fixture'); assert.equal(attempts, 2); assert.equal(waits.length, 1); assert.ok(waits[0] >= 2000);
+});
+test('malformed rate-limit delays fail safely without an immediate retry', async () => {
+  let attempts = 0;
+  const c = createPlandayClient({ ...auth, minIntervalMs: 0, http: { post: async () => token(), get: async () => {
+    attempts++; throw Object.assign(Error('fixture-private'), { response: { status: 429, headers: { 'x-ratelimit-reset': 'untrusted' } } });
+  } } });
+  await assert.rejects(c.get('/fixture'), { message: 'UPSTREAM_UNAVAILABLE' }); assert.equal(attempts, 1);
+});
+test('cached scheduled salary periods expire exactly at Copenhagen month close', async () => {
+  let now = Date.parse('2026-09-30T21:59:59Z'); const f = serviceFixture({ now: () => now });
+  await f.service.get(args); const before = f.calls(); now += 999; await f.service.get(args); assert.equal(f.calls(), before);
+  now++; await f.service.get(args); assert.equal(f.calls(), before + 4);
 });

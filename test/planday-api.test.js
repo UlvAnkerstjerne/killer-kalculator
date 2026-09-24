@@ -39,7 +39,7 @@ test('salary requires the existing session authentication', async () => {
 test('GET needs no CSRF token, and its JSON contains only the aggregate allowlist', async () => {
   const r = await get(route); assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'no-store');
   const body = await r.json(); assert.equal(body.chain.cost, 1200);
-  assert.deepEqual(Object.keys(body).sort(), ['chain', 'meta', 'period', 'stores', 'warnings']);
+  assert.deepEqual(Object.keys(body).sort(), ['chain', 'coverage', 'meta', 'period', 'stores', 'warnings']);
   for (const row of Object.values(body.stores)) assert.deepEqual(Object.keys(row).sort(), ['complete', 'components', 'cost', 'cutoff', 'source', 'warnings']);
   const json = JSON.stringify(body); for (const text of ['employeeId', 'shiftId', 'fixture-', 'wage', 'rate', 'headers', 'Authorization']) assert.ok(!json.includes(text));
 });

@@ -1611,15 +1611,17 @@ function salaryPercent(result, revenueExVat) {
     ? result.cost / revenueExVat * 100 : null;
 }
 function salaryResult(data, storeId = null) {
-  return storeId ? data?.stores?.[storeId] : data?.chain;
+  return storeId ? data?.stores?.[storeId] : data?.chain ? { ...data.chain, warnings: data.warnings } : undefined;
 }
 function salaryLabel(result, active = false) {
-  if (!result?.complete) return 'Unavailable';
+  if (!result?.complete) return result?.warnings?.some(code => ['ACTUAL_HOURS_MISSING', 'ATTENDANCE_UNAPPROVED', 'ATTENDANCE_BREAKS_UNAVAILABLE'].includes(code))
+    ? 'Unavailable · attendance incomplete' : 'Unavailable';
   const time = active && result.cutoff ? ' through ' + new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(new Date(result.cutoff)) : '';
   return (result.source === 'actual' ? (active ? 'Actual' : 'Approved actual')
-    : result.source === 'scheduled' ? 'Scheduled estimate' : 'Estimated allocation') + time;
+    : result.source === 'scheduled' ? 'Scheduled estimate' : 'Estimated allocation') + time +
+    (result.warnings?.includes('SICK_LEAVE_WITHOUT_MONETARY_PAY') ? ' · Sick leave excluded: no payroll amount' : '');
 }
 function salaryCell(data, storeId = null) {
   const result = salaryResult(data, storeId);
@@ -1666,7 +1668,7 @@ async function apiPlandaySalaries(start, end) {
   // ISO dates only. Every view, including the sidebar, uses this same result.
   const key = `${start}:${end}`;
   const hit = _salaryCache.get(key);
-  if (hit && hit.expiresAt > Date.now() && hit.result.period.active === (end > cphNowParts().date)) return hit.result;
+  if (hit && hit.expiresAt > Date.now() && hit.month === cphNowParts().date.slice(0, 7) && hit.result.period.active === (end > cphNowParts().date)) return hit.result;
   _salaryCache.delete(key);
   if (_salaryInFlight.has(key)) return _salaryInFlight.get(key);
   const nonce = sessionNonce;
@@ -1694,10 +1696,12 @@ async function apiPlandaySalaries(start, end) {
       }
       data.chain.revenueExVat = STORES.reduce((sum, st) => sum + data.stores[st.id].revenueExVat, 0);
       if (data.chain.complete) {
-        const ttl = active ? 10 * 60000 : 6 * 3600000;
+        const currentMonth = cphNowParts().date.slice(0, 7);
+        const lastMonth = new Date(Date.parse(end + 'T12:00:00Z') - 86400000).toISOString().slice(0, 7);
+        const ttl = active || lastMonth >= currentMonth ? 10 * 60000 : 6 * 3600000;
         const serverRemaining = ttl - Math.max(0, Number(data.meta?.cacheAgeMs) || 0);
         const expiresAt = Math.min(requestStartedAt + serverRemaining, active ? Date.parse(data.period.cutoff) + ttl : Infinity);
-        _salaryCache.set(key, { result: data, expiresAt });
+        _salaryCache.set(key, { result: data, expiresAt, month: currentMonth });
         while (_salaryCache.size > 64) _salaryCache.delete(_salaryCache.keys().next().value);
       }
       return data;

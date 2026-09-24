@@ -27,8 +27,30 @@ async function main() {
   assert.equal(calls, 4); assert.ok(results.every(r => r.chain.cost === 1200));
   const warmStart = performance.now(); await service.get(args); const warmMs = performance.now() - warmStart; assert.equal(calls, 4);
   times.sort((a, b) => a - b);
+  const { confirmedFixture } = require('../test/fixtures/planday-confirmed.fixture');
+  const { normalizePayroll } = require('../lib/planday-normalize');
+  const special = confirmedFixture({ kind: 'regional' }), template = special.shifts[0];
+  special.shifts = Array.from({ length: 31 }, (_, i) => {
+    const date = nextDate('2026-08-01', i);
+    return { ...template, id: 'fixture-month-' + i, date, departmentId: i % 3 ? 149748 : 149750,
+      startDateTime: date + 'T10:00:00', endDateTime: date + 'T18:00:00' };
+  });
+  special.allocationShifts = special.shifts;
+  special.shiftDetails = new Map(special.shifts.map(s => [s.id, { shiftTypeId: null }]));
+  special.attendance = special.shifts.map((s, i) => ({ id: 'fixture-punch-' + i, employeeId: s.employeeId, shiftId: s.id,
+    departmentId: s.departmentId, startDateTime: s.startDateTime, endDateTime: s.endDateTime, isApproved: true }));
+  special.attendanceBreaks = new Map(special.attendance.map(a => [a.id, []]));
+  const attendanceTimes = [];
+  for (let i = 0; i < 15; i++) {
+    const begin = performance.now(), normalized = normalizePayroll(special, window);
+    attendanceTimes.push(performance.now() - begin);
+    assert.equal(normalized.failures.length, 0); assert.equal(normalized.reconciliation.expectedSalaryOre, normalized.reconciliation.allocatedSalaryOre);
+    assert.equal(normalized.coverage.attendanceMatched, 31);
+  }
+  attendanceTimes.sort((a, b) => a - b);
   console.log(JSON.stringify({ kind: 'deterministic synthetic benchmark; milliseconds, no live providers', records: rows.length,
     totalCost: rows.length * 1200, runs: times.length, medianMs: times[7], p95Ms: times[14],
-    concurrentRequests: 20, upstreamCalls: calls, coldMs, warmMs, responseBytes: Buffer.byteLength(JSON.stringify(results[0])), cache: service.sizes() }, null, 2));
+    concurrentRequests: 20, upstreamCalls: calls, coldMs, warmMs, responseBytes: Buffer.byteLength(JSON.stringify(results[0])), cache: service.sizes(),
+    clockedMonth: { shifts: 31, medianMs: attendanceTimes[7], p95Ms: attendanceTimes[14] } }, null, 2));
 }
 main().catch(() => { console.error('PAYROLL_BENCHMARK_FAILED'); process.exitCode = 1; });

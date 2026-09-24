@@ -187,9 +187,10 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 const { createPlandayClient } = require('./lib/planday-client');
 const { createPayrollService } = require('./lib/planday-service');
 const { STORE_IDS: PAYROLL_STORE_IDS } = require('./lib/planday-payroll');
+const { createWorkerRules } = require('./lib/planday-worker-rules');
 const payrollService = createPayrollService({ client: createPlandayClient({
   http: axios, appId: process.env.PLANDAY_APP_ID, refreshToken: process.env.PLANDAY_REFRESH_TOKEN,
-}) });
+}), workerRules: createWorkerRules(process.env.KK_SESSION_SECRET) });
 
 // ── Store configuration (tokens from environment) ─────────────────────────────
 const STORES = {

@@ -382,29 +382,39 @@ the earliest of the corresponding cached sales snapshots; the main revenue card 
 its existing refresh policy and can be newer. Missing cutoff timestamps invalidate the
 salary calculation instead of creating a mismatched denominator.
 
-The source labels are **Approved actual** (approved provider shift cost), **Scheduled
+The source labels are **Approved actual** (approved provider shift cost or completed
+clock-based salary allocation), **Actual** for supported live punch work, **Scheduled
 estimate** (unapproved provider shift cost), and **Estimated allocation** (clipped hourly
-work, salaried allocation, or daily signed adjustment allocation). A mixed result takes
+work, active-month salary or daily signed adjustment allocation). A mixed result takes
 the least authoritative applicable source. None is silently substituted for another.
 
-Monthly salary is requested separately for each calendar month and counted once. Use
-date-effective configured weights first, then a sole historically verified assignment.
-Configured `ScheduledHours`/`MonthlySalary` sharing uses complete calendar-month shift
-hours, including Parken, Festival and Office; their shares stay outside the six stores.
-Future planned hours may affect these estimated **shares**, but future cost does not
-accrue. Multi-department `NoAllocation` salaries require an explicit business scope rule.
-A day without shifts does not erase salary accrual or invalidate a complete month allocation.
+Monthly salary is fetched separately for each complete calendar month. Three confirmed
+central policies exclude their monthly salaries and include only verified actual work in
+the six stores at the authorized shared rate of 225 DKK/hour. Outside work is excluded.
+Missing/unapproved actual attendance stays incomplete, never scheduled-as-actual.
 
-Calendar accrual and daily signed adjustment sharing are explicitly estimates. One minute
-of overlapping salary shifts may be shared equally only if its conservative monthly
-allocation uncertainty is at most 5 DKK; larger overlaps remain unavailable. The estimate
-has an explicit warning. This tolerance does not forgive missing payroll or unknown rates.
+Two home-store policies assign their full monthly salary to Christianshavn or Indre By.
+Office hours affect daily weights but retain the authorized home-store cost. The regional
+policy uses hours across all verified departments; outside shares remain outside the chain.
+A completed calendar month uses approved punch timestamps minus recorded clock breaks.
+An active calendar month uses the full scheduled month denominator and scheduled hours
+through the requested Copenhagen cutoff, explicitly estimated. A completed day/week in
+an active month still uses that estimate. Zero-hour days accrue zero salary. Month-close
+cache expiry triggers automatic reconciliation to actual monthly attendance.
 
-Verified independent departments are excluded; new unknown departments, incomplete pages,
-conflicting records, missing salary scope or nonzero unverified break/supplement semantics
-produce **Unavailable**, never a guessed rate. Zero-effect nested details are nonblocking.
-Missing approval alone does not invalidate a complete scheduled estimate. Missing monetary
-coverage (including an unexplained excluded absence) remains incomplete for the affected store.
+Monthly allocations use cumulative integer øre differences over chronological qualifying
+hours, preserving the full salary exactly across days and all destinations. Same-store
+intervals are unioned; conflicting cross-store overlaps fail closed. Signed adjustment
+sharing remains explicitly estimated and counted once. Unknown salaries require a policy;
+current broad department membership is not an allocation decision.
+
+Sick leave counts only with monetary Payroll or matching Time & Cost data. A known
+schedule-only sick-leave record contributes zero with a safe warning in its affected store;
+it does not invalidate supported components. No replacement-rate fallback is used. Other
+missing coverage, conflicting records or unverified nonzero nested break/supplement
+semantics produce Unavailable. Missing approval of an otherwise supported ordinary
+hourly monetary record remains a scheduled estimate. Missing clock coverage for the
+confirmed actual-hours policies is separately incomplete.
 
 A complete genuine zero is 0 DKK / 0% with positive revenue. Unavailable is null and
 `complete:false`. A chain result requires all six stores, sums their costs and aligned
@@ -415,8 +425,9 @@ can round visually to DKK without changing percentage arithmetic.
 
 Cards, sidebar, store breakdown and salary graphs use one result and provenance model.
 Salary loads progressively and failure leaves other metrics intact. Successful payroll
-cache TTLs are at most 10 minutes current / 6 hours historical; failures are not cached
+cache TTLs are at most 10 minutes within the active salary month / 6 hours for completed
+months; month transition forces reconciliation and failures are not cached
 as success. There is no flat 160 DKK/hour fallback and no employee-level browser output.
 
-See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, unresolved
-allocation/coverage gates, exact fields, security verification and production checks.
+See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, remaining
+attendance coverage gates, exact fields, security verification and production checks.
