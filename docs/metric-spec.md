@@ -398,7 +398,7 @@ Cancelled, Deleted, unknown-status or unclassified-absence schedules cannot supp
 can extend beyond scheduled times or cross a month boundary.
 
 Each store and chain reports `actualHours`, `scheduledFallbackHours`,
-`scheduledFallbackShifts` and `estimated` as aggregates. Hours/counts cover selected work
+`scheduledFallbackShifts`, `calendarFallbackDays` and `estimated` as aggregates. Hours/counts cover selected work
 inside the requested period/cutoff. Home-manager Office hours follow the home allocation;
 regional outside hours stay outside chain hours. Fallback elsewhere in a monthly
 denominator can make a period estimated even when its own fallback-hour count is zero.
@@ -416,7 +416,31 @@ days. The regional policy includes all verified departments in its denominator a
 outside portions outside the chain. All manager monthly denominators use the same
 shift-by-shift punch-first/fallback hierarchy. An active month's future valid schedules
 may contribute to its denominator, never to the period numerator. Active and mixed months
-are estimated; completed mixed months remain supported. Zero-hour days accrue zero salary.
+are estimated; completed mixed months remain supported. With reliable monthly hour weights,
+zero-hour dates accrue zero salary.
+
+The two home-store policies always allocate the complete authoritative monthly salary to
+their home stores. Hours are weights, never an hourly pay rate. If the month has no usable
+hours, or its hour coverage is demonstrably incomplete/unreliable, use equal calendar-day
+weights instead: `monthly salary / number of Copenhagen calendar days in the month`.
+This includes Saturdays, Sundays, leap days and both 23- and 25-hour DST dates equally.
+Missing/truncated monthly coverage, known unmatched Payroll/punch shifts, or unusable or
+conflicting working-hour evidence trigger this fallback. Sparse but fully covered usable
+hours do not. The monetary salary, policy identity and home-store mapping must remain verified.
+
+Calendar fallback includes only dates overlapping the requested period before its exclusive
+Copenhagen cutoff. An intraday cutoff includes the current date's full daily share; exact
+midnight excludes the new date, and future dates never contribute. This is a daily salary
+allocation, without intraday hourly pricing. Round cumulative month shares to integer øre
+at the requested date boundaries, and assign the slice's rounding residual to its final
+included date. Complete months and adjacent partial-period requests conserve the same salary.
+
+`calendarFallbackDays` counts included salary-allocation dates; chain counts sum store
+counts (two home salaries covering a 31-day month contribute 62 allocation days). Calendar
+allocation creates no worked hours or fallback shifts. It is always estimated, with safe
+`CALENDAR_SALARY_FALLBACK` provenance and “Includes calendar-day salary estimates” in the UI.
+It never applies to the regional department-based policy or the three excluded central
+monthly salaries. Their department allocation and eligible 225 DKK/hour work remain unchanged.
 
 Chronological cumulative integer øre differences conserve the entire monthly salary
 across days and destinations, including outside shares. Same-store overlapping intervals

@@ -1,6 +1,20 @@
 # Planday payroll audit
 
-Updated 2026-09-24 for PR #6, branch `fix/planday-payroll-accuracy`, following `bb95579`. Baseline main remains `29ed320`. This report supersedes the former actual-attendance-only release gate. No merge, deployment, production data change or credential change was performed.
+Updated 2026-09-24 for PR #6, branch `fix/planday-payroll-accuracy`, following `b9face3`. Baseline main remains `29ed320`. This report includes the home-store calendar fallback and supersedes the former actual-attendance-only release gate. No merge, deployment, production data change or credential change was performed.
+
+## Home-store calendar fallback
+
+The two confirmed home-store policies allocate their complete authoritative monthly salaries to Christianshavn and Indre By. Approved punches and valid scheduled fallback remain proportional date weights when the monthly hour coverage is reliable; salary is never priced at an hourly rate. A sparse but complete usable schedule remains eligible for hour weighting.
+
+With no usable monthly hours, or demonstrably incomplete/unreliable monthly coverage, salary instead uses equal calendar-date weights: **monthly salary ÷ calendar days in the Copenhagen month**. Weekends, leap days and DST dates are included equally. A failed/truncated monthly schedule fetch, known Payroll or punch shifts absent from the schedule, or invalid/conflicting hour evidence establishes unreliable coverage. Verified monetary salary and home-policy identity remain required; those cannot be invented by fallback.
+
+For partial or active periods, only dates intersecting the requested interval before the exclusive Copenhagen cutoff contribute. An intraday cutoff includes the current date's full daily share; exact midnight excludes the new date. No future date contributes, and there is no hourly pricing within a calendar day. Cumulative monthly proportions round to integer øre at period boundaries, conserving complete months and adjacent period totals. Internal daily records put each requested slice's residual rounding øre on its final included date.
+
+Store and chain responses expose only the aggregate **`calendarFallbackDays`**, alongside existing aggregate fields, with **`estimated: true`** and safe **`CALENDAR_SALARY_FALLBACK`** provenance. This count sums salary-allocation dates: the two home salaries over a complete 31-day month contribute 62 chain allocation days. It creates no worked hours, individual shifts or hourly costs. The UI retains the percentage and says **“Includes calendar-day salary estimates”**.
+
+The regional location-based salary and all three excluded central monthly salaries are ineligible for calendar fallback. Absence schedules still cannot become worked hours or central 225/hour costs. When a home month contains only absence schedules, its independently owed monthly salary uses calendar weights without inventing absence pay.
+
+Synthetic regression coverage includes 28/29/30/31-day months, weekends, both home assignments together and separately, intraday/exact-midnight cutoffs, 23/25-hour DST dates, adjacent periods, month boundaries, precise rounding, incomplete-source recovery, sparse usable hours, aggregate privacy and exclusion of the other policies. The period tables below retain their explicitly dated live capture; they are not synthetic calendar-fallback examples. A fresh read-only check at 2026-09-24T08:48:39.256Z confirms August and September-to-cutoff remain complete, conserve the 100,600 DKK monthly manager pool, and use zero calendar fallback days because their existing hour coverage is usable. August retains the same 658,877.78 DKK chain cost. No live missing-hour month was fabricated; calendar fallback is exercised with synthetic data.
 
 ## Result
 
@@ -18,7 +32,7 @@ For each ordinary working shift:
 
 1. Use complete approved punch start/end timestamps and complete recorded break coverage, subtracting the recorded breaks.
 2. If punches are absent, open, unapproved, malformed/incomplete, or cannot establish complete break coverage, use the corresponding trustworthy scheduled interval.
-3. Fail with `ACTUAL_HOURS_MISSING` only when neither source supplies usable hours. Conflicting identities, duplicate records, departments, overlaps or unverified nonzero monetary break semantics retain their specific fail-closed reason.
+3. Without either source, working hours remain unverified. Central/regional policies retain their specific fail-closed reason; verified home-store salaries use the separate calendar fallback above when monthly hour weights are unreliable.
 
 A fallback schedule must identify its employee and a verified department, have a valid Copenhagen date/start/end, positive duration, a valid working status, and consistent identity/duplicate/overlap evidence. Valid statuses include Assigned, Approved, ForSale, OnDuty, PendingSwapAcceptance, PendingApproval and the Punchclock working equivalents. Open/Draft/Cancelled/Deleted records do not supply fallback work. Unknown statuses and unknown shift-type classifications cannot silently become ordinary work.
 
@@ -33,6 +47,7 @@ Each store and the chain expose only:
 - `actualHours`: approved punched working hours overlapping the requested period.
 - `scheduledFallbackHours`: substituted schedule hours overlapping the requested period.
 - `scheduledFallbackShifts`: distinct fallback shifts contributing positive hours in that period.
+- `calendarFallbackDays`: included salary-allocation dates under the home-store calendar fallback.
 - `estimated`: true when fallback affects the result or another supported cost component is estimated.
 
 These counts cover ordinary hourly work and the central/manager hour inputs. Home-manager Office hours are attributed to the home store; regional outside hours are omitted from chain period hours along with their cost. Hours are unioned per worker before aggregating. A shift crossing midnight can contribute to both days but is counted once in a multi-day period. No individual keys are exposed.
@@ -190,10 +205,10 @@ The nine previously blocking missing-punch cases are resolved by this rule. The 
 ## Validation and review gate
 
 - Clean isolated `npm ci`: 95 packages installed, 96 audited, zero vulnerabilities. No dependency or credential changes.
-- Full regression suite: **971 tests / 129 suites pass**, including approved-punch precedence, missing/unapproved/open/malformed-punch fallback, complete monthly conservation, valid status/identity/date checks, future/cutoff clipping, central 225/hour, outside exclusion, denominator-only estimation, duplicate/overlap handling, month-crossing overtime, sickness/other absence exclusion and aggregate privacy.
+- Full regression suite: **1,003 tests / 129 suites pass**, including approved-punch precedence, missing/unapproved/open/malformed-punch fallback, complete monthly conservation, valid status/identity/date checks, future/cutoff clipping, central 225/hour, outside exclusion, denominator-only estimation, duplicate/overlap handling, month-crossing overtime, sickness/other absence exclusion and aggregate privacy.
 - Seven browser security checks pass. Local Chromium in America/Los_Angeles confirms Copenhagen cutoff labels, progressive revenue loading, consistent card/sidebar/store percentages, fallback estimate wording, retry and genuine zero; no page errors. Only synthetic screenshot data was used.
 - Aggregate-only privacy scanning finds zero raw employee identifiers, private names/emails or credentials in changed files. API allowlist tests include the new hours/count/estimated fields. Syntax/inline-script parsing and whitespace checks pass.
 - Synthetic benchmark: 4,464 aggregate records at about **2.15 ms median / 8.10 ms p95**; a 31-shift approved-clock month normalizes in about **20.88 ms median / 23.14 ms p95**. Same-key coalescing and warm-cache behavior remain verified.
 - Live diagnostic source timings: about **16 seconds** for the first September day, **29 seconds** of additional reads for September-to-cutoff and **72 seconds** for August. The audit reused raw responses in memory across its period checks; these timings are not independent cold-request guarantees. More ordinary-hourly break coverage is the main additional remote cost. Raw responses were not persisted.
 
-All six requested periods and the supplemental sick-leave/cutoff replays reconcile with **zero remaining unavailable contributions**. The former attendance-only gate is removed by the authorized fallback policy. PR #6 can be marked ready for review after the verified commit is pushed. This is not authorization to merge or deploy; neither action is performed.
+All six requested periods and the supplemental sick-leave/cutoff replays reconcile with **zero remaining unavailable contributions**. The former attendance-only gate is removed by the authorized fallback policy. PR #6 remains ready for review after the verified follow-up is pushed. This is not authorization to merge or deploy; neither action is performed.

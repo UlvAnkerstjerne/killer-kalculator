@@ -41,7 +41,7 @@ test('GET needs no CSRF token, and its JSON contains only the aggregate allowlis
   const r = await get(route); assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'no-store');
   const body = await r.json(); assert.equal(body.chain.cost, 1200);
   assert.deepEqual(Object.keys(body).sort(), ['chain', 'coverage', 'meta', 'period', 'stores', 'warnings']);
-  for (const row of Object.values(body.stores)) assert.deepEqual(Object.keys(row).sort(), ['actualHours', 'complete', 'components', 'cost', 'cutoff', 'estimated', 'scheduledFallbackHours', 'scheduledFallbackShifts', 'source', 'warnings']);
+  for (const row of Object.values(body.stores)) assert.deepEqual(Object.keys(row).sort(), ['actualHours', 'calendarFallbackDays', 'complete', 'components', 'cost', 'cutoff', 'estimated', 'scheduledFallbackHours', 'scheduledFallbackShifts', 'source', 'warnings']);
   const json = JSON.stringify(body); for (const text of ['employeeId', 'shiftId', 'fixture-', 'wage', 'rate', 'headers', 'Authorization']) assert.ok(!json.includes(text));
 });
 for (const suffix of ['/garbage/2026-01-02', '/2026-02-30/2026-03-01', '/2026-09-22/2026-09-22', '/2024-01-01/2026-01-01', '/2026-09-22/2026-09-23?store=unknown', '/2026-09-22/2026-09-23?cutoff=garbage', '/2026-09-22/2026-09-23?cutoff=2099-01-01T00:00:00Z', '/2026-09-22/2026-09-23?debug=1']) test(`rejects invalid request before calling Planday: ${suffix}`, async () => {

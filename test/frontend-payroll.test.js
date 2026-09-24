@@ -133,3 +133,12 @@ test('fallback percentage stays visible with scheduled-hour estimate label', () 
   assert.match(b.run("salaryCard(data,'norrebro')"), /Includes scheduled-hour estimates/);
   assert.doesNotMatch(b.run("salaryCell(data,'norrebro')"), /Approved actual|Unavailable/);
 });
+test('calendar salary fallback keeps percentage visible and labels the calendar estimate', () => {
+  const b = browser(), r = response();
+  r.stores.norrebro.source = 'estimated'; r.stores.norrebro.revenueExVat = 400;
+  r.stores.norrebro.calendarFallbackDays = 2;
+  r.stores.norrebro.warnings = ['CALENDAR_SALARY_FALLBACK']; b.context.data = r;
+  assert.match(b.run("salaryCard(data,'norrebro')"), /25.0%/);
+  assert.match(b.run("salaryCard(data,'norrebro')"), /Includes calendar-day salary estimates/);
+  assert.doesNotMatch(b.run("salaryCell(data,'norrebro')"), /Approved actual|Unavailable/);
+});

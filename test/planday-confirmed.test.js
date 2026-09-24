@@ -87,7 +87,7 @@ for (const [name, change, code] of [
   ['shift classification gap', f => { f.shiftDetails.delete(f.shifts[0].id); }, 'SHIFT_TYPE_UNAVAILABLE'],
   ['short month coverage', f => { f.allocationCoverage.from = '2026-08-02'; }, 'SALARY_HOURS_UNAVAILABLE'],
 ]) test(name + ' fails closed locally', () => {
-  const f = confirmedFixture(); change(f); const { r } = calc(f); assert.equal(r.stores.christianshavn.cost, null); assert.ok(r.warnings.includes(code)); assert.equal(r.stores.norrebro.cost, 0);
+  const f = confirmedFixture({ kind: 'regional' }); change(f); const { r } = calc(f); assert.equal(r.stores.christianshavn.cost, null); assert.ok(r.warnings.includes(code)); assert.equal(r.stores.norrebro.cost, 0);
 });
 test('home Office overlap is unioned before day weights; it never doubles minutes', () => {
   const f = confirmedFixture({ month: '2026-09' }); f.shifts[1].date = f.shifts[0].date;
@@ -267,4 +267,176 @@ test('approved overtime crossing a month boundary wins over a scheduled end befo
   Object.assign(f.shifts[0], { date: '2026-07-31', startDateTime: '2026-07-31T22:00:00', endDateTime: '2026-07-31T23:00:00' });
   Object.assign(f.attendance[0], { startDateTime: '2026-07-31T22:00:00', endDateTime: '2026-08-01T01:00:00' });
   const { r } = calc(f); assert.equal(r.chain.cost, 225); assert.equal(r.chain.actualHours, 1);
+});
+
+function calendarFixture(options = {}) {
+  const f = confirmedFixture({ from: '2020-01-01', ...options });
+  f.shifts = []; f.allocationShifts = []; f.attendance = [];
+  return f;
+}
+for (const [month, days] of [['2026-02', 28], ['2024-02', 29], ['2026-04', 30], ['2026-07', 31]]) {
+  test(days + '-day calendar fallback conserves the full monthly salary and final-day rounding', () => {
+    const f = calendarFixture({ month }), { n, r } = calc(f);
+    assert.equal(r.chain.cost, 1000.01); assert.equal(r.chain.complete, true);
+    assert.equal(r.stores.christianshavn.components.salaried, 1000.01);
+    assert.equal(r.stores.christianshavn.components.hourly, 0);
+    assert.equal(r.chain.calendarFallbackDays, days); assert.equal(r.chain.estimated, true);
+    assert.equal(r.chain.actualHours, 0); assert.equal(r.chain.scheduledFallbackHours, 0);
+    assert.equal(r.chain.scheduledFallbackShifts, 0);
+    const rows = n.records.filter(x => x.calendarFallbackDays);
+    const dailyOre = Math.trunc(100001 / days);
+    assert.equal(rows.length, days);
+    assert.ok(rows.slice(0, -1).every(x => Math.round(x.amount * 100) === dailyOre));
+    assert.equal(Math.round(rows.at(-1).amount * 100), 100001 - dailyOre * (days - 1));
+    assert.equal(n.reconciliation.expectedSalaryOre, 100001);
+    assert.equal(n.reconciliation.allocatedSalaryOre, 100001);
+    assert.equal(n.reconciliation.blockedMonths, 0);
+    let sumOre = 0;
+    for (let date = month + '-01'; date <= f.monthly[0].to; date = p.nextDate(date)) {
+      sumOre += Math.round(calc(f, { start: date, end: p.nextDate(date) }).r.chain.cost * 100);
+    }
+    assert.equal(sumOre, 100001, 'separate daily requests also conserve the complete salary');
+  });
+}
+for (const [departmentId, store] of [[149748, 'christianshavn'], [149668, 'indre-by']]) test('calendar fallback remains entirely in ' + store, () => {
+  const f = calendarFixture({ amount: 4321.09 });
+  f.workerRules = { valid: true, resolve: () => ({ kind: 'home', departmentId, from: '2020-01-01' }) };
+  const { r } = calc(f);
+  assert.equal(r.stores[store].cost, 4321.09); assert.equal(r.chain.cost, 4321.09);
+  assert.equal(r.stores[store].calendarFallbackDays, 31);
+  for (const [id, v] of Object.entries(r.stores)) if (id !== store) {
+    assert.equal(v.cost, 0); assert.equal(v.calendarFallbackDays, 0);
+    assert.ok(!v.warnings.includes('CALENDAR_SALARY_FALLBACK'));
+  }
+});
+test('calendar salary includes Saturday and Sunday, using days rather than business days', () => {
+  const f = calendarFixture({ month: '2026-08', amount: 3100 });
+  const { r } = calc(f, { start: '2026-08-01', end: '2026-08-03' });
+  assert.equal(r.chain.cost, 200); assert.equal(r.chain.calendarFallbackDays, 2);
+});
+test('partial calendar periods conserve rounded monthly proportions across adjacent requests', () => {
+  const f = calendarFixture({ month: '2026-04' });
+  const first = calc(f, { end: '2026-04-11' }), rest = calc(f, { start: '2026-04-11' });
+  assert.equal(first.r.chain.cost, 333.34); assert.equal(rest.r.chain.cost, 666.67);
+  assert.equal(first.r.chain.cost + rest.r.chain.cost, 1000.01);
+  assert.equal(first.r.chain.calendarFallbackDays, 10); assert.equal(rest.r.chain.calendarFallbackDays, 20);
+  const rows = first.n.records.filter(x => x.calendarFallbackDays);
+  assert.equal(rows.at(-1).amount, 33.37, 'partial-period residual goes on final included day');
+});
+test('active calendar fallback counts the current Copenhagen date and excludes future dates', () => {
+  const f = calendarFixture({ month: '2026-09', amount: 3000 });
+  const { r, n } = calc(f, { cutoff: '2026-09-23T12:32:00Z' });
+  assert.equal(r.chain.cost, 2300); assert.equal(r.chain.calendarFallbackDays, 23);
+  assert.equal(n.records.filter(x => x.calendarFallbackDays).at(-1).end, Date.parse('2026-09-23T12:32:00Z'));
+  assert.equal(n.reconciliation.allocatedSalaryOre, 300000);
+  assert.equal(calc(f, { start: '2026-09-23', end: '2026-09-24', cutoff: '2026-09-23T12:32:00Z' }).r.chain.cost, 100);
+});
+test('calendar fallback respects exclusive Copenhagen midnight and zero-width cutoffs', () => {
+  const f = calendarFixture({ month: '2026-09', amount: 3000 });
+  assert.equal(calc(f, { cutoff: '2026-09-23T22:00:00Z' }).r.chain.calendarFallbackDays, 23);
+  assert.equal(calc(f, { cutoff: '2026-09-23T22:00:01Z' }).r.chain.calendarFallbackDays, 24);
+  const zero = calc(f, { start: '2026-09-24', end: '2026-09-25', cutoff: '2026-09-23T22:00:00Z' }).r;
+  assert.equal(zero.chain.cost, 0); assert.equal(zero.chain.calendarFallbackDays, 0); assert.equal(zero.chain.estimated, true);
+});
+for (const [month, date, duration] of [['2026-03', '2026-03-29', 23], ['2025-10', '2025-10-26', 25]]) test(duration + '-hour Copenhagen DST day has one equal calendar salary share', () => {
+  const f = calendarFixture({ month, amount: 3100 });
+  const { r, n } = calc(f, { start: date, end: p.nextDate(date) });
+  assert.equal(r.chain.cost, 100); assert.equal(r.chain.calendarFallbackDays, 1);
+  assert.equal((n.records[0].end - n.records[0].start) / 3600000, duration);
+});
+test('calendar fallback splits month boundaries using each complete monthly amount and day count', () => {
+  const f = calendarFixture(), next = calendarFixture({ month: '2026-09', amount: 2000 });
+  f.monthly.push(next.monthly[0]); f.allocationCoverage.end = next.allocationCoverage.end;
+  const { r, n } = calc(f, { start: '2026-08-31', end: '2026-09-02' });
+  assert.equal(r.chain.cost, 98.93); assert.equal(r.chain.calendarFallbackDays, 2);
+  assert.equal(n.reconciliation.allocatedSalaryOre, 300001);
+});
+for (const [name, change] of [
+  ['missing month coverage', f => { f.allocationCoverage = undefined; }],
+  ['truncated month start', f => { f.allocationCoverage.from = '2026-08-02'; }],
+  ['truncated month end', f => { f.allocationCoverage.end = '2026-08-30'; }],
+  ['unusable scheduled interval', f => { f.attendance = []; f.shifts[0].startDateTime = null; }],
+  ['missing schedule date and timestamps', f => { f.attendance = []; Object.assign(f.shifts[0], { date: null, startDateTime: null, endDateTime: null }); }],
+  ['unverified shift classification', f => { f.shiftDetails.delete(f.shifts[0].id); }],
+  ['conflicting monthly schedule copies', f => { f.shifts.push({ ...f.shifts[0], startDateTime: '2026-08-02T11:00:00' }); }],
+  ['known Payroll shift absent from schedule', f => { f.monthly[0].payroll.shiftsPayroll.push({ id: 'fixture-missing', employeeId: 'fixture-managed' }); }],
+  ['unmatched approved attendance', f => { f.attendance[0].shiftId = 'fixture-missing'; }],
+]) test('home salary uses calendar fallback for ' + name, () => {
+  const f = confirmedFixture(); change(f); const { r, n } = calc(f);
+  assert.equal(r.chain.complete, true); assert.equal(r.stores.christianshavn.cost, 1000.01);
+  assert.equal(r.chain.calendarFallbackDays, 31); assert.equal(r.chain.estimated, true);
+  assert.ok(r.stores.christianshavn.warnings.includes('CALENDAR_SALARY_FALLBACK'));
+  assert.equal(n.reconciliation.blockedMonths, 0);
+});
+test('sparse but complete usable hours remain proportional weights, not calendar fallback or hourly pay', () => {
+  const f = confirmedFixture(); f.shifts.length = 1; f.attendance.length = 1;
+  f.attendance[0].endDateTime = '2026-08-02T10:01:00';
+  const { r } = calc(f, { start: '2026-08-02', end: '2026-08-03' });
+  assert.equal(r.chain.cost, 1000.01); assert.equal(r.chain.calendarFallbackDays, 0);
+  assert.equal(r.stores.christianshavn.components.hourly, 0);
+});
+test('a month containing only absence schedules uses salary calendar weights without inventing work', () => {
+  const f = confirmedFixture(); f.attendance = [];
+  for (const s of f.shifts) f.shiftDetails.set(s.id, { shiftTypeId: 'fixture-sickness' });
+  const { r } = calc(f); assert.equal(r.chain.cost, 1000.01); assert.equal(r.chain.calendarFallbackDays, 31);
+  assert.equal(r.chain.scheduledFallbackHours, 0); assert.equal(r.stores.christianshavn.components.hourly, 0);
+});
+for (const kind of ['central', 'regional']) test(kind + ' never receives calendar salary fallback', () => {
+  const f = calendarFixture({ kind }), { r } = calc(f);
+  assert.equal(r.chain.calendarFallbackDays, 0);
+  assert.equal(r.chain.cost, kind === 'central' ? 0 : null);
+  assert.ok(!r.warnings.includes('CALENDAR_SALARY_FALLBACK'));
+});
+test('calendar fallback cannot invent an unavailable monetary salary or unknown home-store identity', () => {
+  for (const salary of [null, NaN, Infinity]) {
+    const f = calendarFixture(); f.monthly[0].payroll.salariedPayroll[0].salary = salary;
+    assert.equal(calc(f).r.chain.cost, null); assert.equal(calc(f).r.chain.calendarFallbackDays, 0);
+  }
+  const f = calendarFixture(); f.workerRules = { valid: true, resolve: () => ({ kind: 'home', departmentId: 999, from: '2020-01-01' }) };
+  assert.equal(calc(f).r.chain.cost, null);
+});
+test('calendar fallback aggregate never exposes individual salary, identity, dates or internal rows', () => {
+  const { r } = calc(calendarFixture()), json = JSON.stringify(r);
+  assert.equal(r.chain.calendarFallbackDays, 31);
+  assert.doesNotMatch(json, /fixture-|employeeId|salaryCode|salary-calendar|departmentId|calendarFallbackRecords/);
+});
+test('failed monthly schedule pagination still loads a supported calendar home salary', async () => {
+  const f = calendarFixture();
+  const client = { all: async (path, params) => {
+    if (path.includes('departments')) return f.departments;
+    if (path.endsWith('/shifts') && params.from === '2026-07-31' && params.to === '2026-08-31') throw Error('PAGINATION_INCOMPLETE');
+    return [];
+  }, get: async (path, params) => {
+    if (path.includes('/allocations/')) return { data: [{ departmentDistributions: [{ department: { id: 149748 }, departmentWeight: 1 }] }] };
+    return params?.shiftStatus ? f.approved : f.payroll;
+  } };
+  const w = windowFor(f, { start: '2026-08-02', end: '2026-08-03' });
+  const input = await loadPayrollSources({ client, window: w, workerRules: f.workerRules, now: () => f.evaluatedAt });
+  assert.equal(input.allocationCoverage, undefined);
+  const r = p.processPayroll(normalizePayroll(input, w), w);
+  assert.equal(r.chain.complete, true); assert.equal(r.chain.calendarFallbackDays, 1); assert.equal(r.chain.cost, 32.26);
+});
+test('the two home policies retain separate salary amounts and aggregate their calendar days safely', () => {
+  const f = calendarFixture(), second = calendarFixture({ amount: 2000.01 });
+  const salary = { ...second.monthly[0].payroll.salariedPayroll[0], employeeId: 'fixture-second-home' };
+  f.monthly[0].payroll.salariedPayroll.push(salary); f.payroll.salariedPayroll.push(salary);
+  f.workerRules = { valid: true, resolve: id => ({ kind: 'home', departmentId: id === 'fixture-second-home' ? 149668 : 149748, from: '2020-01-01' }) };
+  const { r } = calc(f);
+  assert.equal(r.stores.christianshavn.cost, 1000.01); assert.equal(r.stores['indre-by'].cost, 2000.01);
+  assert.equal(r.chain.cost, 3000.02); assert.equal(r.chain.calendarFallbackDays, 62);
+});
+test('unreliable home schedules trigger calendar fallback only in their affected month', () => {
+  const f = confirmedFixture(), next = confirmedFixture({ month: '2026-09', amount: 2000 });
+  f.evaluatedAt = Date.parse('2026-10-01T12:00:00Z');
+  for (const s of next.shifts) s.id += '-next';
+  for (const a of next.attendance) { a.id += '-next'; a.shiftId += '-next'; }
+  f.monthly.push(next.monthly[0]); f.allocationCoverage.end = next.allocationCoverage.end;
+  f.shifts.push({ ...f.shifts[0], startDateTime: '2026-08-02T11:00:00' }, ...next.shifts);
+  f.attendance.push(...next.attendance);
+  for (const s of next.shifts) f.shiftDetails.set(s.id, { shiftTypeId: null });
+  for (const a of next.attendance) f.attendanceBreaks.set(a.id, []);
+  const { r, n } = calc(f);
+  assert.equal(r.chain.cost, 3000.01); assert.equal(r.chain.calendarFallbackDays, 31);
+  assert.equal(r.chain.actualHours, 8);
+  assert.ok(n.records.filter(x => x.calendarFallbackDays).every(x => x.end <= p.midnight('2026-09-01')));
 });
