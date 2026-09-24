@@ -1,6 +1,6 @@
-# Optional sales database foundation (Stage 1)
+# Optional sales database foundation and historical importer (Stages 1–2)
 
-This foundation is disconnected from `server.js`. Nothing imports it during web
+The foundation and the standalone historical importer are disconnected from `server.js`. Nothing imports it during web
 startup, changes a route, switches reads, warms a cache, or contacts a provider.
 The existing production environment needs no new variables. The only production
 package change is a pinned `pg` dependency; installing it does not open a connection.
@@ -127,7 +127,7 @@ Publication uses a separate transaction advisory lock to serialize this bounded
 foundation operation. This does **not** implement or validate future worker
 leadership, HTTP pagination completeness, rate limiting or correction discovery.
 Callers cannot turn incomplete exports into certified data merely by trusting a
-provider's current early-exit logic; a verified importer is still required.
+provider's current early-exit logic; the Stage 2 importer below supplies a separate terminal-traversal contract.
 
 Reads run in a consistent repeatable-read snapshot. `summary` returns exact
 strings and explicit coverage, with null totals for a never-synchronized/partially
@@ -172,3 +172,214 @@ must reproduce 466 lines, 13,143.68 DKK ex VAT, 2,120.48 Wolt ex VAT, 66 Kombo,
 54 paid rolls, 55% Kombo share and 20 lemonades, using the existing metric engine.
 No new live payload fixture, provider call, backfill, payroll change, infrastructure,
 merge or deployment is part of this foundation.
+
+
+## Stage 2: manual historical importer
+
+The importer is an unused standalone CLI. **No production database or historical
+backfill exists yet.** Nothing is provisioned or enabled by this change. It adds
+no web imports, provider calls at startup, read switches, frontend changes,
+recurring worker, scheduler, shadow reads, cache removal or payroll work. Existing
+startup still needs no database variables. `npm start` and Railway configuration
+are unchanged; migrations remain a separate explicit operation.
+
+### Lifecycle and completeness
+
+1. Validate explicit internal store, inclusive `--from`, optional exclusive
+   `--through` (defaults to the current Copenhagen date, excluding the open day),
+   reviewed catalog, optional database configuration and identity key/version.
+2. With `--apply`, acquire one global session advisory lock on a dedicated
+   connection. It also conflicts with the Stage 1 publication lock. No transaction
+   remains open during network requests. Lock connection loss aborts fetching;
+   every staging/publication query uses that same connection, with no replacement
+   pool connection or silent reacquisition. SIGINT/SIGTERM cancel the request,
+   finish safe cleanup when connected, and release ownership. SIGKILL releases
+   the database lock when PostgreSQL detects the dead session.
+3. Allocate a new run UUID and start at source page one. Parse a bounded page,
+   construct reviewed safe lines immediately, and stage batches of at most 500
+   lines (default 250). Record page/row/review counts, never continuation URLs.
+4. Follow every validated continuation until an explicit `next_page_url: null`.
+   Require an object envelope, array `data`, consecutive positive `current_page`,
+   and a valid optional `last_page`. Missing continuation fields, missing/non-array
+   data, unsuccessful envelopes, loops, stalls, redirects, unsafe paths/origins,
+   or any ceiling fail the scan. Continuations must keep the exact initial HTTPS
+   origin/path and contain exactly the next canonical `page` parameter. Additional
+   provider cursor/query formats require separately reviewed contract support.
+5. Only after genuine termination, filter the logical closed range and build
+   date/month summaries. Validate identities, store isolation, exact totals,
+   signed quantities, negative-price/quantity counts, refund totals and SHA-256
+   over protected source keys plus safe fingerprints in sorted key order. Repeat
+   validation from durable staging before publication or publication-only resume.
+6. Compare with existing facts and, when requested, a separately completed prior
+   scan. Quarantine corrections, changed dates, missing identities or independent
+   verification mismatches before publishing any bucket.
+7. Publish validated month buckets in short transactions, shrinking to individual
+   days when a month exceeds 100,000 lines. A day above 100,000 lines fails before
+   any bucket publishes; changing this safety bound requires review. Each
+   transaction inserts only new facts, validates persisted count/totals/hash, and
+   atomically commits day coverage and its durable bucket checkpoint. Unchanged
+   facts are not rewritten. No transaction waits on a provider.
+
+**Do not reuse `fetchSalesRange` date early-exit logic for completeness.** This API
+is from-date onward with no reliable end bound. A page of newer dates may be
+followed by older in-range records. Neither min/max dates nor empty `data` with a
+non-null continuation terminates a scan. Only the midnight conversion helper is
+shared with the existing fetcher. Neither that fetcher nor its callers changes.
+
+Terminal traversal is **single-pass evidence**, not a provider snapshot guarantee
+or proof of the earliest available history. `--verify-run` performs another full
+page-one traversal after the referenced scan finished. Store/bounds must match.
+Per-date counts, exact amounts/quantities, negative counts/refund totals and sorted
+content digests must all agree; equal revenue alone is insufficient. Matching
+independent passes strengthen evidence but cannot establish unknown provider
+lifetime identity, pagination snapshot, correction or deletion guarantees.
+
+### Precision and privacy
+
+The bounded JSON grammar keeps every numeric token as its exact string lexeme.
+`JSON.parse` is used only to decode quoted JSON strings, never numeric source
+values. There is no new parser dependency, global parser override, floating-point
+money conversion, per-line ore rounding, VAT recomputation or price-times-quantity
+calculation. Exact decimal validation is the Stage 1 contract, including rejection
+of scientific notation and unsupported magnitude/scale/precision. Aggregate
+arithmetic uses scaled BigInt values and PostgreSQL numeric, serialized as strings.
+
+Page limits are 16 MiB UTF-8, 10,000 rows, depth 16, one million JSON values and
+64 KiB per encoded string. Duplicate/prototype keys, malformed UTF-8 and invalid
+Unicode/NUL are rejected. Default scan limits are 10,000 pages and 2,000,000 rows;
+row ceiling may be explicitly lowered or raised to at most 20,000,000. Hitting a
+limit is failure, never a partial-success signal. The CLI HTTP transport makes
+one request at a time, at most 30 starts/minute, with a 20-second total deadline,
+no redirects/compression, and immediate safe failure on 429 or other errors.
+There is no automatic retry that might mix different mutable scans.
+
+The normalization allowlist is the Stage 1 fact contract: internal store,
+store-scoped protected line key/version, validated business date and normalized
+local time/quality, product/group IDs and reviewed labels, signed quantity and
+exact inclusive/exclusive revenue, reviewed payment values and safe fingerprint.
+Payment time takes precedence over fallback time; a malformed primary time is
+not concealed by a valid fallback. A valid date-only value has missing-time
+quality. Copenhagen spring gaps fail; naive autumn repeats remain ambiguous.
+
+A trusted reviewed catalog file is mandatory; it is never learned from a response.
+Unknown product/group/payment values are discarded, counted and quarantine the
+entire scan. Their text does not enter staging, facts, reports or diagnostics.
+Review must use a separately authorized source/catalog process. Raw customer,
+debtor, card, employee/clerk, order, company/account, table/terminal/pax, arbitrary
+JSON, headers, credentials, URLs and response/error bodies are never persisted.
+Raw line IDs are discarded after the Stage 1 domain-separated, length-framed
+HMAC derivation. Fingerprints cover only canonical ordered safe fields, excluding
+private properties, input property order, ingestion time and derived metrics.
+No new production catalog, source identifiers, credentials or payload is supplied.
+
+### Runs, evidence and recovery
+
+Migration `002_backfill.sql` extends the existing run table with `run_kind`,
+retains the original 31-day/10,000-row limits for foundation callers, and permits
+bounded historical importer runs and larger publication buckets. It adds:
+
+- `sales_import_scan`: finite importer lifecycle, terminal flag, page/row/review
+  counters, exact totals/negative counts, safe error code, completion timestamp
+  and independent-verification reference.
+- `sales_import_day`: per-run/store/date counts, exact totals and sorted checksum,
+  including explicit zero-line dates.
+- `sales_import_bucket`: atomically published month/date checkpoints linked to
+  existing `sales_sync_run` publication records.
+- `sales_import_discrepancy`: protected identity and old/new affected dates and
+  fingerprints for changed/missing candidates. No raw identity or payload.
+- `sales_day_state.evidence` and `verification_run`: distinguish single-pass
+  completion, independently verified data and independently verified empty dates.
+
+The run states are `fetching`, `staged`, `validated`, `publication-pending`,
+`published`, `quarantined`, `failed`, `interrupted`. Stage 2 coverage reports
+`never-synchronized`, `staged`, `complete-single-pass`, `independently-verified`,
+`conflict-quarantine`, or `verified-empty`, with latest-attempt state separate
+from previously published coverage. A single empty pass is explicitly single-pass,
+not independently verified empty. Older observations cannot replace newer coverage.
+
+An incomplete, invalid, failed or interrupted **source scan** cannot change facts
+or coverage. It must replay page one with a new UUID. Sanitized fragments from
+separate scans never combine. Handled failed/quarantined staging is removed
+immediately in 1,000-row cleanup batches; success also purges staging. After a
+process crash, the next apply invocation under ownership marks abandoned scans
+interrupted and clears their staging before a new fetch. Run/day/discrepancy
+metadata remains for audit. There is no background retention daemon: crash leftovers
+remain until that explicit CLI cleanup, bounded by the scan quota.
+
+A failure **after terminal validation during publication** leaves the failed
+bucket unchanged and the scan `publication-pending`. Earlier atomically committed
+buckets remain valid checkpoints; this is not reported as successful completion.
+`--resume-publication` revalidates the immutable staged snapshot and publishes only
+remaining buckets without contacting the provider. A pending publication blocks
+starting another source scan for that store, bounding retained staging. Staging is
+kept until all buckets finish. Database statement/transaction safeguards bound
+operations; very large buckets can safely fail rather than certify incomplete data.
+
+No stored fact is deleted, deactivated or overwritten based on an absent or
+changed source identity. A moved date records both dates. Candidate corrections
+and discrepancy resolution remain quarantined for a later separately reviewed
+reconciliation policy; Stage 2 does not implement tombstones or the Stage 3 worker.
+
+### Explicit operations (placeholders only)
+
+Supply optional configuration through the execution environment, not a committed
+file: `KK_SALES_DB_ENABLED=true`, `KK_SALES_DB_URL=<disposable-connection-url>`,
+`KK_SALES_IDENTITY_KEY_HEX=<stable-32-byte-key-as-64-hex-digits>`,
+`KK_SALES_IDENTITY_KEY_VERSION=<positive-version>`,
+`KK_BACKFILL_TOKEN=<separately-authorized-token>`, and
+`KK_BACKFILL_COMPANY_ID=<separately-authorized-company-id>`.
+No production values are configured by this implementation.
+
+```sh
+# Explicit schema operation; never performed by the importer or web startup.
+npm run db:migrate
+
+# Default is validation only; also accepts --validate or --dry-run.
+npm run sales:backfill -- --store '<internal-store>' --from '<YYYY-MM-DD>' \
+  --through '<exclusive-YYYY-MM-DD>' --catalog '<reviewed-catalog-path>' --dry-run
+
+# Separately authorized database writes require --apply.
+npm run sales:backfill -- --store '<internal-store>' --from '<YYYY-MM-DD>' \
+  --through '<exclusive-YYYY-MM-DD>' --catalog '<reviewed-catalog-path>' --apply
+
+# A new independent traversal against a previously published scan.
+npm run sales:backfill -- --store '<internal-store>' --from '<YYYY-MM-DD>' \
+  --through '<exclusive-YYYY-MM-DD>' --catalog '<reviewed-catalog-path>' \
+  --verify-run '<published-run-uuid>' --apply
+
+# Only a terminal, validated publication checkpoint can resume without fetching.
+npm run sales:backfill -- --store '<internal-store>' --from '<YYYY-MM-DD>' \
+  --through '<exclusive-YYYY-MM-DD>' --catalog '<reviewed-catalog-path>' \
+  --resume-publication '<pending-run-uuid>' --apply
+```
+
+Validation mode performs no database connection/write and retains at most 20,000
+unique safe projections / an 8 MiB accounted payload budget; exceeding it fails.
+Full-history validation uses `--apply` and bounded durable staging. Both modes
+require explicit enabled configuration and a valid identity/catalog. There is no
+implicit reuse of the web process's tokens or store/company configuration.
+Progress contains safe run UUIDs, internal store/date bounds, counts and exact
+aggregate totals only. No protected identity, fingerprint or free text is logged.
+Exit is nonzero on invalid/incomplete scans; only fully completed publication
+emits `published`. `validated-only` never claims publication or independent proof.
+
+### Stage 2 verification
+
+The existing pinned PostgreSQL 16.15 workflow retains `contents: read` only,
+synthetic credentials, no repository secrets, no deployment environments and no
+uploads. It adds an explicit zero-vulnerability audit and the real importer suite.
+Test subprocesses block public HTTP/fetch access while allowing loopback services.
+The test launcher scans buffered diagnostics for private canaries before emitting
+only test names/counts and safe aggregate memory results; row/driver assertion
+bodies are not uploaded. PostgreSQL error-statement logging remains suppressed.
+All CI service data disappears with the runner.
+
+The existing 859 regression tests and 30 real foundation tests remain; migration
+ledger expectations now include the second file. Importer tests cover malformed
+and reordered pagination, precision, corrections/absence, atomic publication,
+page-one crash replay, actual independent sessions, SIGKILL/connection-loss
+ownership, privacy, CLI write refusal, DST, independent checksums, and the unchanged
+466-line reference fixture. A synthetic 100,000-row/100-page PostgreSQL traversal
+records bounded page/batch size and observed heap/RSS. These are synthetic memory
+measurements, not production throughput, historical inventory or live provider
+contract validation. No production database/backfill or cutover is authorized here.

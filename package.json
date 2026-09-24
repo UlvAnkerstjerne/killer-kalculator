@@ -1,9 +1,11 @@
 {
   "scripts": {
     "start": "node server.js",
-    "test": "node --test server.test.js fixture.test.js test/sales-lines.test.js test/pos-fetcher.test.js test/sales-range-derivation.test.js test/sales-range-cache.test.js test/revenue-summary.test.js test/sales-range.test.js test/frontend-sales.test.js test/frontend-cache.test.js test/lemonade.test.js test/frontend-revenue.test.js test/product-metrics.test.js test/product-metrics-integration.test.js test/completed-period-warming.test.js test/sales-db/foundation.test.js",
+    "test": "node --test server.test.js fixture.test.js test/sales-lines.test.js test/pos-fetcher.test.js test/sales-range-derivation.test.js test/sales-range-cache.test.js test/revenue-summary.test.js test/sales-range.test.js test/frontend-sales.test.js test/frontend-cache.test.js test/lemonade.test.js test/frontend-revenue.test.js test/product-metrics.test.js test/product-metrics-integration.test.js test/completed-period-warming.test.js test/sales-db/foundation.test.js test/sales-sync/importer.test.js",
     "test:db": "node --test test/sales-db/postgres.test.js",
-    "db:migrate": "node scripts/migrate-sales-db.js"
+    "db:migrate": "node scripts/migrate-sales-db.js",
+    "test:importer:db": "node scripts/run-sales-tests.js importer",
+    "sales:backfill": "node scripts/sales-backfill.js"
   },
   "dependencies": {
     "axios": "^1.13.6",
