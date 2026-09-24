@@ -8,7 +8,7 @@ permissions:
 jobs:
   postgres-foundation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       # Expected constraint failures must not write row/statement details to service logs.
       PGOPTIONS: '-c log_min_messages=panic -c log_min_error_statement=panic'
@@ -36,12 +36,14 @@ jobs:
           node-version: '22'
       - name: Clean locked install
         run: npm ci
+      - name: Zero-vulnerability gate
+        run: npm audit --audit-level=low
       - name: Syntax and whitespace
         run: |
           git ls-files '*.js' | xargs -n 1 node --check
           git diff --check
       - name: Complete regression and pure foundation suite
-        run: npm test
+        run: node scripts/run-sales-tests.js regression
       - name: Explicit migrations against disposable PostgreSQL
         env:
           KK_SALES_DB_ENABLED: 'true'
@@ -50,6 +52,10 @@ jobs:
       - name: Real PostgreSQL foundation suite
         env:
           KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
-        run: npm run test:db
+        run: node scripts/run-sales-tests.js foundation
+      - name: Real PostgreSQL importer suite and bounded-memory simulation
+        env:
+          KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
+        run: npm run test:importer:db
       # No persistent volumes, repository secrets, provider access, deployment,
       # artifact uploads or database dumps. The service dies with this job.

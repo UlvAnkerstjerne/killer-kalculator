@@ -51,19 +51,19 @@ after(async () => {
   assert.equal(db.health().total, 0); assert.equal(independent.health().total, 0);
 });
 
-test('empty bootstrap creates six stores and one checksum-ledger entry', async () => {
+test('empty bootstrap creates six stores and two checksum-ledger entries', async () => {
   assert.equal(await count('sales_store'), 6);
-  assert.equal(await count('schema_migration'), 1);
+  assert.equal(await count('schema_migration'), 2);
   for (const table of ['sales_line', 'sales_stage_line', 'sales_day_state', 'sales_sync_run', 'identity_key_check']) assert.equal(await count(table), 0);
 });
 test('repeated migrations are an exact no-op', async () => {
-  assert.deepEqual(await migrate(db), { applied: 0, total: 1 });
-  assert.equal(await count('schema_migration'), 1);
+  assert.deepEqual(await migrate(db), { applied: 0, total: 2 });
+  assert.equal(await count('schema_migration'), 2);
 });
 test('concurrent independent migration sessions serialize empty bootstrap', async () => {
   await db.query('DROP SCHEMA sales_foundation CASCADE');
   const results = await Promise.all([migrate(db), migrate(independent)]);
-  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 1);
+  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 2);
   assert.equal(await count('sales_store'), 6);
 });
 test('migration runner waits on the real advisory lock and releases it at commit', async () => {
@@ -97,7 +97,7 @@ test('changed applied migration checksum fails closed', async () => {
     const name = '001_foundation.sql';
     await fs.writeFile(path.join(temp, name), await fs.readFile(path.join(migrationDir, name), 'utf8') + '\n-- changed\n');
     await assert.rejects(migrate(db, temp), { code: 'MIGRATION_MISMATCH' });
-    assert.equal(await count('schema_migration'), 1);
+    assert.equal(await count('schema_migration'), 2);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('failed migration rolls back schema and ledger and frees migration lock', async () => {
@@ -107,7 +107,7 @@ test('failed migration rolls back schema and ledger and frees migration lock', a
     await fs.writeFile(path.join(temp, '001_failure.sql'), 'CREATE TABLE sales_foundation.transient (id int); SELECT missing_synthetic_function();');
     await rejected(migrate(db, temp));
     assert.equal((await db.query("SELECT to_regnamespace('sales_foundation') IS NULL AS absent")).rows[0].absent, true);
-    assert.equal((await migrate(independent)).applied, 1);
+    assert.equal((await migrate(independent)).applied, 2);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('PK, FK, typed state, bounds and fact check constraints are enforced', async () => {
