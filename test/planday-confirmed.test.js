@@ -323,13 +323,13 @@ test('partial calendar periods conserve rounded monthly proportions across adjac
   const rows = first.n.records.filter(x => x.calendarFallbackDays);
   assert.equal(rows.at(-1).amount, 33.37, 'partial-period residual goes on final included day');
 });
-test('active calendar fallback counts the current Copenhagen date and excludes future dates', () => {
+test('active calendar fallback accrues only the elapsed share of the current Copenhagen date', () => {
   const f = calendarFixture({ month: '2026-09', amount: 3000 });
   const { r, n } = calc(f, { cutoff: '2026-09-23T12:32:00Z' });
-  assert.equal(r.chain.cost, 2300); assert.equal(r.chain.calendarFallbackDays, 23);
+  assert.equal(r.chain.cost, 2260.56); assert.equal(r.chain.calendarFallbackDays, 23);
   assert.equal(n.records.filter(x => x.calendarFallbackDays).at(-1).end, Date.parse('2026-09-23T12:32:00Z'));
   assert.equal(n.reconciliation.allocatedSalaryOre, 300000);
-  assert.equal(calc(f, { start: '2026-09-23', end: '2026-09-24', cutoff: '2026-09-23T12:32:00Z' }).r.chain.cost, 100);
+  assert.equal(calc(f, { start: '2026-09-23', end: '2026-09-24', cutoff: '2026-09-23T12:32:00Z' }).r.chain.cost, 60.56);
 });
 test('calendar fallback respects exclusive Copenhagen midnight and zero-width cutoffs', () => {
   const f = calendarFixture({ month: '2026-09', amount: 3000 });
@@ -439,4 +439,63 @@ test('unreliable home schedules trigger calendar fallback only in their affected
   assert.equal(r.chain.cost, 3000.01); assert.equal(r.chain.calendarFallbackDays, 31);
   assert.equal(r.chain.actualHours, 8);
   assert.ok(n.records.filter(x => x.calendarFallbackDays).every(x => x.end <= p.midnight('2026-09-01')));
+});
+
+for (const [date, dayHours, noonElapsedHours, monthlyAmount] of [
+  ['2026-09-24', 24, 12, 3000],
+  ['2026-03-29', 23, 11, 3100],
+  ['2026-10-25', 25, 13, 3100],
+]) {
+  test(dayHours + '-hour date accrues from zero at midnight through local noon to the complete daily share', () => {
+    const f = calendarFixture({ month: date.slice(0, 7), amount: monthlyAmount });
+    const start = p.midnight(date), end = p.midnight(p.nextDate(date));
+    f.evaluatedAt = end + 1000;
+    assert.equal((end - start) / 3600000, dayHours);
+    const noon = p.localInstant(date + 'T12:00:00');
+    assert.equal((noon - start) / 3600000, noonElapsedHours);
+    const costAt = instant => calc(f, { start: date, end: p.nextDate(date), cutoff: new Date(instant).toISOString() }).r.chain.cost;
+    assert.equal(costAt(start), 0);
+    assert.equal(costAt(start + 60000), Math.round(10000 / (dayHours * 60)) / 100);
+    assert.equal(costAt(noon), Math.round(10000 * noonElapsedHours / dayHours) / 100);
+    assert.equal(costAt(start + (end - start) / 2), 50, 'half the actual elapsed date is half its daily share');
+    assert.equal(costAt(end - 1000), Math.round(10000 * (1 - 1 / (dayHours * 3600))) / 100);
+    assert.equal(costAt(end), 100);
+    const previousDays = Number(date.slice(-2)) - 1;
+    assert.equal(calc(f, { cutoff: new Date(noon).toISOString() }).r.chain.cost,
+      previousDays * 100 + costAt(noon), 'completed dates retain complete daily shares');
+    f.evaluatedAt = p.midnight(p.nextDate(f.monthly[0].to)) + 1000;
+    assert.equal(calc(f).r.chain.cost, monthlyAmount);
+  });
+}
+test('autumn repeated wall-clock hour accrues both distinct elapsed hours', () => {
+  const f = calendarFixture({ month: '2026-10', amount: 3100 }); f.evaluatedAt = Date.parse('2026-11-01T12:00:00Z');
+  const at = cutoff => calc(f, { start: '2026-10-25', end: '2026-10-26', cutoff }).r.chain.cost;
+  assert.equal(at('2026-10-25T02:30:00+02:00'), 10);
+  assert.equal(at('2026-10-25T02:30:00+01:00'), 14);
+});
+test('spring skipped wall-clock hour does not add an extra elapsed hour of salary', () => {
+  const f = calendarFixture({ month: '2026-03', amount: 3100 });
+  const at = cutoff => calc(f, { start: '2026-03-29', end: '2026-03-30', cutoff }).r.chain.cost;
+  assert.equal(at('2026-03-29T01:30:00+01:00'), 6.52);
+  assert.equal(at('2026-03-29T03:30:00+02:00'), 10.87);
+});
+for (const month of ['2026-02', '2024-02', '2026-04', '2026-07']) test(month + ' intraday slices and final month residual conserve every øre', () => {
+  const f = calendarFixture({ month }), full = windowFor(f), lastDate = f.monthly[0].to;
+  const split = p.localInstant(lastDate + 'T12:34:56');
+  const parts = [[full.from, split], [split, full.until]].map(([from, until]) => {
+    const w = { ...full, from, until, cutoff: new Date(until).toISOString() };
+    const n = normalizePayroll(f, w), r = p.processPayroll(n, w);
+    assert.equal(r.chain.complete, true); return { n, ore: Math.round(r.chain.cost * 100) };
+  });
+  assert.equal(parts[0].ore + parts[1].ore, 100001);
+  assert.equal(parts[1].n.records.at(-1).end, full.until);
+  assert.equal(parts[1].ore, 100001 - parts[0].ore, 'final slice deterministically completes the exact monthly salary');
+});
+for (const departmentId of [149748, 149668]) test('intraday calendar accrual remains exclusively in home department ' + departmentId, () => {
+  const f = calendarFixture({ month: '2026-09', amount: 3000 });
+  f.workerRules = { valid: true, resolve: () => ({ kind: 'home', departmentId, from: '2020-01-01' }) };
+  const { r } = calc(f, { start: '2026-09-23', end: '2026-09-24', cutoff: '2026-09-23T10:00:00Z' });
+  assert.equal(r.stores[p.storeForDepartment(departmentId)].cost, 50);
+  assert.equal(r.chain.cost, 50); assert.equal(r.chain.calendarFallbackDays, 1);
+  assert.equal(r.chain.actualHours, 0); assert.equal(r.chain.scheduledFallbackHours, 0);
 });

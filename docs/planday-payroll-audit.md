@@ -1,6 +1,6 @@
 # Planday payroll audit
 
-Updated 2026-09-24 for PR #6, branch `fix/planday-payroll-accuracy`, following `b9face3`. Baseline main remains `29ed320`. This report includes the home-store calendar fallback and supersedes the former actual-attendance-only release gate. No merge, deployment, production data change or credential change was performed.
+Updated 2026-09-24 for PR #6, branch `fix/planday-payroll-accuracy`, following `d4d6b53`. Baseline main remains `29ed320`. This report includes proportional intraday home-store calendar accrual and supersedes the former whole-current-day calendar rule and actual-attendance-only release gate. No merge, deployment, production data change or credential change was performed.
 
 ## Home-store calendar fallback
 
@@ -8,9 +8,21 @@ The two confirmed home-store policies allocate their complete authoritative mont
 
 With no usable monthly hours, or demonstrably incomplete/unreliable monthly coverage, salary instead uses equal calendar-date weights: **monthly salary ÷ calendar days in the Copenhagen month**. Weekends, leap days and DST dates are included equally. A failed/truncated monthly schedule fetch, known Payroll or punch shifts absent from the schedule, or invalid/conflicting hour evidence establishes unreliable coverage. Verified monetary salary and home-policy identity remain required; those cannot be invented by fallback.
 
-For partial or active periods, only dates intersecting the requested interval before the exclusive Copenhagen cutoff contribute. An intraday cutoff includes the current date's full daily share; exact midnight excludes the new date. No future date contributes, and there is no hourly pricing within a calendar day. Cumulative monthly proportions round to integer øre at period boundaries, conserving complete months and adjacent period totals. Internal daily records put each requested slice's residual rounding øre on its final included date.
+For partial or active periods, completed dates receive their full daily shares. The current date contributes **daily calendar share × elapsed seconds since Copenhagen midnight ÷ seconds between that date's Copenhagen midnights**. It starts at zero and accrues continuously to the full daily share at the next midnight. The denominator is 86,400 seconds for an ordinary date, 82,800 for a spring DST date and 90,000 for an autumn DST date. No future time contributes. This apportions monthly salary without an hourly wage rate.
 
-Store and chain responses expose only the aggregate **`calendarFallbackDays`**, alongside existing aggregate fields, with **`estimated: true`** and safe **`CALENDAR_SALARY_FALLBACK`** provenance. This count sums salary-allocation dates: the two home salaries over a complete 31-day month contribute 62 chain allocation days. It creates no worked hours, individual shifts or hourly costs. The UI retains the percentage and says **“Includes calendar-day salary estimates”**.
+Cumulative monthly accrual is rounded to integer øre at each requested instant; the starting accrued amount is subtracted from the ending amount. Internal records assign each requested slice's rounding residual to its final included date. The final full-month slice completes the exact monthly salary, and adjacent intraday slices conserve the same total. Currency output changes in øre increments even though its unrounded accrual is continuous.
+
+The following synthetic examples use a **100 DKK daily share**, not an employee salary. Times are Copenhagen local time, and costs are for that date alone:
+
+| Date | Date length | 00:00 | Elapsed time at 12:00 | Cost at 12:00 | End of date (next 00:00) |
+|---|---:|---:|---:|---:|---:|
+| 2026-09-24 | 24 hours | 0.00 DKK | 12 hours | 50.00 DKK | 100.00 DKK |
+| 2026-03-29 | 23 hours | 0.00 DKK | 11 hours | 47.83 DKK | 100.00 DKK |
+| 2026-10-25 | 25 hours | 0.00 DKK | 13 hours | 52.00 DKK | 100.00 DKK |
+
+At 23:59:59 the unrounded amounts are respectively 99.998843, 99.998792 and 99.998889 DKK (all round to 100.00 DKK); the exact full share is reached at the following midnight. Tests additionally distinguish both occurrences of the autumn repeated hour and exclude the spring skipped hour.
+
+Store and chain responses expose only the aggregate **`calendarFallbackDays`**, alongside existing aggregate fields, with **`estimated: true`** and safe **`CALENDAR_SALARY_FALLBACK`** provenance. This count sums salary-allocation dates: a partially elapsed date counts once, exact midnight adds no new date, and the two home salaries over a complete 31-day month contribute 62 chain allocation days. It creates no worked hours, individual shifts or hourly costs. The UI retains the percentage and says **“Includes calendar-day salary estimates”**.
 
 The regional location-based salary and all three excluded central monthly salaries are ineligible for calendar fallback. Absence schedules still cannot become worked hours or central 225/hour costs. When a home month contains only absence schedules, its independently owed monthly salary uses calendar weights without inventing absence pay.
 
@@ -205,7 +217,7 @@ The nine previously blocking missing-punch cases are resolved by this rule. The 
 ## Validation and review gate
 
 - Clean isolated `npm ci`: 95 packages installed, 96 audited, zero vulnerabilities. No dependency or credential changes.
-- Full regression suite: **1,003 tests / 129 suites pass**, including approved-punch precedence, missing/unapproved/open/malformed-punch fallback, complete monthly conservation, valid status/identity/date checks, future/cutoff clipping, central 225/hour, outside exclusion, denominator-only estimation, duplicate/overlap handling, month-crossing overtime, sickness/other absence exclusion and aggregate privacy.
+- Full regression suite: **1,014 tests / 129 suites pass**, including proportional intraday calendar accrual, ordinary/23-hour/25-hour midnight and noon checks, repeated/skipped DST hours, intraday rounding conservation, approved-punch precedence, missing/unapproved/open/malformed-punch fallback, complete monthly conservation, valid status/identity/date checks, future/cutoff clipping, central 225/hour, outside exclusion, denominator-only estimation, duplicate/overlap handling, month-crossing overtime, sickness/other absence exclusion and aggregate privacy.
 - Seven browser security checks pass. Local Chromium in America/Los_Angeles confirms Copenhagen cutoff labels, progressive revenue loading, consistent card/sidebar/store percentages, fallback estimate wording, retry and genuine zero; no page errors. Only synthetic screenshot data was used.
 - Aggregate-only privacy scanning finds zero raw employee identifiers, private names/emails or credentials in changed files. API allowlist tests include the new hours/count/estimated fields. Syntax/inline-script parsing and whitespace checks pass.
 - Synthetic benchmark: 4,464 aggregate records at about **2.15 ms median / 8.10 ms p95**; a 31-shift approved-clock month normalizes in about **20.88 ms median / 23.14 ms p95**. Same-key coalescing and warm-cache behavior remain verified.

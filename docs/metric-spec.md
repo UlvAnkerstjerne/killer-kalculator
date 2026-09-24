@@ -429,13 +429,18 @@ conflicting working-hour evidence trigger this fallback. Sparse but fully covere
 hours do not. The monetary salary, policy identity and home-store mapping must remain verified.
 
 Calendar fallback includes only dates overlapping the requested period before its exclusive
-Copenhagen cutoff. An intraday cutoff includes the current date's full daily share; exact
-midnight excludes the new date, and future dates never contribute. This is a daily salary
-allocation, without intraday hourly pricing. Round cumulative month shares to integer øre
-at the requested date boundaries, and assign the slice's rounding residual to its final
-included date. Complete months and adjacent partial-period requests conserve the same salary.
+Copenhagen cutoff. Completed dates receive their complete daily share. The current date
+accrues `daily calendar share × elapsed seconds since Copenhagen midnight / total seconds
+between that date's Copenhagen midnights`. Its contribution is zero at midnight and reaches
+the full share at the following midnight. Spring DST dates use 82,800 seconds and autumn
+DST dates use 90,000 seconds; ordinary dates use 86,400. Future time never contributes.
+This apportions a monthly salary; it does not introduce an hourly wage rate. Round cumulative
+monthly accrual to integer øre at each requested instant and subtract the starting accrual.
+Assign the slice's rounding residual to its final included date; the final full-month slice
+therefore completes the exact monthly salary. Adjacent intraday requests remain additive.
 
-`calendarFallbackDays` counts included salary-allocation dates; chain counts sum store
+`calendarFallbackDays` counts included salary-allocation dates (a partially elapsed date
+counts once, exact midnight counts no new date); chain counts sum store
 counts (two home salaries covering a 31-day month contribute 62 allocation days). Calendar
 allocation creates no worked hours or fallback shifts. It is always estimated, with safe
 `CALENDAR_SALARY_FALLBACK` provenance and “Includes calendar-day salary estimates” in the UI.
