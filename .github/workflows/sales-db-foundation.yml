@@ -1,0 +1,55 @@
+name: Sales database foundation
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  postgres-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Expected constraint failures must not write row/statement details to service logs.
+      PGOPTIONS: '-c log_min_messages=panic -c log_min_error_statement=panic'
+    services:
+      postgres:
+        # Official postgres 16.15-bookworm, immutable multi-platform image digest.
+        image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+        env:
+          POSTGRES_DB: kk_foundation_test
+          POSTGRES_USER: foundation_test
+          POSTGRES_PASSWORD: disposable_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U foundation_test -d kk_foundation_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Clean locked install
+        run: npm ci
+      - name: Syntax and whitespace
+        run: |
+          git ls-files '*.js' | xargs -n 1 node --check
+          git diff --check
+      - name: Complete regression and pure foundation suite
+        run: npm test
+      - name: Explicit migrations against disposable PostgreSQL
+        env:
+          KK_SALES_DB_ENABLED: 'true'
+          KK_SALES_DB_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
+        run: npm run db:migrate
+      - name: Real PostgreSQL foundation suite
+        env:
+          KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
+        run: npm run test:db
+      # No persistent volumes, repository secrets, provider access, deployment,
+      # artifact uploads or database dumps. The service dies with this job.
