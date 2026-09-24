@@ -125,3 +125,11 @@ test('chain salary callback cannot overwrite a later period render', async () =>
   await b.run('renderChainView()'); b.run('_chainRenderGen++'); release(response()); await tick();
   assert.equal(b.els.get('chain-kpi-sal')?.innerHTML || '', '');
 });
+test('fallback percentage stays visible with scheduled-hour estimate label', () => {
+  const b = browser(), r = response();
+  r.stores.norrebro.source = 'estimated'; r.stores.norrebro.revenueExVat = 400;
+  r.stores.norrebro.warnings = ['SCHEDULED_HOURS_FALLBACK']; b.context.data = r;
+  assert.match(b.run("salaryCard(data,'norrebro')"), /25.0%/);
+  assert.match(b.run("salaryCard(data,'norrebro')"), /Includes scheduled-hour estimates/);
+  assert.doesNotMatch(b.run("salaryCell(data,'norrebro')"), /Approved actual|Unavailable/);
+});

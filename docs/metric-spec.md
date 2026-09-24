@@ -388,33 +388,50 @@ estimate** (unapproved provider shift cost), and **Estimated allocation** (clipp
 work, active-month salary or daily signed adjustment allocation). A mixed result takes
 the least authoritative applicable source. None is silently substituted for another.
 
-Monthly salary is fetched separately for each complete calendar month. Three confirmed
-central policies exclude their monthly salaries and include only verified actual work in
-the six stores at the authorized shared rate of 225 DKK/hour. Outside work is excluded.
-Missing/unapproved actual attendance stays incomplete, never scheduled-as-actual.
+For ordinary working hours, prefer complete approved punches (minus verified recorded
+breaks); otherwise use the corresponding valid assigned/approved working schedule.
+Missing, open, incomplete or unapproved punches alone do not make a result unavailable.
+Fallback requires a verified employee, department, Copenhagen date/start/end, positive
+interval, working status and consistent identity/duplicate/overlap evidence. Draft, Open,
+Cancelled, Deleted, unknown-status or unclassified-absence schedules cannot supply fallback.
+`ACTUAL_HOURS_MISSING` applies when neither source supplies usable hours. Actual overtime
+can extend beyond scheduled times or cross a month boundary.
 
-Two home-store policies assign their full monthly salary to Christianshavn or Indre By.
-Office hours affect daily weights but retain the authorized home-store cost. The regional
-policy uses hours across all verified departments; outside shares remain outside the chain.
-A completed calendar month uses approved punch timestamps minus recorded clock breaks.
-An active calendar month uses the full scheduled month denominator and scheduled hours
-through the requested Copenhagen cutoff, explicitly estimated. A completed day/week in
-an active month still uses that estimate. Zero-hour days accrue zero salary. Month-close
-cache expiry triggers automatic reconciliation to actual monthly attendance.
+Each store and chain reports `actualHours`, `scheduledFallbackHours`,
+`scheduledFallbackShifts` and `estimated` as aggregates. Hours/counts cover selected work
+inside the requested period/cutoff. Home-manager Office hours follow the home allocation;
+regional outside hours stay outside chain hours. Fallback elsewhere in a monthly
+denominator can make a period estimated even when its own fallback-hour count is zero.
+The UI displays the supported percentage with “Includes scheduled-hour estimates”.
+Source-quality missing-punch coverage counts are not unavailable-contribution counts.
 
-Monthly allocations use cumulative integer øre differences over chronological qualifying
-hours, preserving the full salary exactly across days and all destinations. Same-store
-intervals are unioned; conflicting cross-store overlaps fail closed. Signed adjustment
-sharing remains explicitly estimated and counted once. Unknown salaries require a policy;
-current broad department membership is not an allocation decision.
+Three central policies exclude monthly salaries and charge selected six-store work at
+the shared 225 DKK/hour rate. Both approved punches and valid schedule fallback qualify;
+outside work remains excluded. Current-day fallback and actual hours stop at the common
+Copenhagen cutoff; future shifts never enter the numerator.
 
-Sick leave counts only with monetary Payroll or matching Time & Cost data. A known
-schedule-only sick-leave record contributes zero with a safe warning in its affected store;
-it does not invalidate supported components. No replacement-rate fallback is used. Other
-missing coverage, conflicting records or unverified nonzero nested break/supplement
-semantics produce Unavailable. Missing approval of an otherwise supported ordinary
-hourly monetary record remains a scheduled estimate. Missing clock coverage for the
-confirmed actual-hours policies is separately incomplete.
+Monthly salary is fetched separately for each full calendar month. Two home policies
+assign the entire monthly salary to Christianshavn or Indre By, including Office-weighted
+days. The regional policy includes all verified departments in its denominator and keeps
+outside portions outside the chain. All manager monthly denominators use the same
+shift-by-shift punch-first/fallback hierarchy. An active month's future valid schedules
+may contribute to its denominator, never to the period numerator. Active and mixed months
+are estimated; completed mixed months remain supported. Zero-hour days accrue zero salary.
+
+Chronological cumulative integer øre differences conserve the entire monthly salary
+across days and destinations, including outside shares. Same-store overlapping intervals
+are unioned; approved coverage takes precedence over overlapping fallback. Conflicting
+cross-department work and duplicate identities fail closed. Ordinary hourly money stays
+the authoritative Payroll amount, with existing verified partial-shift clipping: it is
+never multiplied by the newly reported hours. Signed adjustments remain counted once
+under their explicit elapsed-shift estimate.
+
+Sickness/absence never supplies ordinary fallback hours, central 225/hour work, or salary
+working-hour weights. Sickness counts only with monetary Payroll or matching Time & Cost.
+Schedule-only sickness contributes zero with a local nonblocking warning. Unknown types
+remain unclassified; unsupported monetary arithmetic, identity conflicts and genuinely
+missing usable coverage remain unavailable. Unknown new salaries require a policy rather
+than an inferred current department membership.
 
 A complete genuine zero is 0 DKK / 0% with positive revenue. Unavailable is null and
 `complete:false`. A chain result requires all six stores, sums their costs and aligned
@@ -429,5 +446,5 @@ cache TTLs are at most 10 minutes within the active salary month / 6 hours for c
 months; month transition forces reconciliation and failures are not cached
 as success. There is no flat 160 DKK/hour fallback and no employee-level browser output.
 
-See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, remaining
-attendance coverage gates, exact fields, security verification and production checks.
+See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, the verified
+attendance hierarchy, exact fields, security verification and production checks.

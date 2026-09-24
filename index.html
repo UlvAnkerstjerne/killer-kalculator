@@ -1621,6 +1621,7 @@ function salaryLabel(result, active = false) {
   }).format(new Date(result.cutoff)) : '';
   return (result.source === 'actual' ? (active ? 'Actual' : 'Approved actual')
     : result.source === 'scheduled' ? 'Scheduled estimate' : 'Estimated allocation') + time +
+    (result.warnings?.includes('SCHEDULED_HOURS_FALLBACK') ? ' · Includes scheduled-hour estimates' : '') +
     (result.warnings?.includes('SICK_LEAVE_WITHOUT_MONETARY_PAY') ? ' · Sick leave excluded: no payroll amount' : '');
 }
 function salaryCell(data, storeId = null) {

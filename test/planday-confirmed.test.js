@@ -22,9 +22,9 @@ test('regional allocation conserves complete salary including a newly verified o
   const { n, r } = calc(f); assert.equal(r.chain.cost, 500.01); assert.equal(n.reconciliation.outsideSalaryOre, 50000);
   assert.equal(n.reconciliation.allocatedSalaryOre, 100001);
 });
-test('active calendar month uses full scheduled denominator, even for a completed day', () => {
+test('active calendar month uses approved punches ahead of schedules in its denominator', () => {
   const f = confirmedFixture({ month: '2026-09' }); f.attendance[0].endDateTime = '2026-09-02T11:00:00';
-  const { r } = calc(f, { start: '2026-09-02', end: '2026-09-03' }); assert.equal(r.chain.cost, 500.01); assert.equal(r.chain.source, 'estimated');
+  const { r } = calc(f, { start: '2026-09-02', end: '2026-09-03' }); assert.equal(r.chain.cost, 200); assert.equal(r.chain.source, 'estimated');
   f.evaluatedAt = Date.parse('2026-10-01T01:00Z');
   const actual = calc(f, { start: '2026-09-02', end: '2026-09-03' }).r; assert.equal(actual.chain.cost, 200); assert.equal(actual.chain.source, 'actual');
 });
@@ -37,53 +37,51 @@ test('day with no qualifying hours is estimated zero, not uniform calendar accru
   const { r } = calc(confirmedFixture({ month: '2026-09' }), { start: '2026-09-04', end: '2026-09-05' });
   assert.equal(r.chain.cost, 0); assert.equal(r.chain.complete, true); assert.equal(r.stores.christianshavn.source, 'estimated');
 });
-test('completed month missing one Office clock record invalidates home allocation only', () => {
+test('completed month missing Office punches falls back and keeps the home allocation complete', () => {
   const f = confirmedFixture(); f.attendance.pop(); const { r } = calc(f);
-  assert.equal(r.stores.christianshavn.cost, null); assert.equal(r.stores.norrebro.cost, 0); assert.equal(r.chain.cost, null);
+  assert.equal(r.stores.christianshavn.cost, 1000.01); assert.equal(r.stores.norrebro.cost, 0); assert.equal(r.chain.cost, 1000.01); assert.equal(r.chain.estimated, true); assert.equal(r.chain.actualHours, 4); assert.equal(r.chain.scheduledFallbackHours, 4);
   assert.equal(r.coverage.attendanceMissing, 1); assert.equal(r.coverage.attendanceRequired, 2);
 });
-test('incomplete regional denominator invalidates each affected store and retains outside share', () => {
+test('regional denominator uses outside scheduled fallback without redistributing its cost', () => {
   const f = confirmedFixture({ kind: 'regional' }); f.attendance.pop(); const { r, n } = calc(f);
-  assert.equal(r.stores.christianshavn.cost, null); assert.equal(n.reconciliation.reconciledMonths, 0); assert.equal(r.chain.cost, null);
+  assert.equal(r.stores.christianshavn.cost, 500.01); assert.equal(n.reconciliation.reconciledMonths, 1); assert.equal(n.reconciliation.outsideSalaryOre, 50000); assert.equal(r.chain.estimated, true);
 });
 test('central salary is excluded and only clocked store work costs exactly 225 per hour', () => {
   const f = confirmedFixture({ kind: 'central' }); f.attendance[0].endDateTime = '2026-08-02T12:00:00';
   const { r, n } = calc(f); assert.equal(r.chain.cost, 450); assert.equal(r.stores.christianshavn.components.salaried, 0);
   assert.equal(n.reconciliation.excludedOverheadOre, 100001); assert.equal(r.coverage.attendanceRequired, 1);
 });
-test('central work without a punch never becomes scheduled work or a plausible zero', () => {
+test('central missing punches use supported scheduled hours at 225 per hour', () => {
   const f = confirmedFixture({ kind: 'central' }); f.attendance = []; const { r } = calc(f);
-  assert.equal(r.stores.christianshavn.cost, null); assert.ok(r.warnings.includes('ACTUAL_HOURS_MISSING'));
+  assert.equal(r.stores.christianshavn.cost, 900); assert.equal(r.chain.scheduledFallbackHours, 4); assert.equal(r.chain.scheduledFallbackShifts, 1); assert.equal(r.chain.estimated, true); assert.ok(!r.warnings.includes('ACTUAL_HOURS_MISSING'));
 });
 test('central outside work needs no clock record and costs zero', () => {
   const f = confirmedFixture({ kind: 'central' }); f.shifts[0].departmentId = 999; f.attendance = [];
   assert.equal(calc(f).r.chain.cost, 0);
 });
-test('attendance endpoint failure cannot assert central zero based only on outside schedules', () => {
+test('attendance endpoint failure does not charge excluded outside schedules', () => {
   const f = confirmedFixture({ kind: 'central' }); f.shifts[0].departmentId = 999; f.attendance = null;
-  assert.equal(calc(f).r.chain.cost, null);
+  assert.equal(calc(f).r.chain.cost, 0);
 });
 test('future central scheduled work is excluded without demanding future punches', () => {
   const f = confirmedFixture({ kind: 'central', month: '2026-09' }); f.attendance = [];
   const { r } = calc(f, { start: '2026-09-01', end: '2026-09-02' }); assert.equal(r.chain.cost, 0); assert.equal(r.coverage.attendanceRequired, 0);
 });
-test('central in-progress punch counts elapsed work, excluding an open recorded break', () => {
+test('central open punch uses scheduled fallback clipped to Copenhagen cutoff', () => {
   const f = confirmedFixture({ kind: 'central', month: '2026-09' }); f.evaluatedAt = Date.parse('2026-09-02T11:00Z');
   f.shifts[0].status = 'PunchclockStarted'; f.attendance[0].endDateTime = null; f.attendance[0].isApproved = false;
   f.attendanceBreaks.set(f.attendance[0].id, [{ startDateTime: '2026-09-02T11:30:00', endDateTime: null }]);
-  const { r } = calc(f, { end: '2026-09-03', cutoff: '2026-09-02T10:00:00Z' }); assert.equal(r.chain.cost, 337.5); assert.equal(r.chain.source, 'actual');
+  const { r } = calc(f, { end: '2026-09-03', cutoff: '2026-09-02T10:00:00Z' }); assert.equal(r.chain.cost, 450); assert.equal(r.chain.source, 'estimated'); assert.equal(r.chain.scheduledFallbackHours, 2);
 });
-test('stale unclosed central punch is incomplete, not unlimited elapsed work', () => {
+test('stale unclosed central punch uses only valid scheduled hours', () => {
   const f = confirmedFixture({ kind: 'central' }); f.attendance[0].endDateTime = null;
-  assert.equal(calc(f).r.chain.cost, null);
+  assert.equal(calc(f).r.chain.cost, 900);
 });
 test('recorded clock breaks reduce actual hour weights; no payroll duration substitution', () => {
   const f = confirmedFixture(); f.attendanceBreaks.set(f.attendance[0].id, [{ startDateTime: '2026-08-02T11:00:00', endDateTime: '2026-08-02T13:00:00' }]);
   assert.equal(calc(f, { start: '2026-08-02', end: '2026-08-03' }).r.chain.cost, 333.34);
 });
 for (const [name, change, code] of [
-  ['unapproved attendance', f => { f.attendance[0].isApproved = false; }, 'ATTENDANCE_UNAPPROVED'],
-  ['break fetch gap', f => { f.attendanceBreaks.delete(f.attendance[0].id); }, 'ATTENDANCE_BREAKS_UNAVAILABLE'],
   ['manual break semantics', f => { f.monthly[0].payroll.shiftsPayroll.push({ id: f.shifts[0].id, breaks: [{ duration: 1, amount: 0 }] }); }, 'UNVERIFIED_BREAK_OR_SUPPLEMENT'],
   ['mismatched punch department', f => { f.attendance[0].departmentId = 149700; }, 'ATTENDANCE_CONFLICT'],
   ['shift classification gap', f => { f.shiftDetails.delete(f.shifts[0].id); }, 'SHIFT_TYPE_UNAVAILABLE'],
@@ -93,11 +91,11 @@ for (const [name, change, code] of [
 });
 test('home Office overlap is unioned before day weights; it never doubles minutes', () => {
   const f = confirmedFixture({ month: '2026-09' }); f.shifts[1].date = f.shifts[0].date;
-  f.shifts[1].startDateTime = f.shifts[0].startDateTime; f.shifts[1].endDateTime = f.shifts[0].endDateTime;
+  f.shifts[1].startDateTime = f.shifts[0].startDateTime; f.shifts[1].endDateTime = f.shifts[0].endDateTime; f.attendance = [];
   const { r } = calc(f, { start: '2026-09-02', end: '2026-09-03' }); assert.equal(r.chain.cost, 1000.01);
 });
 test('regional cross-department overlap is incomplete instead of inventing shares', () => {
-  const f = confirmedFixture({ kind: 'regional', month: '2026-09' }); Object.assign(f.shifts[1], { date: f.shifts[0].date, startDateTime: f.shifts[0].startDateTime, endDateTime: f.shifts[0].endDateTime });
+  const f = confirmedFixture({ kind: 'regional', month: '2026-09' }); Object.assign(f.shifts[1], { date: f.shifts[0].date, startDateTime: f.shifts[0].startDateTime, endDateTime: f.shifts[0].endDateTime }); f.attendance = [];
   const { r } = calc(f); assert.equal(r.chain.cost, null); assert.ok(r.warnings.includes('OVERLAPPING_WORK'));
 });
 test('duplicate schedules and punch identities cannot double salary or hours', () => {
@@ -202,4 +200,71 @@ test('verified monetary sickness zero needs no invented wage and its exclusion w
   assert.equal(calc(f).r.chain.cost, 0);
   const absent = calc(absenceFixture()).r; assert.ok(absent.stores.norrebro.warnings.includes('SICK_LEAVE_WITHOUT_MONETARY_PAY'));
   assert.ok(!absent.stores.christianshavn.warnings.includes('SICK_LEAVE_WITHOUT_MONETARY_PAY'));
+});
+
+for (const [name, change] of [
+  ['unapproved', f => { f.attendance[0].isApproved = false; }],
+  ['open', f => { f.attendance[0].endDateTime = null; }],
+  ['missing start', f => { f.attendance[0].startDateTime = null; }],
+  ['missing break coverage', f => { f.attendanceBreaks.delete(f.attendance[0].id); }],
+  ['invalid punch duration', f => { f.attendance[0].endDateTime = f.attendance[0].startDateTime; }],
+]) test(name + ' punches use valid schedule, retain salary and disclose fallback provenance', () => {
+  const f = confirmedFixture(); change(f); const { r } = calc(f);
+  assert.equal(r.chain.cost, 1000.01); assert.equal(r.chain.complete, true);
+  assert.equal(r.chain.actualHours, 4); assert.equal(r.chain.scheduledFallbackHours, 4);
+  assert.equal(r.chain.scheduledFallbackShifts, 1); assert.equal(r.chain.estimated, true);
+  assert.equal(r.stores.christianshavn.source, 'estimated');
+});
+for (const status of ['Open', 'Draft', 'Cancelled', 'Deleted']) test(status + ' central schedule never supplies fallback hours', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.shifts[0].status = status; f.attendance = [];
+  const { r } = calc(f); assert.equal(r.chain.cost, 0); assert.equal(r.chain.scheduledFallbackHours, 0);
+});
+for (const change of [f => { f.shifts[0].startDateTime = null; }, f => { f.shifts[0].endDateTime = f.shifts[0].startDateTime; }, f => { f.shifts[0].status = 'fixture-invalid-status'; }, f => { f.shifts[0].date = '2026-08-01'; }]) test('neither usable punch nor trustworthy schedule still fails closed', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.attendance = []; change(f);
+  const { r } = calc(f); assert.equal(r.stores.christianshavn.cost, null); assert.ok(r.warnings.includes('ACTUAL_HOURS_MISSING'));
+});
+test('approved punches can supply working hours when scheduled timestamps are incomplete', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.shifts[0].startDateTime = null;
+  const { r } = calc(f); assert.equal(r.chain.cost, 900); assert.equal(r.chain.actualHours, 4); assert.equal(r.chain.scheduledFallbackHours, 0);
+});
+test('no future fallback contributes to active numerator or aggregate period hours', () => {
+  const f = confirmedFixture({ month: '2026-09' }); f.attendance = [];
+  const { r, n } = calc(f, { start: '2026-09-02', end: '2026-09-03', cutoff: '2026-09-02T10:00:00Z' });
+  assert.equal(r.chain.cost, 250); assert.equal(r.chain.actualHours, 0); assert.equal(r.chain.scheduledFallbackHours, 2);
+  assert.equal(r.chain.scheduledFallbackShifts, 1); assert.equal(n.reconciliation.allocatedSalaryOre, 100001);
+});
+for (const kind of ['central', 'home', 'regional']) test(kind + ' sickness and other verified absence schedules cannot become working-hour fallback', () => {
+  const f = confirmedFixture({ kind }); f.attendance = [];
+  f.absenceTypes = new Set(['fixture-sickness', 'fixture-other-absence']);
+  f.shiftDetails.set(f.shifts[0].id, { shiftTypeId: 'fixture-other-absence' });
+  const { r } = calc(f); assert.equal(r.chain.scheduledFallbackHours, kind === 'home' ? 4 : 0);
+  assert.equal(r.stores.christianshavn.components.hourly, 0);
+  f.shiftDetails.set(f.shifts[0].id, { shiftTypeId: 'fixture-sickness' });
+  const sick = calc(f).r; assert.equal(sick.stores.christianshavn.components.hourly, 0);
+  assert.ok(sick.warnings.includes('SICK_LEAVE_WITHOUT_MONETARY_PAY'));
+});
+test('duplicate schedule fallback never doubles hours, count or money', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.attendance = []; f.shifts.push(structuredClone(f.shifts[0]));
+  const { r } = calc(f); assert.equal(r.chain.cost, 900); assert.equal(r.chain.scheduledFallbackHours, 4); assert.equal(r.chain.scheduledFallbackShifts, 1);
+});
+for (const [field, value] of [['date', '2026-08-01'], ['timeZone', 'UTC'], ['shiftTypeId', 'fixture-sickness']]) test('conflicting duplicate schedule ' + field + ' cannot supply fallback', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.attendance = [];
+  f.shifts.push({ ...f.shifts[0], [field]: value });
+  const { r } = calc(f); assert.equal(r.stores.christianshavn.cost, null);
+  assert.ok(r.warnings.includes('CONFLICTING_DUPLICATE'));
+});
+test('ordinary hourly money remains authoritative while punch/fallback hours disclose provenance', () => {
+  const f = absenceFixture(), h = fixture(); f.payroll.shiftsPayroll = h.payroll.shiftsPayroll; f.approved.shiftsPayroll = h.approved.shiftsPayroll;
+  f.shiftDetails.set(f.shifts[0].id, { shiftTypeId: null });
+  const { r } = calc(f); assert.equal(r.chain.cost, 1200); assert.equal(r.chain.scheduledFallbackHours, 8); assert.equal(r.chain.estimated, true);
+});
+test('malformed incomplete punch falls back instead of failing cutoff selection', () => {
+  const f = confirmedFixture({ kind: 'central' }); f.attendance[0].startDateTime = 'fixture-invalid-time';
+  assert.equal(calc(f).r.chain.cost, 900);
+});
+test('approved overtime crossing a month boundary wins over a scheduled end before midnight', () => {
+  const f = confirmedFixture({ kind: 'central' });
+  Object.assign(f.shifts[0], { date: '2026-07-31', startDateTime: '2026-07-31T22:00:00', endDateTime: '2026-07-31T23:00:00' });
+  Object.assign(f.attendance[0], { startDateTime: '2026-07-31T22:00:00', endDateTime: '2026-08-01T01:00:00' });
+  const { r } = calc(f); assert.equal(r.chain.cost, 225); assert.equal(r.chain.actualHours, 1);
 });

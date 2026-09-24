@@ -118,7 +118,7 @@ test('public response uses an allowlist and drops employee information', () => {
   const r = p.processPayroll({ records: [record({ employeeId: 'fixture-sensitive', name: 'fixture-name', token: 'fixture-token' })], warnings: ['fixture-raw-error'] }, day);
   const json = JSON.stringify(r); for (const forbidden of ['employeeId', 'fixture-sensitive', 'fixture-name', 'fixture-token', 'fixture-raw-error']) assert.ok(!json.includes(forbidden));
   assert.deepEqual(Object.keys(r).sort(), ['chain', 'period', 'stores', 'warnings']);
-  assert.deepEqual(Object.keys(r.stores.norrebro).sort(), ['complete', 'components', 'cost', 'cutoff', 'source', 'warnings']);
+  assert.deepEqual(Object.keys(r.stores.norrebro).sort(), ['actualHours', 'complete', 'components', 'cost', 'cutoff', 'estimated', 'scheduledFallbackHours', 'scheduledFallbackShifts', 'source', 'warnings']);
 });
 test('invalid dates, reversed ranges, future cutoffs and excessive ranges rejected', () => {
   for (const args of [{ start: '2026-02-30', end: '2026-03-01' }, { start: '2026-03-01', end: '2026-03-01' }, { start: '2024-01-01', end: '2026-01-01' }, { start: '2026-09-22', end: '2026-09-23', cutoff: '2026-09-24T12:00:00Z' }]) assert.throws(() => p.period(args, Date.parse('2026-09-23T12:00:00Z')));
