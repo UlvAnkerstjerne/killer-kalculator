@@ -365,3 +365,115 @@ Rounded to 4 decimal places for display.
 | count = 2 lines                 | 22               |
 | count = 3 lines                 | 4                |
 | count < 0 lines (refunds)       | 0                |
+
+---
+
+## Salary cost and salary percentage
+
+Salary is an aggregate Planday Payroll calculation; wages have **no VAT adjustment**.
+
+`salary_pct = complete salary cost in DKK / corresponding revenue excluding VAT in DKK × 100`
+
+Dates are **Europe/Copenhagen**, with inclusive start and exclusive end. Current Today,
+Week and Month stop at the salary card's effective Copenhagen cutoff; historical periods
+use the full interval. Future scheduled work never enters the current salary percentage.
+The displayed **Revenue basis ex VAT** is filtered to exactly that same cutoff. It uses
+the earliest of the corresponding cached sales snapshots; the main revenue card keeps
+its existing refresh policy and can be newer. Missing cutoff timestamps invalidate the
+salary calculation instead of creating a mismatched denominator.
+
+The source labels are **Approved actual** (approved provider shift cost or completed
+clock-based salary allocation), **Actual** for supported live punch work, **Scheduled
+estimate** (unapproved provider shift cost), and **Estimated allocation** (clipped hourly
+work, active-month salary or daily signed adjustment allocation). A mixed result takes
+the least authoritative applicable source. None is silently substituted for another.
+
+For ordinary working hours, prefer complete approved punches (minus verified recorded
+breaks); otherwise use the corresponding valid assigned/approved working schedule.
+Missing, open, incomplete or unapproved punches alone do not make a result unavailable.
+Fallback requires a verified employee, department, Copenhagen date/start/end, positive
+interval, working status and consistent identity/duplicate/overlap evidence. Draft, Open,
+Cancelled, Deleted, unknown-status or unclassified-absence schedules cannot supply fallback.
+`ACTUAL_HOURS_MISSING` applies when neither source supplies usable hours. Actual overtime
+can extend beyond scheduled times or cross a month boundary.
+
+Each store and chain reports `actualHours`, `scheduledFallbackHours`,
+`scheduledFallbackShifts`, `calendarFallbackDays` and `estimated` as aggregates. Hours/counts cover selected work
+inside the requested period/cutoff. Home-manager Office hours follow the home allocation;
+regional outside hours stay outside chain hours. Fallback elsewhere in a monthly
+denominator can make a period estimated even when its own fallback-hour count is zero.
+The UI displays the supported percentage with “Includes scheduled-hour estimates”.
+Source-quality missing-punch coverage counts are not unavailable-contribution counts.
+
+Three central policies exclude monthly salaries and charge selected six-store work at
+the shared 225 DKK/hour rate. Both approved punches and valid schedule fallback qualify;
+outside work remains excluded. Current-day fallback and actual hours stop at the common
+Copenhagen cutoff; future shifts never enter the numerator.
+
+Monthly salary is fetched separately for each full calendar month. Two home policies
+assign the entire monthly salary to Christianshavn or Indre By, including Office-weighted
+days. The regional policy includes all verified departments in its denominator and keeps
+outside portions outside the chain. All manager monthly denominators use the same
+shift-by-shift punch-first/fallback hierarchy. An active month's future valid schedules
+may contribute to its denominator, never to the period numerator. Active and mixed months
+are estimated; completed mixed months remain supported. With reliable monthly hour weights,
+zero-hour dates accrue zero salary.
+
+The two home-store policies always allocate the complete authoritative monthly salary to
+their home stores. Hours are weights, never an hourly pay rate. If the month has no usable
+hours, or its hour coverage is demonstrably incomplete/unreliable, use equal calendar-day
+weights instead: `monthly salary / number of Copenhagen calendar days in the month`.
+This includes Saturdays, Sundays, leap days and both 23- and 25-hour DST dates equally.
+Missing/truncated monthly coverage, known unmatched Payroll/punch shifts, or unusable or
+conflicting working-hour evidence trigger this fallback. Sparse but fully covered usable
+hours do not. The monetary salary, policy identity and home-store mapping must remain verified.
+
+Calendar fallback includes only dates overlapping the requested period before its exclusive
+Copenhagen cutoff. Completed dates receive their complete daily share. The current date
+accrues `daily calendar share × elapsed seconds since Copenhagen midnight / total seconds
+between that date's Copenhagen midnights`. Its contribution is zero at midnight and reaches
+the full share at the following midnight. Spring DST dates use 82,800 seconds and autumn
+DST dates use 90,000 seconds; ordinary dates use 86,400. Future time never contributes.
+This apportions a monthly salary; it does not introduce an hourly wage rate. Round cumulative
+monthly accrual to integer øre at each requested instant and subtract the starting accrual.
+Assign the slice's rounding residual to its final included date; the final full-month slice
+therefore completes the exact monthly salary. Adjacent intraday requests remain additive.
+
+`calendarFallbackDays` counts included salary-allocation dates (a partially elapsed date
+counts once, exact midnight counts no new date); chain counts sum store
+counts (two home salaries covering a 31-day month contribute 62 allocation days). Calendar
+allocation creates no worked hours or fallback shifts. It is always estimated, with safe
+`CALENDAR_SALARY_FALLBACK` provenance and “Includes calendar-day salary estimates” in the UI.
+It never applies to the regional department-based policy or the three excluded central
+monthly salaries. Their department allocation and eligible 225 DKK/hour work remain unchanged.
+
+Chronological cumulative integer øre differences conserve the entire monthly salary
+across days and destinations, including outside shares. Same-store overlapping intervals
+are unioned; approved coverage takes precedence over overlapping fallback. Conflicting
+cross-department work and duplicate identities fail closed. Ordinary hourly money stays
+the authoritative Payroll amount, with existing verified partial-shift clipping: it is
+never multiplied by the newly reported hours. Signed adjustments remain counted once
+under their explicit elapsed-shift estimate.
+
+Sickness/absence never supplies ordinary fallback hours, central 225/hour work, or salary
+working-hour weights. Sickness counts only with monetary Payroll or matching Time & Cost.
+Schedule-only sickness contributes zero with a local nonblocking warning. Unknown types
+remain unclassified; unsupported monetary arithmetic, identity conflicts and genuinely
+missing usable coverage remain unavailable. Unknown new salaries require a policy rather
+than an inferred current department membership.
+
+A complete genuine zero is 0 DKK / 0% with positive revenue. Unavailable is null and
+`complete:false`. A chain result requires all six stores, sums their costs and aligned
+revenue, and never averages store percentages or drops a failed store. Nonpositive
+revenue produces no percentage. Money rounds at store-component øre boundaries;
+shared allocations conserve signed integer øre. Browser card/table currency formatting
+can round visually to DKK without changing percentage arithmetic.
+
+Cards, sidebar, store breakdown and salary graphs use one result and provenance model.
+Salary loads progressively and failure leaves other metrics intact. Successful payroll
+cache TTLs are at most 10 minutes within the active salary month / 6 hours for completed
+months; month transition forces reconciliation and failures are not cached
+as success. There is no flat 160 DKK/hour fallback and no employee-level browser output.
+
+See [Planday payroll audit](planday-payroll-audit.md) for live reconciliation, the verified
+attendance hierarchy, exact fields, security verification and production checks.

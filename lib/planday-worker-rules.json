@@ -1,0 +1,37 @@
+{
+  "keyCheck": "2db34ff54f0523c966c72a67086d1412269dba60a9119c43300728c32372b4a7",
+  "policies": [
+    {
+      "token": "5824be53b7ff96af7d5685416408e0b56a91537f5e74c9c7cbc53983da4dd180",
+      "kind": "central",
+      "from": "2000-01-01"
+    },
+    {
+      "token": "d8ed6d0de49fa0754324b165fe9555d913aa25625291e0ec4e6faffb8e329be9",
+      "kind": "central",
+      "from": "2026-01-01"
+    },
+    {
+      "token": "39aa9af41845e3538d8eaea2bf4bebe1900af0784412ce0fcaf9a7849f509dbc",
+      "kind": "central",
+      "from": "2026-02-01"
+    },
+    {
+      "token": "11521188cd01af6d450da68be0546a7a5bc2e968e6c27b6fd911cdbda0392c05",
+      "kind": "home",
+      "from": "2025-11-01",
+      "departmentId": 149748
+    },
+    {
+      "token": "520bb46d2fbc86be0af851d08cf3d49efc1c2b68212d1497b05f6725fe229b5d",
+      "kind": "regional",
+      "from": "2025-11-01"
+    },
+    {
+      "token": "30b0d38da6e28b3242ac27a5a233c3aab9eb2dc8100eeb63c9c71954dcf7a062",
+      "kind": "home",
+      "from": "2026-04-01",
+      "departmentId": 149668
+    }
+  ]
+}
