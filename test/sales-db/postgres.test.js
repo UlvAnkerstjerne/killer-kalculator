@@ -36,6 +36,11 @@ before(async () => {
   const { rows } = await db.query("SELECT current_setting('server_version') AS version, current_setting('server_version_num')::int AS number");
   assert.ok(rows[0].number >= 160000 && rows[0].number < 170000, 'PostgreSQL 16 required');
   console.log(`Real PostgreSQL integration server: ${rows[0].version}`);
+  if (process.env.CI) {
+    const logging = await db.query("SELECT current_setting('log_min_messages') AS messages, current_setting('log_min_error_statement') AS statements");
+    assert.equal(logging.rows[0].messages, 'panic');
+    assert.equal(logging.rows[0].statements, 'panic');
+  }
 });
 beforeEach(async () => {
   await db.query('DROP SCHEMA IF EXISTS sales_foundation CASCADE');
@@ -174,8 +179,8 @@ test('changed prior identity and missing old identities cannot silently reconcil
 });
 test('concurrent independent publications keep facts and coverage consistent', async () => {
   const other = createRepository(independent, context);
-  const results = await Promise.all([repository.publishCompletedRun(run()), other.publishCompletedRun(run())]);
-  assert.ok(results.every(result => result.published));
+  const results = await Promise.allSettled([repository.publishCompletedRun(run()), other.publishCompletedRun(run())]);
+  assert.ok(results.every(result => result.status === 'fulfilled' && result.value.published));
   assert.equal(await count('sales_line'), 1);
   assert.equal(await count('sales_sync_run'), 2);
   assert.equal((await repository.summary(request)).revenueExcl, '8');

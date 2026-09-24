@@ -9,6 +9,9 @@ jobs:
   postgres-foundation:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # Expected constraint failures must not write row/statement details to service logs.
+      PGOPTIONS: '-c log_min_messages=panic -c log_min_error_statement=panic'
     services:
       postgres:
         # Official postgres 16.15-bookworm, immutable multi-platform image digest.

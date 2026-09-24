@@ -151,7 +151,9 @@ regression/pure foundation suite, explicit migrations, then `npm run test:db`.
 Node is version 22; checkout/setup actions are pinned to commits. Permissions are
 only `contents: read`; checkout does not persist credentials. There are no secrets,
 deployment environments, packages/write grants, persistent mounts or uploads.
-All container data disappears with the hosted CI runner. Synthetic credentials
+Test-session `PGOPTIONS` suppress PostgreSQL error/statement logging so deliberate
+constraint failures do not put row details into service logs. The suite verifies
+these settings in CI. All container data disappears with the hosted CI runner. Synthetic credentials
 in this workflow are deliberately public and have no use outside that job.
 
 For an already available disposable local PostgreSQL 16, create only a throwaway
