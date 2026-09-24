@@ -112,7 +112,9 @@ test('distinct IDs preserve identical-looking purchases', async () => {
   assert.equal(result.lineCount, 2); assert.equal(result.revenueExcl, '16');
 });
 test('missing IDs and a mismatched provider store fail safely', () => {
-  assert.throws(() => normalizeLine(raw({ orderlineid: undefined }), { ...options, context }), { code: 'INVALID_LINE' });
+  for (const orderlineid of [undefined, null, '', '01', '-1', 'synthetic invalid id']) {
+    assert.throws(() => normalizeLine(raw({ orderlineid }), { ...options, context }), { code: 'INVALID_LINE', message: 'INVALID_LINE' });
+  }
   assert.throws(() => normalizeLine(raw({ firmaid: '54321' }), { ...options, context }), { code: 'STORE_MISMATCH' });
 });
 test('Copenhagen midnight, fallback, date-only, spring gap and autumn ambiguity remain explicit', () => {

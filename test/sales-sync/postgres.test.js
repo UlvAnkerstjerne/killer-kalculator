@@ -156,8 +156,115 @@ test('count greater than one never multiplies signed line totals', async () => {
   const result = await scan([[raw({ count: '3', price: '10.111', priceexclvat: '7.004' })]]);
   assert.equal(result.revenueIncl, '10.111'); assert.equal(result.revenueExcl, '7.004');
 });
-test('missing stable identity fails without coverage or facts', async () => {
-  await assert.rejects(scan([[raw({ orderlineid: null })]]), { code: 'INVALID_LINE' }); await noPublished();
+test('missing stable identity quarantines fresh coverage without publishing facts', async () => {
+  for (const orderlineid of [undefined, null]) {
+    await assert.rejects(scan([[raw({ orderlineid })]]), { code: 'INVALID_LINE' });
+    assert.equal((await state()).status, 'quarantined');
+    assert.equal((await state()).error_code, 'INVALID_LINE');
+    const coverage = await covered();
+    assert.equal(coverage.latestAttempt, 'quarantined');
+    assert.ok(coverage.days.every(day => day.status === 'conflict-quarantine' && day.lineCount === null));
+    await noPublished(); assert.equal(await count('sales_stage_line'), 0);
+  }
+});
+test('malformed stable identities quarantine the candidate rather than report never synchronized', async () => {
+  for (const orderlineid of ['', '01', '-1', 'synthetic invalid id']) {
+    await assert.rejects(scan([[raw({ orderlineid })]]), { code: 'INVALID_LINE' });
+    assert.equal((await state()).status, 'quarantined');
+    assert.ok((await covered()).days.every(day => day.status === 'conflict-quarantine'));
+    await noPublished(); assert.equal(await count('sales_stage_line'), 0);
+  }
+});
+test('an invalid identity after a staged valid page quarantines the whole mixed candidate', async () => {
+  let page = 0;
+  await assert.rejects(scan(undefined, { request: async () => {
+    if (++page === 1) return body([raw()], 1, initial + '?page=2');
+    assert.equal(await count('sales_stage_line'), 1);
+    return body([raw({ orderlineid: null })], 2);
+  } }), { code: 'INVALID_LINE' });
+  assert.equal(page, 2); assert.equal((await state()).status, 'quarantined');
+  assert.equal(await count('sales_stage_line'), 0); await noPublished();
+  assert.ok((await covered()).days.every(day => day.status === 'conflict-quarantine'));
+});
+test('identity quarantine preserves an existing published snapshot and its coverage', async () => {
+  await scan();
+  const priorFacts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  const priorDays = (await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows;
+  const priorCoverage = await covered();
+  await assert.rejects(scan([[raw({ price: '99' }), raw({ orderlineid: 'synthetic-new' })],
+    [raw({ orderlineid: null })]]), { code: 'INVALID_LINE' });
+  assert.equal((await state()).status, 'quarantined');
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, priorFacts);
+  assert.deepEqual((await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows, priorDays);
+  const coverage = await covered();
+  assert.equal(coverage.latestAttempt, 'quarantined'); assert.deepEqual(coverage.days, priorCoverage.days);
+  assert.equal(await count('sales_line'), 1); assert.equal(await count('sales_import_bucket'), 1);
+  assert.equal(await count('sales_stage_line'), 0);
+});
+test('repeated identity quarantine leaves no duplicate data state and failure finalization is idempotent', async () => {
+  const pages = [[raw()], [raw({ orderlineid: null })]];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(scan(pages), { code: 'INVALID_LINE' });
+    await noPublished(); assert.equal(await count('sales_stage_line'), 0);
+    assert.equal(await count('sales_import_discrepancy'), 0);
+    assert.ok((await covered()).days.every(day => day.status === 'conflict-quarantine'));
+  }
+  // Each page-one traversal keeps its own audit run, never duplicate facts or
+  // coverage. Re-finalizing the same run must not create another audit record.
+  const attempts = (await db.query('SELECT run_id, status, error_code FROM sales_foundation.sales_import_scan ORDER BY run_id')).rows;
+  assert.equal(attempts.length, 2); assert.notEqual(attempts[0].run_id, attempts[1].run_id);
+  assert.ok(attempts.every(row => row.status === 'quarantined' && row.error_code === 'INVALID_LINE'));
+  await withImportOwner(config, async session => {
+    const repo = createImportRepository(session, context), run = { id: attempts[0].run_id };
+    await repo.failed(run, 'INVALID_LINE'); await repo.failed(run, 'INVALID_LINE');
+  });
+  assert.deepEqual((await db.query('SELECT run_id, status, error_code FROM sales_foundation.sales_import_scan ORDER BY run_id')).rows, attempts);
+  await noPublished(); assert.equal(await count('sales_stage_line'), 0);
+});
+test('a clean retry after identity quarantine publishes and independently verifies normally', async () => {
+  await assert.rejects(scan([[raw({ orderlineid: null })]]), { code: 'INVALID_LINE' });
+  const rejectedId = (await db.query('SELECT run_id FROM sales_foundation.sales_import_scan')).rows[0].run_id;
+  await assert.rejects(scan(undefined, { options: { ...options, verificationOf: rejectedId } }), { code: 'INVALID_RUN' });
+  await noPublished();
+  const clean = await scan();
+  assert.equal(clean.status, 'published'); assert.equal(clean.verified, false);
+  assert.ok((await covered()).days.every(day => day.status === 'complete-single-pass'));
+  const verified = await scan(undefined, { options: { ...options, verificationOf: clean.runId } });
+  assert.equal(verified.status, 'published'); assert.equal(verified.verified, true);
+  const coverage = await covered(); assert.equal(coverage.latestAttempt, 'published');
+  assert.ok(coverage.days.every(day => day.status === (day.date === '2025-01-10' ? 'independently-verified' : 'verified-empty')));
+  assert.equal(await count('sales_line'), 1); assert.equal(await count('sales_stage_line'), 0);
+  assert.equal((await db.query('SELECT status FROM sales_foundation.sales_import_scan WHERE run_id = $1', [rejectedId])).rows[0].status, 'quarantined');
+});
+test('provider failures stay operational failures rather than data quarantine', async () => {
+  for (const failure of [new Error(CANARY), new ImportError('UPSTREAM_RATE_LIMIT')]) {
+    await assert.rejects(scan(undefined, { request: async () => { throw failure; } }),
+      { code: failure.code || 'UPSTREAM_FAILED' });
+    assert.equal((await state()).status, 'failed');
+    assert.equal((await covered()).latestAttempt, 'failed');
+    await noPublished(); assert.equal(await count('sales_stage_line'), 0);
+  }
+});
+test('identity quarantine retains only safe metadata and fixed errors without private identifiers or payloads', async () => {
+  const reports = [], invalidId = CANARY + ' invalid', validId = 'synthetic-private-source-id';
+  const candidate = raw({ orderlineid: invalidId, customer: CANARY, credentials: CANARY, rawResponse: CANARY });
+  await assert.rejects(scan([[raw({ orderlineid: validId })], [candidate]], { report: value => reports.push(value) }), error => {
+    assert.equal(error.code, 'INVALID_LINE'); assert.equal(error.message, 'INVALID_LINE');
+    assert.ok(!String(error.stack).includes(CANARY)); assert.ok(!JSON.stringify(error).includes(CANARY));
+    return true;
+  });
+  assert.equal((await state()).status, 'quarantined');
+  for (const table of ['sales_line', 'sales_stage_line', 'sales_sync_run', 'sales_day_state', 'sales_import_scan',
+    'sales_import_day', 'sales_import_bucket', 'sales_import_discrepancy', 'identity_key_check']) {
+    const result = await db.query(`SELECT coalesce(bool_or(row_to_json(t)::text LIKE $1 OR row_to_json(t)::text LIKE $2), false) AS leaked
+      FROM sales_foundation.${table} t`, ['%' + CANARY + '%', '%' + validId + '%']);
+    assert.equal(result.rows[0].leaked, false, 'quarantine metadata privacy scan');
+  }
+  const serialized = JSON.stringify(reports);
+  assert.ok(!serialized.includes(CANARY) && !serialized.includes(validId), 'quarantine report privacy scan');
+  assert.ok(!serialized.includes(context.identity.protect(options.storeSlug, validId).toString('hex')), 'protected identity report scan');
+  assert.ok(!reports.some(row => row.status === 'published'));
+  await noPublished(); assert.equal(await count('sales_stage_line'), 0);
 });
 test('same-ID identical replay deduplicates and repeated publications do not rewrite facts', async () => {
   await scan([[raw(), raw({ customer: CANARY })]]);
