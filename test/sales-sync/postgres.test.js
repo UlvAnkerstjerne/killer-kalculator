@@ -61,12 +61,36 @@ test('reviewed spaced payment codes stage, publish and independently verify with
   const pages = [[raw({ paymenttypecode: 'mixed 1' })]];
   const first = await scan(pages, { context: ctx });
   assert.equal(first.status, 'published'); assert.equal(first.verified, false);
+  const factBefore = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  const coverageBefore = (await db.query('SELECT published_run, source_observed_at FROM sales_foundation.sales_day_state')).rows;
+  const bucketsBefore = await count('sales_import_bucket');
+  await db.query(`CREATE FUNCTION sales_foundation.forbid_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'verification attempted fact mutation'; END $$;
+    CREATE TRIGGER forbid_fact_mutation BEFORE INSERT OR UPDATE OR DELETE ON sales_foundation.sales_line
+      FOR EACH STATEMENT EXECUTE FUNCTION sales_foundation.forbid_fact_mutation()`);
   const second = await scan(pages, { context: ctx, options: { ...options, verificationOf: first.runId } });
-  assert.equal(second.status, 'published'); assert.equal(second.verified, true);
+  assert.equal(second.status, 'verified'); assert.equal(second.verified, true);
   assert.equal(await count('sales_line'), 1); assert.equal(await count('sales_stage_line'), 0);
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, factBefore);
+  assert.deepEqual((await db.query('SELECT published_run, source_observed_at FROM sales_foundation.sales_day_state')).rows, coverageBefore);
+  assert.equal(await count('sales_import_bucket'), bucketsBefore, 'verification must not create publication buckets');
   assert.equal(await count('sales_import_discrepancy'), 0);
   assert.equal((await db.query('SELECT payment_code FROM sales_foundation.sales_line')).rows[0].payment_code, 'mixed 1');
   assert.ok((await covered()).days.every(day => day.status === 'independently-verified' || day.status === 'verified-empty'));
+  const verificationAudit = (await db.query(`SELECT i.status, i.verified, i.verification_of,
+    r.store_id, r.start_date::text, r.end_date::text, r.observed_at
+    FROM sales_foundation.sales_import_scan i JOIN sales_foundation.sales_sync_run r USING (run_id, store_id)
+    WHERE i.run_id = $1`, [second.runId])).rows[0];
+  assert.deepEqual({ status: verificationAudit.status, verified: verificationAudit.verified,
+    verificationOf: verificationAudit.verification_of },
+  { status: 'published', verified: true, verificationOf: first.runId });
+  const auditCount = (await db.query('SELECT count(*)::int AS count FROM sales_foundation.sales_import_scan')).rows[0].count;
+  await withImportOwner(config, session => createImportRepository(session, ctx).verify({
+    id: second.runId, store: verificationAudit.store_id, start: verificationAudit.start_date,
+    end: verificationAudit.end_date, observedAt: verificationAudit.observed_at.toISOString(), verificationOf: first.runId,
+  }));
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM sales_foundation.sales_import_scan')).rows[0].count, auditCount,
+    'metadata finalization is idempotent');
 });
 test('later older in-range dates survive newer pages and logical filtering happens after termination', async () => {
   const pages = [[raw({ orderlineid: 'synthetic-newer', timestamp_pay: '2025-02-20 12:00:00' })],
@@ -246,7 +270,7 @@ test('a clean retry after identity quarantine publishes and independently verifi
   assert.equal(clean.status, 'published'); assert.equal(clean.verified, false);
   assert.ok((await covered()).days.every(day => day.status === 'complete-single-pass'));
   const verified = await scan(undefined, { options: { ...options, verificationOf: clean.runId } });
-  assert.equal(verified.status, 'published'); assert.equal(verified.verified, true);
+  assert.equal(verified.status, 'verified'); assert.equal(verified.verified, true);
   const coverage = await covered(); assert.equal(coverage.latestAttempt, 'published');
   assert.ok(coverage.days.every(day => day.status === (day.date === '2025-01-10' ? 'independently-verified' : 'verified-empty')));
   assert.equal(await count('sales_line'), 1); assert.equal(await count('sales_stage_line'), 0);
@@ -338,7 +362,7 @@ test('independent verification matches sorted content despite page order and pri
   const a = raw(), b = raw({ orderlineid: 'synthetic-two' });
   const first = await scan([[a], [b]]);
   const second = await scan([[{ ...b, customer: CANARY }, a]], { options: { ...options, verificationOf: first.runId } });
-  assert.equal(second.verified, true);
+  assert.equal(second.status, 'verified'); assert.equal(second.verified, true);
   assert.equal((await covered()).days.find(day => day.date === '2025-01-10').status, 'independently-verified');
 });
 test('independent verification detects an added zero-value identity despite unchanged revenue', async () => {
