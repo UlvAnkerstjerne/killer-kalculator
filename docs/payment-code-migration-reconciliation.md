@@ -30,6 +30,16 @@ transaction and advisory lock apply unchanged. A second migration apply is a
 ledger-verified no-op. Tests also upgrade a populated 001–002 schema and compare
 facts, staging and coverage before and after.
 
+The metadata-only schema comparison also requires fresh and upgraded 001–003
+schemas to match, limits the 003 upgrade diff to the two payment-code checks, and
+checks that repeated migration application causes no schema drift. A negative
+test adds an untracked column without changing the ledger and detects the drift.
+The comparison covers relations, columns, constraints, indexes, types, triggers,
+routines, rules, policies and sequences in `sales_foundation`; ownership/ACLs and
+objects outside that schema require a separate operational audit. These synthetic
+tests do not establish the current live production schema. A fresh read-only
+production comparison remains required before claiming there is no other drift.
+
 ## Recovered provenance
 
 The earlier source worktree `/tmp/kk2-canary` was created from main

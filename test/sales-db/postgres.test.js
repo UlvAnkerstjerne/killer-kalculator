@@ -11,6 +11,7 @@ const { createIdentity } = require('../../lib/sales-db/identity');
 const { createSafeLine, createReviewedCatalog } = require('../../lib/sales-db/facts');
 const { computeMetrics } = require('../../lib/product-metrics');
 const { context, line, run, request } = require('./helpers');
+const { schemaSnapshot } = require('./schema-snapshot');
 
 // Destructive schema resets are allowed ONLY on this explicit disposable target.
 // No fallback to production DATABASE_URL, no skipped/mock integration suite.
@@ -63,6 +64,7 @@ test('repeated migrations are an exact no-op', async () => {
   assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, before);
 });
 test('migration 003 widens only payment-code validation and preserves existing facts and staging', async () => {
+  const freshSchema = await schemaSnapshot(db);
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-migration-upgrade-'));
   try {
     for (const name of ['001_foundation.sql', '002_backfill.sql']) {
@@ -78,13 +80,24 @@ test('migration 003 widens only payment-code validation and preserves existing f
       coverage: (await db.query('SELECT * FROM sales_foundation.sales_day_state')).rows,
     });
     const before = await snapshot();
+    const schemaBefore = await schemaSnapshot(db);
     for (const table of ['sales_line', 'sales_stage_line']) {
       await rejected(db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, ['mixed 1']));
     }
     assert.deepEqual(await migrate(db), { applied: 1, total: 3 });
     assert.deepEqual(await snapshot(), before);
+    const upgradedSchema = await schemaSnapshot(db);
+    assert.deepEqual(upgradedSchema, freshSchema, 'fresh and upgraded schemas must match');
+    const paymentCheck = row => ['sales_line', 'sales_stage_line'].includes(row.relname) &&
+      row.contype === 'c' && row.definition.startsWith('CHECK ((payment_code ~ ');
+    assert.equal(schemaBefore.constraints.filter(paymentCheck).length, 2);
+    assert.equal(upgradedSchema.constraints.filter(paymentCheck).length, 2);
+    assert.deepEqual({ ...upgradedSchema, constraints: upgradedSchema.constraints.filter(row => !paymentCheck(row)) },
+      { ...schemaBefore, constraints: schemaBefore.constraints.filter(row => !paymentCheck(row)) },
+      'migration 003 must change only the two payment-code checks');
     assert.deepEqual(await migrate(db), { applied: 0, total: 3 });
     assert.deepEqual(await snapshot(), before);
+    assert.deepEqual(await schemaSnapshot(db), upgradedSchema, 'repeated migrations must not drift');
     for (const table of ['sales_line', 'sales_stage_line']) {
       await db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, ['mixed 1']);
       assert.equal((await db.query(`SELECT payment_code FROM sales_foundation.${table}`)).rows[0].payment_code, 'mixed 1');
@@ -93,6 +106,13 @@ test('migration 003 widens only payment-code validation and preserves existing f
       }
     }
   } finally { await fs.rm(temp, { recursive: true }); }
+});
+test('schema comparison detects untracked changes even when the migration ledger is unchanged', async () => {
+  const baseline = await schemaSnapshot(db);
+  const ledger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+  await db.query('ALTER TABLE sales_foundation.sales_line ADD COLUMN synthetic_drift text');
+  assert.notDeepEqual(await schemaSnapshot(db), baseline);
+  assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, ledger);
 });
 test('reviewed spaced payment codes round-trip through foundation publication unchanged', async () => {
   const ctx = { identity: context.identity, catalog: createReviewedCatalog({
