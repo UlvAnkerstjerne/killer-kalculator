@@ -363,6 +363,46 @@ aggregate totals only. No protected identity, fingerprint or free text is logged
 Exit is nonzero on invalid/incomplete scans; only fully completed publication
 emits `published`. `validated-only` never claims publication or independent proof.
 
+### Read-only catalogue diagnostic
+
+`--diagnose-catalog` is an explicit diagnostic mode, mutually exclusive with
+`--apply`, `--dry-run`, `--validate`, `--verify-run` and `--resume-publication`:
+
+```sh
+node scripts/sales-backfill.js --store '<internal-store>' --from '<YYYY-MM-DD>' \
+  --through '<exclusive-YYYY-MM-DD>' --catalog '<reviewed-catalog-path>' --diagnose-catalog
+```
+
+It uses the existing bounded, lossless production traversal and normalizer,
+including genuine terminal pagination, declared totals, Copenhagen timestamp
+validation, protected identity derivation and exact decimals. It performs no
+database connection, writes, staging, publication, verification or quarantine.
+Raw rows and temporary normalized batches remain in memory only. It does not
+retry failed requests or exit early when a later date appears.
+
+Only after terminal validation, the output contains pages, provider-row count,
+affected-row count (`reviewCount`, counted once per provider row), and
+fixed category counts for `before`, `inside` or `after` the requested interval.
+The start is inclusive and the end exclusive. Categories are `product` (the
+whole product/group tuple), `payment-type` (an unknown payment label), and
+`payment-type-code` (an unreviewed code paired with a known payment label).
+One row can contribute to multiple field categories. A code paired with an
+unknown label is reported as `payment-type`; no equivalent mapping is inferred.
+No candidate value, identity, protected digest, exact candidate date, private
+field or per-candidate amount is emitted. Malformed rows fail closed, and an
+incomplete scan emits no successful diagnostic report. The normal date-only
+source contract remains valid with explicitly missing time; absent or invalid
+primary/fallback dates are rejected, including Copenhagen spring DST gaps.
+
+`catalog-diagnostic` and `verified: false` mean only that the diagnostic finished.
+They do not approve a mapping, establish provider/database agreement or permit
+publication. The existing import path still validates the catalogue before
+range filtering, so an out-of-range unknown still fails ordinary validation.
+The diagnostic supplies evidence for a separately reviewed correction; it does
+not move that filter or change the trusted catalogue. Operational identity-key,
+database, deployed-version and scope preflight remains required before a live
+diagnostic; this read-only mode does not establish those prerequisites itself.
+
 ### Stage 2 verification
 
 The existing pinned PostgreSQL 16.15 workflow retains `contents: read` only,
