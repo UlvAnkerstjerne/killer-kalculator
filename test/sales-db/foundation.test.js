@@ -4,10 +4,41 @@ const assert = require('node:assert/strict');
 const { readConfig } = require('../../lib/sales-db/config');
 const { createDatabase } = require('../../lib/sales-db/database');
 const { createIdentity } = require('../../lib/sales-db/identity');
-const { createSafeLine, validateSafeLine, publicLine } = require('../../lib/sales-db/facts');
-const { decimal, date, range, saleTime } = require('../../lib/sales-db/values');
+const { createReviewedCatalog, createSafeLine, validateSafeLine, publicLine } = require('../../lib/sales-db/facts');
+const { decimal, date, range, saleTime, identifier, paymentCode } = require('../../lib/sales-db/values');
 const { sanitized } = require('../../lib/sales-db/errors');
 const { identity, context, input, line } = require('./helpers');
+
+test('immutable migration files match the recovered production checksums', () => {
+  const { readFileSync } = require('node:fs');
+  const { createHash } = require('node:crypto');
+  const path = require('node:path');
+  for (const expected of require('./migration-checksums.json')) {
+    const bytes = readFileSync(path.join(__dirname, '../../migrations/sales-db', expected.version));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), expected.checksum);
+  }
+});
+test('payment codes preserve reviewed ASCII spaces without widening product identifiers', () => {
+  for (const value of ['mixed 1', ' mixed  1 ', 'A_b-9', 'x'.repeat(64)]) assert.equal(paymentCode(value), value);
+  assert.throws(() => identifier('mixed 1'), { code: 'INVALID_INPUT' });
+  for (const value of ['', 'x'.repeat(65), 'mixed\t1', 'mixed\n1', 'mixed\u00a01', 'mixed/1', 'mixed\0', null, 1]) {
+    assert.throws(() => paymentCode(value), { code: 'INVALID_INPUT' });
+  }
+});
+test('spaced payment codes still require exact reviewed catalog membership', () => {
+  const product = input();
+  const catalog = createReviewedCatalog({
+    products: [{ storeSlug: product.storeSlug, productId: product.productId, productLabel: product.productLabel,
+      groupId: product.groupId, groupLabel: product.groupLabel }],
+    payments: [{ paymentType: product.paymentType, paymentCode: 'mixed 1' }],
+  });
+  const ctx = { identity, catalog };
+  const safe = line({ paymentCode: 'mixed 1' }, ctx);
+  assert.equal(publicLine(safe, ctx).paymentCode, 'mixed 1');
+  for (const value of ['mixed 2', 'mixed  1', ' mixed 1', 'mixed 1 ']) {
+    assert.throws(() => line({ paymentCode: value }, ctx), { code: 'UNREVIEWED_CATALOG' });
+  }
+});
 
 test('database defaults disabled and ignores unrelated/invalid URL when disabled', () => {
   assert.deepEqual(readConfig({ KK_SALES_DB_URL: 'invalid' }), { enabled: false });

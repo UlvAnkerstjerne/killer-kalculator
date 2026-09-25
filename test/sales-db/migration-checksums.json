@@ -1,0 +1,5 @@
+[
+  {"version":"001_foundation.sql","checksum":"463437d63400011ee46a6f630f2b402aeba17301696b849c19d29b6db3b34062"},
+  {"version":"002_backfill.sql","checksum":"dc4dfca9530d920d07599fbc0b12540024aadc09e4034bdef43ed60402b30d23"},
+  {"version":"003_payment_code_spaces.sql","checksum":"7c8d9a9a17b74d7140b00b667641982013e6d67c8bb04cfceea14db33a6e4f96"}
+]

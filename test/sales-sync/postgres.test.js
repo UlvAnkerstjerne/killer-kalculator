@@ -52,6 +52,22 @@ test('real multi-page terminal traversal publishes complete single-pass coverage
   assert.equal((await state()).terminal, true); assert.equal(await count('sales_stage_line'), 0);
   const coverage = await covered(); assert.ok(coverage.days.every(day => day.status === 'complete-single-pass'));
 });
+test('reviewed spaced payment codes stage, publish and independently verify without duplicate facts', async () => {
+  const ctx = { identity: context.identity, catalog: createReviewedCatalog({
+    products: [{ storeSlug: 'norrebro', productId: 'synthetic-product', productLabel: 'Synthetic product',
+      groupId: 'synthetic-group', groupLabel: 'Synthetic group' }],
+    payments: [{ paymentType: 'Synthetic payment', paymentCode: 'mixed 1' }],
+  }) };
+  const pages = [[raw({ paymenttypecode: 'mixed 1' })]];
+  const first = await scan(pages, { context: ctx });
+  assert.equal(first.status, 'published'); assert.equal(first.verified, false);
+  const second = await scan(pages, { context: ctx, options: { ...options, verificationOf: first.runId } });
+  assert.equal(second.status, 'published'); assert.equal(second.verified, true);
+  assert.equal(await count('sales_line'), 1); assert.equal(await count('sales_stage_line'), 0);
+  assert.equal(await count('sales_import_discrepancy'), 0);
+  assert.equal((await db.query('SELECT payment_code FROM sales_foundation.sales_line')).rows[0].payment_code, 'mixed 1');
+  assert.ok((await covered()).days.every(day => day.status === 'independently-verified' || day.status === 'verified-empty'));
+});
 test('later older in-range dates survive newer pages and logical filtering happens after termination', async () => {
   const pages = [[raw({ orderlineid: 'synthetic-newer', timestamp_pay: '2025-02-20 12:00:00' })],
     [raw({ orderlineid: 'synthetic-older', timestamp_pay: '2025-01-01 00:00:00' })]];
