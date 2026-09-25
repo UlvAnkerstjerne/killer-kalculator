@@ -51,19 +51,65 @@ after(async () => {
   assert.equal(db.health().total, 0); assert.equal(independent.health().total, 0);
 });
 
-test('empty bootstrap creates six stores and two checksum-ledger entries', async () => {
+test('empty bootstrap creates six stores and three exact checksum-ledger entries', async () => {
   assert.equal(await count('sales_store'), 6);
-  assert.equal(await count('schema_migration'), 2);
+  assert.deepEqual((await db.query('SELECT version, checksum FROM sales_foundation.schema_migration ORDER BY version')).rows,
+    require('./migration-checksums.json'));
   for (const table of ['sales_line', 'sales_stage_line', 'sales_day_state', 'sales_sync_run', 'identity_key_check']) assert.equal(await count(table), 0);
 });
 test('repeated migrations are an exact no-op', async () => {
-  assert.deepEqual(await migrate(db), { applied: 0, total: 2 });
-  assert.equal(await count('schema_migration'), 2);
+  const before = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+  assert.deepEqual(await migrate(db), { applied: 0, total: 3 });
+  assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, before);
+});
+test('migration 003 widens only payment-code validation and preserves existing facts and staging', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-migration-upgrade-'));
+  try {
+    for (const name of ['001_foundation.sql', '002_backfill.sql']) {
+      await fs.copyFile(path.join(migrationDir, name), path.join(temp, name));
+    }
+    await db.query('DROP SCHEMA sales_foundation CASCADE');
+    assert.deepEqual(await migrate(db, temp), { applied: 2, total: 2 });
+    const published = run(); await repository.publishCompletedRun(published);
+    await db.query('INSERT INTO sales_foundation.sales_stage_line SELECT l.*, $1::uuid, 1, 0 FROM sales_foundation.sales_line l', [published.runId]);
+    const snapshot = async () => ({
+      facts: (await db.query('SELECT * FROM sales_foundation.sales_line')).rows,
+      staging: (await db.query('SELECT * FROM sales_foundation.sales_stage_line')).rows,
+      coverage: (await db.query('SELECT * FROM sales_foundation.sales_day_state')).rows,
+    });
+    const before = await snapshot();
+    for (const table of ['sales_line', 'sales_stage_line']) {
+      await rejected(db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, ['mixed 1']));
+    }
+    assert.deepEqual(await migrate(db), { applied: 1, total: 3 });
+    assert.deepEqual(await snapshot(), before);
+    assert.deepEqual(await migrate(db), { applied: 0, total: 3 });
+    assert.deepEqual(await snapshot(), before);
+    for (const table of ['sales_line', 'sales_stage_line']) {
+      await db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, ['mixed 1']);
+      assert.equal((await db.query(`SELECT payment_code FROM sales_foundation.${table}`)).rows[0].payment_code, 'mixed 1');
+      for (const invalid of ['', 'x'.repeat(65), 'mixed\t1', 'mixed\n1', 'mixed/1', 'mixed\u00a01']) {
+        await rejected(db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, [invalid]));
+      }
+    }
+  } finally { await fs.rm(temp, { recursive: true }); }
+});
+test('reviewed spaced payment codes round-trip through foundation publication unchanged', async () => {
+  const ctx = { identity: context.identity, catalog: createReviewedCatalog({
+    products: [{ storeSlug: 'norrebro', productId: 'synthetic-product', productLabel: 'Synthetic product',
+      groupId: 'synthetic-group', groupLabel: 'Synthetic group' }],
+    payments: [{ paymentType: 'Synthetic payment', paymentCode: 'mixed 1' }],
+  }) };
+  const repo = createRepository(db, ctx);
+  await repo.publishCompletedRun(run([line({ paymentCode: 'mixed 1' }, ctx)]));
+  const saved = (await repo.lines(request)).lines;
+  assert.equal(saved.length, 1); assert.equal(saved[0].paymentCode, 'mixed 1');
+  assert.equal(saved[0].revenueExcl, '8');
 });
 test('concurrent independent migration sessions serialize empty bootstrap', async () => {
   await db.query('DROP SCHEMA sales_foundation CASCADE');
   const results = await Promise.all([migrate(db), migrate(independent)]);
-  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 2);
+  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 3);
   assert.equal(await count('sales_store'), 6);
 });
 test('migration runner waits on the real advisory lock and releases it at commit', async () => {
@@ -97,7 +143,7 @@ test('changed applied migration checksum fails closed', async () => {
     const name = '001_foundation.sql';
     await fs.writeFile(path.join(temp, name), await fs.readFile(path.join(migrationDir, name), 'utf8') + '\n-- changed\n');
     await assert.rejects(migrate(db, temp), { code: 'MIGRATION_MISMATCH' });
-    assert.equal(await count('schema_migration'), 2);
+    assert.equal(await count('schema_migration'), 3);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('failed migration rolls back schema and ledger and frees migration lock', async () => {
@@ -107,7 +153,7 @@ test('failed migration rolls back schema and ledger and frees migration lock', a
     await fs.writeFile(path.join(temp, '001_failure.sql'), 'CREATE TABLE sales_foundation.transient (id int); SELECT missing_synthetic_function();');
     await rejected(migrate(db, temp));
     assert.equal((await db.query("SELECT to_regnamespace('sales_foundation') IS NULL AS absent")).rows[0].absent, true);
-    assert.equal((await migrate(independent)).applied, 2);
+    assert.equal((await migrate(independent)).applied, 3);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('PK, FK, typed state, bounds and fact check constraints are enforced', async () => {
