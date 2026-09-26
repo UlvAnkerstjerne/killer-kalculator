@@ -5,6 +5,8 @@ const { parseLossless } = require('../../lib/sales-sync/parse');
 const { traverse } = require('../../lib/sales-sync/traverse');
 const { normalizeLine } = require('../../lib/sales-sync/normalize');
 const { importHistory, safeReport } = require('../../lib/sales-sync/importer');
+const { diagnoseCatalog } = require('../../lib/sales-sync/diagnostic');
+const { ImportError } = require('../../lib/sales-sync/errors');
 const { units, amount, months } = require('../../lib/sales-sync/checksums');
 const { parseArgs, main } = require('../../scripts/sales-backfill');
 const { createHttpRequest } = require('../../lib/sales-sync/http');
@@ -180,4 +182,105 @@ for (const [status, bytes, limit, code] of [[429, Buffer.from(CANARY), 100, 'UPS
 test('month buckets cover leap/month/year boundaries exactly once', () => {
   assert.deepEqual(months('2024-02-28', '2024-03-02'), [{ start: '2024-02-28', end: '2024-03-01' }, { start: '2024-03-01', end: '2024-03-02' }]);
   assert.deepEqual(months('2024-12-31', '2025-01-02'), [{ start: '2024-12-31', end: '2025-01-01' }, { start: '2025-01-01', end: '2025-01-02' }]);
+});
+
+const diagnose = (pages, extra = {}) => diagnoseCatalog({ context, options, request: provider(pages).request, ...extra });
+test('diagnostic classifies review fields across inclusive-start/exclusive-end boundaries without early exit', async () => {
+  const mock = provider([
+    [raw({ timestamp_pay: end + ' 00:00:00', productname: CANARY })],
+    [raw({ timestamp_pay: '2024-12-31 23:59:59', paymenttype: CANARY }),
+      raw({ timestamp_pay: start + ' 00:00:00', paymenttypecode: CANARY }),
+      raw({ productgroup: CANARY, paymenttypecode: CANARY })],
+  ]);
+  const result = await diagnose(undefined, { request: mock.request });
+  assert.equal(mock.calls.length, 2); assert.equal(result.terminal, true);
+  assert.equal(result.pages, 2); assert.equal(result.rows, 4); assert.equal(result.reviewCount, 4);
+  assert.deepEqual(result.reviews, [
+    { interval: 'before', field: 'payment-type', affectedRows: 1 },
+    { interval: 'inside', field: 'product', affectedRows: 1 },
+    { interval: 'inside', field: 'payment-type-code', affectedRows: 2 },
+    { interval: 'after', field: 'product', affectedRows: 1 },
+  ]);
+  assert.equal(result.verified, false); assert.equal(result.status, 'catalog-diagnostic');
+});
+test('synthetic 2351-row reproduction diagnoses a late unknown without changing importer rejection', async () => {
+  const rows = Array.from({ length: 2350 }, (_, i) => raw({ orderlineid: 'synthetic-' + i }));
+  rows.push(raw({ orderlineid: 'synthetic-unknown', timestamp_pay: end + ' 12:00:00', productname: CANARY }));
+  const result = await diagnose([rows]);
+  assert.equal(result.pages, 1); assert.equal(result.rows, 2351); assert.equal(result.reviewCount, 1);
+  assert.deepEqual(result.reviews, [{ interval: 'after', field: 'product', affectedRows: 1 }]);
+  await assert.rejects(importHistory({ config, context, options, request: provider([rows]).request }), { code: 'CATALOG_REVIEW' });
+});
+test('diagnostic returns no values, identities, protected hashes or private payload fields', async () => {
+  const item = raw({ orderlineid: CANARY, productname: CANARY, paymenttype: CANARY,
+    customer: CANARY, card: CANARY, clerk: CANARY, headers: { token: CANARY } });
+  const result = await diagnose([[item]]), text = JSON.stringify(result);
+  assert.ok(!text.includes(CANARY), 'diagnostic privacy scan');
+  assert.ok(!text.includes(context.identity.protect(options.storeSlug, CANARY).toString('hex')), 'diagnostic protected identity scan');
+  assert.deepEqual(Object.keys(result).sort(), ['end', 'pages', 'reviewCount', 'reviews', 'rows', 'start', 'status', 'store', 'terminal', 'timezone', 'verified'].sort());
+  assert.ok(result.reviews.every(review => Object.keys(review).join(',') === 'interval,field,affectedRows'));
+  assert.throws(() => normalizeLine(item, { ...options, context }), { code: 'CATALOG_REVIEW' });
+});
+test('diagnostic preserves validated Copenhagen dates, DST ambiguity and primary/fallback rules', async () => {
+  for (const [day, endDate, middle] of [['2025-03-30', '2025-03-31', '03:30:00'], ['2025-10-26', '2025-10-27', '02:30:00']]) {
+    const result = await diagnose([[
+      raw({ timestamp_pay: day + ' 00:00:00', productname: CANARY }),
+      raw({ timestamp_pay: null, datetime: day + ' ' + middle, productname: CANARY }),
+      raw({ timestamp_pay: day, productname: CANARY }),
+      raw({ timestamp_pay: endDate + ' 00:00:00', productname: CANARY }),
+    ]], { options: { ...options, start: day, end: endDate } });
+    assert.deepEqual(result.reviews, [{ interval: 'inside', field: 'product', affectedRows: 3 },
+      { interval: 'after', field: 'product', affectedRows: 1 }]);
+  }
+});
+test('diagnostic fails closed on malformed rows even before or after the requested dates', async () => {
+  for (const override of [
+    { timestamp_pay: undefined, datetime: undefined }, { timestamp_pay: null, datetime: null },
+    { timestamp_pay: '2025-02-30 12:00:00' }, { timestamp_pay: '2025-03-30 02:30:00' },
+    { timestamp_pay: '2024-12-31 24:00:00' }, { timestamp_pay: CANARY, datetime: start + ' 00:00:00' },
+    { timestamp_pay: '2025-02-01T00:00:00Z' }, { orderlineid: null }, { price: '1e3' },
+    { productname: null }, { productgroup: '\n' }, { paymenttypecode: 'bad/code' },
+  ]) {
+    await assert.rejects(diagnose([[raw({ productname: CANARY, ...override })]]), { code: 'INVALID_LINE' });
+  }
+  await assert.rejects(diagnose([[raw({ firmaid: '99999', productname: CANARY })]]), { code: 'STORE_MISMATCH' });
+});
+test('diagnostic requires genuine terminal pagination and consistent declared totals after review candidates', async () => {
+  for (const tail of [{}, { data: [], current_page: 2, next_page_url: null, total: 2 },
+    { data: [], current_page: 2, next_page_url: null, last_page: 3 },
+    { data: [], current_page: 2, next_page_url: initial + '?page=2' }]) {
+    let calls = 0;
+    await assert.rejects(diagnose(undefined, { request: async () => {
+      if (++calls === 1) return body([raw({ productname: CANARY })], 1, initial + '?page=2');
+      return JSON.stringify(tail);
+    } }));
+    assert.equal(calls, 2);
+  }
+  let calls = 0;
+  await assert.rejects(diagnose(undefined, { request: async () => { calls++; throw new ImportError('CATALOG_REVIEW'); } }), { code: 'CATALOG_REVIEW' });
+  assert.equal(calls, 1, 'no retries on an upstream failure');
+  await assert.rejects(diagnose([[raw({ productname: CANARY })], []], { limits: { maxPages: 1 } }), { code: 'PAGE_LIMIT' });
+  await assert.rejects(diagnose([[raw(), raw()]], { limits: { maxRows: 1 } }), { code: 'ROW_LIMIT' });
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(diagnose([[]], { signal: controller.signal }), { code: 'INTERRUPTED' });
+});
+test('diagnostic reports reviewed and empty traversals without claiming verification', async () => {
+  for (const rows of [[], [raw()]]) {
+    const result = await diagnose([rows]);
+    assert.equal(result.rows, rows.length); assert.equal(result.reviewCount, 0);
+    assert.deepEqual(result.reviews, []); assert.equal(result.verified, false);
+    assert.equal(result.status, 'catalog-diagnostic');
+  }
+});
+test('diagnostic CLI is explicit and cannot be combined with publication or verification modes', async () => {
+  assert.equal(parseArgs(['--diagnose-catalog']).diagnose, true);
+  for (const mode of [['--apply'], ['--validate'], ['--dry-run'], ['--verify-run', 'synthetic'], ['--resume-publication', 'synthetic']]) {
+    assert.throws(() => parseArgs(['--diagnose-catalog', ...mode]), { code: 'INVALID_OPTIONS' });
+  }
+  for (const extra of [{ verificationOf: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa' },
+    { resumePublication: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa' }, { end: start }]) {
+    let calls = 0;
+    await assert.rejects(diagnose(undefined, { options: { ...options, ...extra }, request: async () => { calls++; } }), { code: 'INVALID_OPTIONS' });
+    assert.equal(calls, 0);
+  }
 });

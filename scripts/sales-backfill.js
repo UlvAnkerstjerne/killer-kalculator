@@ -5,12 +5,13 @@ const { readConfig } = require('../lib/sales-db/config');
 const { createIdentity } = require('../lib/sales-db/identity');
 const { createReviewedCatalog } = require('../lib/sales-db/facts');
 const { importHistory, validateOptions } = require('../lib/sales-sync/importer');
+const { diagnoseCatalog } = require('../lib/sales-sync/diagnostic');
 const { createHttpRequest } = require('../lib/sales-sync/http');
 const { fail, safeError } = require('../lib/sales-sync/errors');
 
 function parseArgs(args) {
   const valueFlags = new Set(['--store', '--from', '--through', '--catalog', '--verify-run', '--resume-publication', '--max-pages', '--max-rows', '--batch-size']);
-  const flags = new Set(['--apply', '--dry-run', '--validate', '--help']);
+  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--help']);
   const values = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -23,6 +24,8 @@ function parseArgs(args) {
     }
   }
   if (values['--apply'] && (values['--dry-run'] || values['--validate'])) fail('INVALID_OPTIONS');
+  if (values['--diagnose-catalog'] && ['--apply', '--dry-run', '--validate', '--verify-run', '--resume-publication']
+    .some(flag => values[flag] !== undefined)) fail('INVALID_OPTIONS');
   const options = { storeSlug: values['--store'], start: values['--from'], end: values['--through'],
     verificationOf: values['--verify-run'], resumePublication: values['--resume-publication'] };
   const limits = {};
@@ -31,7 +34,8 @@ function parseArgs(args) {
     if (!/^[1-9]\d{0,7}$/.test(values[flag]) || Number(values[flag]) > max) fail('INVALID_OPTIONS');
     limits[key] = Number(values[flag]);
   }
-  return { options, limits, apply: values['--apply'] === true, catalogPath: values['--catalog'], help: values['--help'] === true };
+  return { options, limits, apply: values['--apply'] === true, diagnose: values['--diagnose-catalog'] === true,
+    catalogPath: values['--catalog'], help: values['--help'] === true };
 }
 async function main(args = process.argv.slice(2), env = process.env, output = line => process.stdout.write(line + '\n'), dependencies = {}) {
   const controller = new AbortController();
@@ -40,7 +44,7 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
   try {
     const parsed = parseArgs(args);
     if (parsed.help) {
-      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
+      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply | --diagnose-catalog] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
       return 0;
     }
     validateOptions(parsed.options);
@@ -65,6 +69,11 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
     const companyId = env.KK_BACKFILL_COMPANY_ID;
     const request = dependencies.request || (parsed.options.resumePublication
       ? async () => fail('INVALID_RUN') : createHttpRequest({ token: env.KK_BACKFILL_TOKEN, companyId }));
+    if (parsed.diagnose) {
+      const result = await diagnoseCatalog({ context: { identity, catalog }, request,
+        options: { ...parsed.options, companyId }, limits: parsed.limits, signal: controller.signal });
+      output(JSON.stringify(result)); return 0;
+    }
     await importHistory({ config, context: { identity, catalog }, request,
       options: { ...parsed.options, companyId }, limits: parsed.limits, apply: parsed.apply,
       signal: controller.signal, report: value => output(JSON.stringify(value)) });

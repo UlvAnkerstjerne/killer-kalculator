@@ -519,6 +519,40 @@ test('CLI requires apply for database writes and exits nonzero on incomplete tra
     await noPublished(); assert.equal(await count('sales_stage_line'), 0);
   } finally { await fs.rm(directory, { recursive: true }); }
 });
+test('diagnostic CLI leaves every populated foundation table and fact row version unchanged', async () => {
+  await scan();
+  await assert.rejects(scan([[raw({ productname: CANARY })]]), { code: 'CATALOG_REVIEW' });
+  const tables = ['schema_migration', 'sales_store', 'identity_key_check', 'sales_line', 'sales_stage_line',
+    'sales_sync_run', 'sales_day_state', 'sales_import_scan', 'sales_import_day', 'sales_import_bucket', 'sales_import_discrepancy'];
+  const snapshot = async () => {
+    const result = {};
+    for (const table of tables) result[table] = (await db.query(
+      `SELECT xmin::text AS row_version, row_to_json(t)::text AS content FROM sales_foundation.${table} t ORDER BY row_to_json(t)::text`)).rows;
+    return result;
+  };
+  const before = JSON.stringify(await snapshot());
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-diagnostic-catalog-'));
+  const file = path.join(directory, 'reviewed.json');
+  await fs.writeFile(file, JSON.stringify({ products: [{ storeSlug: 'norrebro', productId: 'synthetic-product', productLabel: 'Synthetic product',
+    groupId: 'synthetic-group', groupLabel: 'Synthetic group' }], payments: [{ paymentType: 'Synthetic payment', paymentCode: 'TEST' }] }));
+  const args = ['--store', 'norrebro', '--from', start, '--through', end, '--catalog', file, '--diagnose-catalog'];
+  const env = { KK_SALES_DB_ENABLED: 'true', KK_SALES_DB_URL: config.connectionString,
+    KK_SALES_IDENTITY_KEY_HEX: Buffer.alloc(32, 7).toString('hex'), KK_SALES_IDENTITY_KEY_VERSION: '1', KK_BACKFILL_COMPANY_ID: '12345' };
+  const output = [], mock = provider([[raw(), raw({ productname: CANARY, timestamp_pay: end + ' 00:00:00' })]]);
+  try {
+    assert.equal(await main(args, env, value => output.push(value), { request: mock.request }), 0);
+    assert.equal(mock.calls.length, 1); assert.equal(output.length, 1);
+    const report = JSON.parse(output[0]);
+    assert.equal(report.status, 'catalog-diagnostic'); assert.equal(report.reviewCount, 1);
+    assert.deepEqual(report.reviews, [{ interval: 'after', field: 'product', affectedRows: 1 }]);
+    assert.equal(await main(args, env, value => output.push(value), { request: async () => '{}' }), 1);
+    assert.equal(JSON.stringify(await snapshot()) === before, true, 'all database rows and xmin unchanged');
+    assert.ok(!output.join('').includes(CANARY), 'diagnostic CLI privacy scan');
+    // An unreachable configured database also succeeds: the diagnostic never connects.
+    assert.equal(await main(args, { ...env, KK_SALES_DB_URL: 'postgresql://unused.invalid/synthetic' },
+      value => output.push(value), { request: provider([[]]).request }), 0);
+  } finally { await fs.rm(directory, { recursive: true }); }
+});
 test('real importer preserves the unchanged reference fixture and all canonical metric values', async () => {
   const fixture = parseLossless(await fs.readFile(path.join(__dirname, '../fixtures/norrebro-2026-09-20.fixture.json'), 'utf8'));
   const ctx = { identity: context.identity, catalog: createReviewedCatalog(require('../sales-db/reviewed-fixture-catalog.json')) };
