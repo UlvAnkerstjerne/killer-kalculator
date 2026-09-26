@@ -423,3 +423,50 @@ ownership, privacy, CLI write refusal, DST, independent checksums, and the uncha
 records bounded page/batch size and observed heap/RSS. These are synthetic memory
 measurements, not production throughput, historical inventory or live provider
 contract validation. No production database/backfill or cutover is authorized here.
+
+### Unapproved catalogue review export
+
+`--export-catalog-review` is a separate, explicitly authorized discovery operation.
+It cannot be combined with apply, dry-run, validation, verification, resume or
+aggregate diagnostic modes. It requires only the intended store's provider token
+and company mapping, plus an existing reviewed catalogue as a comparison baseline.
+It does not read database/identity configuration, connect to PostgreSQL, construct
+protected identities, stage, quarantine, publish or verify anything.
+
+```sh
+node scripts/sales-backfill.js --store '<internal-store>' \
+  --from '<inclusive-date>' --through '<exclusive-date>' \
+  --catalog '<unchanged-reviewed-catalog-path>' --export-catalog-review
+```
+
+The existing bounded parser and traversal reach the genuine terminal page and
+validate declared totals across all rows, without chronological early exit. Store
+and Copenhagen time validity are checked before inclusive-start/exclusive-end
+filtering. Only in-range rows contribute catalogue candidates. Source IDs,
+monetary fields and arbitrary private properties are never read by the collector.
+Raw responses remain in memory; the command does not write files.
+
+Output is one `catalog-review-candidates` envelope with `approvalRequired: true`,
+traversal/range counters, and separate `productCandidates` and `paymentCandidates`.
+Each exact tuple has an occurrence count and is deterministically sorted. The
+envelope intentionally lacks `products`/`payments` and cannot load as a trusted
+catalogue. At most 10,000 distinct product tuples and 100 payment tuples are retained.
+No partial envelope is emitted on error.
+
+`already-reviewed` means exact membership in the supplied baseline; it does not
+approve new data. `mechanical-cross-store-equivalent` requires an existing tuple
+from another store with identical product label, group ID and group label; only
+store and product IDs may differ. `novel` means neither test matched. Payment
+membership is global in the existing trusted schema and requires the exact label
+and code, including case, spaces and nulls. Different payment codes remain novel.
+These are comparison facts, not business-classification or approval decisions.
+
+Every candidate string has schema/length/control-character validation. Conservative
+checks reject email/contact details, phone-like label text, card-like digit runs,
+credential/hash patterns and explicit personal-data markers. Suspicious or malformed
+text yields only `incomplete`, `CATALOG_TEXT_REVIEW`, `redacted: true`; no candidate
+values are echoed. Pattern checks cannot recognize every personal name or business
+ambiguity, so every candidate still requires human review. Never automatically
+load the envelope into the trusted catalogue, infer business metrics from similar
+names, or expand the catalogue just to make an importer pass. The existing
+`--diagnose-catalog` aggregate-only privacy contract is unchanged.

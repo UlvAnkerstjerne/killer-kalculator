@@ -600,3 +600,34 @@ test('ordinary import skips unknown outside facts before staging and keeps retro
   assert.deepEqual(reports.filter(value => value.status === 'staging').map(value => value.sanitizedRows), [1, 2]);
   assert.ok(!JSON.stringify(reports).includes(CANARY));
 });
+
+test('catalogue review export leaves every populated foundation table and row version unchanged', async () => {
+  await scan();
+  await assert.rejects(scan([[raw({ productname: CANARY })]]), { code: 'CATALOG_REVIEW' });
+  const tables = ['schema_migration', 'sales_store', 'identity_key_check', 'sales_line', 'sales_stage_line',
+    'sales_sync_run', 'sales_day_state', 'sales_import_scan', 'sales_import_day', 'sales_import_bucket', 'sales_import_discrepancy'];
+  const snapshot = async () => {
+    const result = {};
+    for (const table of tables) result[table] = (await db.query(
+      `SELECT xmin::text AS row_version, row_to_json(t)::text AS content FROM sales_foundation.${table} t ORDER BY row_to_json(t)::text`)).rows;
+    return JSON.stringify(result);
+  };
+  const before = await snapshot();
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-review-export-catalog-'));
+  const file = path.join(directory, 'reviewed.json');
+  await fs.writeFile(file, JSON.stringify({ products: [{ storeSlug: 'norrebro', productId: 'synthetic-product', productLabel: 'Synthetic product',
+    groupId: 'synthetic-group', groupLabel: 'Synthetic group' }], payments: [{ paymentType: 'Synthetic payment', paymentCode: 'TEST' }] }));
+  const args = ['--store', 'norrebro', '--from', start, '--through', end, '--catalog', file, '--export-catalog-review'];
+  // Deliberately no DB configuration, identity key/version, or provider credential.
+  const env = { KK_BACKFILL_COMPANY_ID: '12345' }, output = [];
+  try {
+    assert.equal(await main(args, env, value => output.push(value), { request: provider([[raw({ orderlineid: CANARY, customer: CANARY }),
+      raw({ timestamp_pay: end, productname: CANARY })]]).request }), 0);
+    assert.equal(output.length, 1); const result = JSON.parse(output[0]);
+    assert.equal(result.status, 'catalog-review-candidates'); assert.equal(result.inRangeRows, 1); assert.equal(result.excludedRows, 1);
+    assert.equal(await main(args, env, value => output.push(value), { request: provider([[raw({ productname: 'customer: Example Person' })]]).request }), 1);
+    assert.deepEqual(JSON.parse(output[1]), { status: 'incomplete', code: 'CATALOG_TEXT_REVIEW', redacted: true });
+    assert.equal(await snapshot() === before, true, 'complete table and row-version equality');
+    assert.ok(!output.join('').includes(CANARY), 'review-export privacy canary');
+  } finally { await fs.rm(directory, { recursive: true }); }
+});

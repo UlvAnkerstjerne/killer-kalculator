@@ -2,16 +2,16 @@
 'use strict';
 const fs = require('node:fs/promises');
 const { readConfig } = require('../lib/sales-db/config');
-const { createIdentity } = require('../lib/sales-db/identity');
 const { createReviewedCatalog } = require('../lib/sales-db/facts');
 const { importHistory, validateOptions } = require('../lib/sales-sync/importer');
 const { diagnoseCatalog } = require('../lib/sales-sync/diagnostic');
+const { exportCatalogReview } = require('../lib/sales-sync/catalog-review');
 const { createHttpRequest } = require('../lib/sales-sync/http');
 const { fail, safeError } = require('../lib/sales-sync/errors');
 
 function parseArgs(args) {
   const valueFlags = new Set(['--store', '--from', '--through', '--catalog', '--verify-run', '--resume-publication', '--max-pages', '--max-rows', '--batch-size']);
-  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--help']);
+  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--export-catalog-review', '--help']);
   const values = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -26,6 +26,8 @@ function parseArgs(args) {
   if (values['--apply'] && (values['--dry-run'] || values['--validate'])) fail('INVALID_OPTIONS');
   if (values['--diagnose-catalog'] && ['--apply', '--dry-run', '--validate', '--verify-run', '--resume-publication']
     .some(flag => values[flag] !== undefined)) fail('INVALID_OPTIONS');
+  if (values['--export-catalog-review'] && ['--apply', '--dry-run', '--validate', '--verify-run', '--resume-publication', '--diagnose-catalog']
+    .some(flag => values[flag] !== undefined)) fail('INVALID_OPTIONS');
   const options = { storeSlug: values['--store'], start: values['--from'], end: values['--through'],
     verificationOf: values['--verify-run'], resumePublication: values['--resume-publication'] };
   const limits = {};
@@ -35,7 +37,23 @@ function parseArgs(args) {
     limits[key] = Number(values[flag]);
   }
   return { options, limits, apply: values['--apply'] === true, diagnose: values['--diagnose-catalog'] === true,
+    exportReview: values['--export-catalog-review'] === true,
     catalogPath: values['--catalog'], help: values['--help'] === true };
+}
+async function readReviewedCatalog(filePath) {
+  try {
+    const file = await fs.open(filePath, 'r');
+    try {
+      const stat = await file.stat(); if (!stat.isFile() || stat.size > 1024 * 1024) fail('INVALID_CATALOG');
+      const buffer = Buffer.alloc(1024 * 1024 + 1);
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > 1024 * 1024) fail('INVALID_CATALOG');
+      const reviewed = JSON.parse(buffer.toString('utf8', 0, bytesRead));
+      if (!Array.isArray(reviewed.products) || reviewed.products.length > 10000 || !Array.isArray(reviewed.payments) || reviewed.payments.length > 100) fail('INVALID_CATALOG');
+      createReviewedCatalog(reviewed);
+      return reviewed;
+    } finally { await file.close(); }
+  } catch { fail('INVALID_CATALOG'); }
 }
 async function main(args = process.argv.slice(2), env = process.env, output = line => process.stdout.write(line + '\n'), dependencies = {}) {
   const controller = new AbortController();
@@ -44,28 +62,25 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
   try {
     const parsed = parseArgs(args);
     if (parsed.help) {
-      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply | --diagnose-catalog] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
+      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply | --diagnose-catalog | --export-catalog-review] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
       return 0;
     }
     validateOptions(parsed.options);
+    if (parsed.exportReview) {
+      const reviewed = await readReviewedCatalog(parsed.catalogPath);
+      const companyId = env.KK_BACKFILL_COMPANY_ID;
+      const request = dependencies.request || createHttpRequest({ token: env.KK_BACKFILL_TOKEN, companyId });
+      const result = await exportCatalogReview({ reviewed, request, options: { ...parsed.options, companyId },
+        limits: parsed.limits, signal: controller.signal });
+      output(JSON.stringify(result)); return 0;
+    }
     const config = readConfig(env);
     if (!config.enabled) fail('DB_DISABLED');
     if (!/^[a-fA-F0-9]{64}$/.test(env.KK_SALES_IDENTITY_KEY_HEX || '') ||
         !/^[1-9]\d{0,4}$/.test(env.KK_SALES_IDENTITY_KEY_VERSION || '') || Number(env.KK_SALES_IDENTITY_KEY_VERSION) > 32767) fail('INVALID_IDENTITY');
+    const { createIdentity } = require('../lib/sales-db/identity');
     const identity = createIdentity({ key: Buffer.from(env.KK_SALES_IDENTITY_KEY_HEX, 'hex'), version: Number(env.KK_SALES_IDENTITY_KEY_VERSION) });
-    let catalog;
-    try {
-      const file = await fs.open(parsed.catalogPath, 'r');
-      try {
-        const stat = await file.stat(); if (!stat.isFile() || stat.size > 1024 * 1024) fail('INVALID_CATALOG');
-        const buffer = Buffer.alloc(1024 * 1024 + 1);
-        const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
-        if (bytesRead > 1024 * 1024) fail('INVALID_CATALOG');
-        const reviewed = JSON.parse(buffer.toString('utf8', 0, bytesRead));
-        if (!Array.isArray(reviewed.products) || reviewed.products.length > 10000 || !Array.isArray(reviewed.payments) || reviewed.payments.length > 100) fail('INVALID_CATALOG');
-        catalog = createReviewedCatalog(reviewed);
-      } finally { await file.close(); }
-    } catch { fail('INVALID_CATALOG'); }
+    const catalog = createReviewedCatalog(await readReviewedCatalog(parsed.catalogPath));
     const companyId = env.KK_BACKFILL_COMPANY_ID;
     const request = dependencies.request || (parsed.options.resumePublication
       ? async () => fail('INVALID_RUN') : createHttpRequest({ token: env.KK_BACKFILL_TOKEN, companyId }));
@@ -79,7 +94,8 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
       signal: controller.signal, report: value => output(JSON.stringify(value)) });
     return 0;
   } catch (error) {
-    output(JSON.stringify({ status: 'incomplete', code: safeError(error).code })); return 1;
+    const code = safeError(error).code;
+    output(JSON.stringify({ status: 'incomplete', code, ...(code === 'CATALOG_TEXT_REVIEW' ? { redacted: true } : {}) })); return 1;
   } finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
 }
 if (require.main === module) main().then(code => { process.exitCode = code; });
