@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseLossless } = require('../../lib/sales-sync/parse');
 const { traverse } = require('../../lib/sales-sync/traverse');
-const { normalizeLine } = require('../../lib/sales-sync/normalize');
+const { normalizeLine, readLineTime } = require('../../lib/sales-sync/normalize');
 const { importHistory, safeReport } = require('../../lib/sales-sync/importer');
 const { diagnoseCatalog } = require('../../lib/sales-sync/diagnostic');
 const { ImportError } = require('../../lib/sales-sync/errors');
@@ -203,13 +203,14 @@ test('diagnostic classifies review fields across inclusive-start/exclusive-end b
   ]);
   assert.equal(result.verified, false); assert.equal(result.status, 'catalog-diagnostic');
 });
-test('synthetic 2351-row reproduction diagnoses a late unknown without changing importer rejection', async () => {
+test('synthetic 2351-row reproduction diagnoses a late unknown while ordinary import excludes it', async () => {
   const rows = Array.from({ length: 2350 }, (_, i) => raw({ orderlineid: 'synthetic-' + i }));
   rows.push(raw({ orderlineid: 'synthetic-unknown', timestamp_pay: end + ' 12:00:00', productname: CANARY }));
   const result = await diagnose([rows]);
   assert.equal(result.pages, 1); assert.equal(result.rows, 2351); assert.equal(result.reviewCount, 1);
   assert.deepEqual(result.reviews, [{ interval: 'after', field: 'product', affectedRows: 1 }]);
-  await assert.rejects(importHistory({ config, context, options, request: provider([rows]).request }), { code: 'CATALOG_REVIEW' });
+  const imported = await importHistory({ config, context, options, request: provider([rows]).request });
+  assert.equal(imported.lineCount, 2350); assert.equal(imported.sanitizedRows, 2350);
 });
 test('diagnostic returns no values, identities, protected hashes or private payload fields', async () => {
   const item = raw({ orderlineid: CANARY, productname: CANARY, paymenttype: CANARY,
@@ -281,6 +282,109 @@ test('diagnostic CLI is explicit and cannot be combined with publication or veri
     { resumePublication: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa' }, { end: start }]) {
     let calls = 0;
     await assert.rejects(diagnose(undefined, { options: { ...options, ...extra }, request: async () => { calls++; } }), { code: 'INVALID_OPTIONS' });
+    assert.equal(calls, 0);
+  }
+});
+
+test('ordinary traversal includes exact start and last second, excluding before start and exact end', async () => {
+  const target = sink(), progress = [];
+  target.progress = value => progress.push(value);
+  const times = ['2024-12-31 23:59:59', start + ' 00:00:00', '2025-01-31 23:59:59', end + ' 00:00:00'];
+  const result = await walk(provider([times.map((timestamp_pay, i) => raw({ timestamp_pay, orderlineid: 'synthetic-boundary-' + i }))]).request, target);
+  assert.equal(result.rows, 4); assert.equal(result.reviewCount, 0); assert.equal(result.terminal, true);
+  assert.deepEqual(target.lines.map(line => line.saleLocal), times.slice(1, 3));
+  assert.equal(progress[0].sanitizedRows, 2);
+});
+for (const field of ['productid', 'productname', 'productgroup', 'paymenttype', 'paymenttypecode']) {
+  test('unknown ' + field + ' is ignored only outside the interval', async () => {
+    const target = sink();
+    const outside = ['2024-12-31 23:59:59', end + ' 00:00:00', end + ' 12:00:00'];
+    const result = await walk(provider([outside.map(timestamp_pay => raw({ timestamp_pay, [field]: CANARY }))]).request, target);
+    assert.equal(result.rows, 3); assert.equal(result.reviewCount, 0); assert.equal(target.lines.length, 0);
+    await assert.rejects(walk(provider([[raw({ [field]: CANARY })]]).request), { code: 'CATALOG_REVIEW' });
+  });
+}
+test('time prefilter reads no identity, product, payment or monetary fields', () => {
+  const item = { timestamp_pay: end + ' 00:00:00', firmaid: options.companyId };
+  for (const key of ['orderlineid', 'productid', 'productname', 'productgroupid', 'productgroup', 'count', 'price', 'priceexclvat', 'paymenttype', 'paymenttypecode']) {
+    Object.defineProperty(item, key, { get() { assert.fail('Fact field read before range filtering'); } });
+  }
+  assert.equal(readLineTime(item, options.companyId).businessDate, end);
+});
+test('outside rows cannot create identities, consult catalogue or contribute malformed fact values', async () => {
+  let identities = 0, reviews = 0;
+  const ctx = { identity: { ...context.identity, protect() { identities++; assert.fail('Unexpected identity'); } },
+    catalog: { validate() { reviews++; assert.fail('Unexpected catalogue validation'); } } };
+  const outside = ['2024-12-31', end].map(timestamp_pay => raw({ timestamp_pay,
+    orderlineid: null, productid: null, productname: { private: CANARY }, productgroup: null,
+    count: '1e3', price: 'not-money', priceexclvat: null, paymenttype: null, paymenttypecode: 'invalid/code' }));
+  const result = await importHistory({ config, context: ctx, options, request: provider([outside]).request,
+    limits: { inspectAllDates: true } }); // Diagnostic behaviour cannot leak through import limits.
+  assert.equal(identities, 0); assert.equal(reviews, 0);
+  assert.equal(result.lineCount, 0); assert.equal(result.sanitizedRows, 0);
+  assert.equal(result.revenueIncl, '0'); assert.equal(result.revenueExcl, '0');
+});
+test('ordinary prefilter fails closed on missing, malformed, invalid calendar and DST-gap times', async () => {
+  for (const overrides of [
+    { timestamp_pay: undefined, datetime: undefined }, { timestamp_pay: null, datetime: null },
+    { timestamp_pay: '', datetime: start + ' 12:00:00' },
+    { timestamp_pay: CANARY, datetime: start + ' 12:00:00' },
+    { timestamp_pay: '2025-02-30' }, { timestamp_pay: '2024-12-32 12:00:00' },
+    { timestamp_pay: '2025-02-30 12:00:00', datetime: start + ' 12:00:00' },
+    { timestamp_pay: '2025-03-30 02:30:00' }, { timestamp_pay: '2024-12-31 24:00:00' },
+    { timestamp_pay: end + 'T00:00:00Z' },
+  ]) await assert.rejects(walk(provider([[raw(overrides)]]).request), { code: 'INVALID_LINE' });
+  for (const item of [null, [], 'invalid']) await assert.rejects(walk(provider([[item]]).request), { code: 'INVALID_LINE' });
+});
+test('ordinary traversal preserves valid fallback, ambiguous autumn time and explicit date-only time', async () => {
+  const target = sink();
+  await walk(provider([[raw({ timestamp_pay: '2025-10-26 02:30:00' }),
+    raw({ orderlineid: 'synthetic-fallback', timestamp_pay: null, datetime: '2025-10-26 02:30:00' }),
+    raw({ orderlineid: 'synthetic-missing-time', timestamp_pay: '2025-10-26' })]]).request, target,
+  { start: '2025-10-26', end: '2025-10-27' });
+  assert.deepEqual(target.lines.map(line => line.timeQuality), ['payment_ambiguous', 'fallback_ambiguous', 'missing']);
+  assert.equal(target.lines[2].saleLocal, null); assert.equal(target.lines[2].secondOfDay, null);
+});
+test('company mismatch fails closed before, inside and after the interval', async () => {
+  for (const timestamp_pay of ['2024-12-31', start, end]) {
+    await assert.rejects(walk(provider([[raw({ timestamp_pay, firmaid: '99999' })]]).request), { code: 'STORE_MISMATCH' });
+  }
+});
+test('nonchronological pages after an ignored unknown still require terminal proof and all-row totals', async () => {
+  const pages = [[raw({ timestamp_pay: end, productname: CANARY }), raw()],
+    [raw({ timestamp_pay: start, orderlineid: 'synthetic-retroactive' }), raw({ timestamp_pay: '2024-12-31', paymenttype: CANARY })]];
+  for (const total of [4, 2]) {
+    let calls = 0;
+    const request = async () => {
+      const page = ++calls;
+      return JSON.stringify({ data: pages[page - 1], current_page: page, next_page_url: page === 1 ? initial + '?page=2' : null,
+        last_page: 2, per_page: 2, total });
+    };
+    if (total === 2) await assert.rejects(walk(request), { code: 'INVALID_PAGE' });
+    else {
+      const target = sink(), result = await walk(request, target);
+      assert.equal(calls, 2); assert.equal(result.pages, 2); assert.equal(result.rows, 4);
+      assert.equal(result.reviewCount, 0); assert.equal(target.lines.length, 2);
+      assert.deepEqual(target.lines.map(line => line.businessDate), ['2025-01-10', start]);
+    }
+  }
+  let calls = 0;
+  await assert.rejects(walk(async () => ++calls === 1 ? body(pages[0], 1, initial + '?page=2') : '{}'), { code: 'INVALID_PAGE' });
+  assert.equal(calls, 2);
+  await assert.rejects(walk(async () => JSON.stringify({ data: pages[0], current_page: 1, next_page_url: null, total: 1 })), { code: 'INVALID_PAGE' });
+});
+test('ignored rows still obey row, page, byte, page-size, interruption and pagination-loop limits', async () => {
+  const row = raw({ timestamp_pay: end, productname: CANARY });
+  await assert.rejects(walk(provider([[row, row]]).request, sink(), { maxRows: 1 }), { code: 'ROW_LIMIT' });
+  await assert.rejects(walk(provider([[row], []]).request, sink(), { maxPages: 1 }), { code: 'PAGE_LIMIT' });
+  await assert.rejects(walk(provider([[row]]).request, sink(), { maxBytes: 10 }), { code: 'PAGE_TOO_LARGE' });
+  await assert.rejects(walk(async () => JSON.stringify({ data: [row, row], current_page: 1, next_page_url: null, per_page: 1 })), { code: 'INVALID_PAGE' });
+  await assert.rejects(walk(async () => body([row], 1, initial)), { code: 'PAGINATION_LOOP' });
+  const controller = new AbortController();
+  await assert.rejects(walk(async () => { controller.abort(); return body([row]); }, sink(), { signal: controller.signal }), { code: 'INTERRUPTED' });
+  for (const range of [{ end: undefined }, { end: start }, { start: 'invalid' }]) {
+    let calls = 0;
+    await assert.rejects(walk(async () => { calls++; }, sink(), range), { code: 'INVALID_OPTIONS' });
     assert.equal(calls, 0);
   }
 });

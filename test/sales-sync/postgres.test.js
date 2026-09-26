@@ -58,7 +58,8 @@ test('reviewed spaced payment codes stage, publish and independently verify with
       groupId: 'synthetic-group', groupLabel: 'Synthetic group' }],
     payments: [{ paymentType: 'Synthetic payment', paymentCode: 'mixed 1' }],
   }) };
-  const pages = [[raw({ paymenttypecode: 'mixed 1' })]];
+  const pages = [[raw({ timestamp_pay: end, orderlineid: null, productname: CANARY, price: 'invalid' })],
+    [raw({ paymenttypecode: 'mixed 1' })]];
   const first = await scan(pages, { context: ctx });
   assert.equal(first.status, 'published'); assert.equal(first.verified, false);
   const factBefore = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
@@ -92,11 +93,11 @@ test('reviewed spaced payment codes stage, publish and independently verify with
   assert.equal((await db.query('SELECT count(*)::int AS count FROM sales_foundation.sales_import_scan')).rows[0].count, auditCount,
     'metadata finalization is idempotent');
 });
-test('later older in-range dates survive newer pages and logical filtering happens after termination', async () => {
+test('later older in-range dates survive newer pages and only in-range rows enter staging', async () => {
   const pages = [[raw({ orderlineid: 'synthetic-newer', timestamp_pay: '2025-02-20 12:00:00' })],
     [raw({ orderlineid: 'synthetic-older', timestamp_pay: '2025-01-01 00:00:00' })]];
   const result = await scan(pages);
-  assert.equal(result.sanitizedRows, 2); assert.equal(result.lineCount, 1);
+  assert.equal(result.sanitizedRows, 1); assert.equal(result.lineCount, 1);
   assert.equal((await db.query('SELECT business_date::text AS date FROM sales_foundation.sales_line')).rows[0].date, start);
 });
 for (const [mode, expected] of [['missing-data', 'INVALID_PAGE'], ['non-array', 'INVALID_PAGE'],
@@ -575,4 +576,27 @@ test('large synthetic traversal uses bounded pages and staging without retaining
   assert.ok(result.peakHeapBytes < 256 * 1024 * 1024, 'bounded heap budget');
   assert.ok(result.latePeakHeapBytes - result.earlyPeakHeapBytes < 96 * 1024 * 1024, 'bounded retained-memory growth');
   console.log('Synthetic importer memory result: ' + JSON.stringify(result));
+});
+
+test('ordinary import skips unknown outside facts before staging and keeps retroactive rows and provider totals', async () => {
+  let calls = 0;
+  const reports = [];
+  const result = await scan(undefined, { report: value => reports.push(value), request: async () => {
+    const page = ++calls;
+    if (page === 2) {
+      assert.equal(await count('sales_stage_line'), 1);
+      assert.equal((await db.query('SELECT line_count FROM sales_foundation.sales_sync_run')).rows[0].line_count, 1);
+    }
+    return JSON.stringify({ current_page: page, next_page_url: page === 1 ? initial + '?page=2' : null,
+      total: 4, last_page: 2, per_page: 2, data: page === 1 ?
+        [raw({ timestamp_pay: end, orderlineid: null, productname: CANARY, price: 'invalid' }), raw()] :
+        [raw({ timestamp_pay: start, orderlineid: 'synthetic-retroactive' }),
+          raw({ timestamp_pay: '2024-12-31', paymenttypecode: CANARY, count: 'invalid' })] });
+  } });
+  assert.equal(calls, 2); assert.equal(result.lineCount, 2); assert.equal(result.sanitizedRows, 2);
+  assert.equal(await count('sales_line'), 2); assert.equal(await count('sales_stage_line'), 0);
+  const scanState = (await db.query('SELECT received_rows, review_count, terminal FROM sales_foundation.sales_import_scan')).rows[0];
+  assert.deepEqual(scanState, { received_rows: 4, review_count: 0, terminal: true });
+  assert.deepEqual(reports.filter(value => value.status === 'staging').map(value => value.sanitizedRows), [1, 2]);
+  assert.ok(!JSON.stringify(reports).includes(CANARY));
 });
