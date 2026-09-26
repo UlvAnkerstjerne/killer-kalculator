@@ -470,3 +470,91 @@ ambiguity, so every candidate still requires human review. Never automatically
 load the envelope into the trusted catalogue, infer business metrics from similar
 names, or expand the catalogue just to make an importer pass. The existing
 `--diagnose-catalog` aggregate-only privacy contract is unchanged.
+
+### Structural catalogue-text diagnostics (explicit opt-in)
+
+For a separately authorized traversal, add `--diagnose-catalog-text` to the
+existing review command:
+
+```sh
+node scripts/sales-backfill.js --store '<internal-store>' \
+  --from '<inclusive-date>' --through '<exclusive-date>' \
+  --catalog '<unchanged-reviewed-catalog-path>' \
+  --export-catalog-review --diagnose-catalog-text
+```
+
+The flag requires `--export-catalog-review`. All existing exclusions for apply,
+validation, resume, verification and aggregate diagnostics still apply. It uses
+the same parser, strict store/time checks, range filter, pagination, terminal
+proof and declared-total checks. It never retries. After a catalogue-field
+rejection it continues that same traversal to collect bounded structural issues;
+any other traversal failure discards the summary and returns the existing fixed
+error. It does not load a database client, database configuration, import owner,
+repository, publisher or identity module. Shared pure schema/time validators are
+still used. No writes or protected identities are created.
+
+This mode never emits candidate values, including on success. Its non-loadable
+format is `kk-catalog-text-diagnostic-v1`, with `redacted: true` and
+`approvalRequired: true`. If any field is rejected, it reports `status:
+incomplete`, `code: CATALOG_TEXT_REVIEW`, and exits **1**. If none is rejected it
+reports `status: catalog-text-diagnostic` and exits 0; this is not catalogue
+approval or verification. The ordinary command without this flag retains PR #13's
+acceptance boundary, fixed error envelope and exact valid-candidate output.
+
+Each retained diagnostic has only these properties:
+
+- `candidateKind`: `product` or `payment`.
+- `fieldRole`: `product-id`, `product-label`, `product-group-id`,
+  `product-group-label`, `payment-type` or `payment-type-code`.
+- `reason`: one of the fixed enums below.
+- `utf16Length`, `characterLength`, `utf8ByteLength`, `lengthsCapped`.
+- `offendingCharacters`: at most four `{position, codePoint}` pairs, and
+  `charactersTruncated`.
+- `occurrences`: number of rejected fields with this identical structural shape.
+
+Reasons are `UNSUPPORTED_TYPE`, `EMPTY_TEXT`, `LENGTH_LIMIT`,
+`FORBIDDEN_LINE_BREAK`, `ANSI_ESCAPE`, `CONTROL_CHARACTER`, `BIDI_FORMATTING`,
+`FORMAT_CONTROL`, `SENSITIVE_PATTERN`, `INVALID_IDENTIFIER`,
+`INVALID_PAYMENT_CODE`, `INVALID_UNICODE`, `UTF8_BYTE_LIMIT`, and
+`UNSAFE_OUTPUT_SEQUENCE`. `SENSITIVE_PATTERN` deliberately does not distinguish
+particular secrets, identities or personal details.
+
+`LENGTH_LIMIT` retains the original limit of 160 UTF-16 code units for labels and
+64 for IDs/codes. Character count means Unicode code points, not grapheme clusters.
+Positions are zero-based UTF-16 offsets. Only control/format characters and lone
+surrogates can appear as `U+XXXX` code points; ordinary source characters are never
+encoded into the diagnostic. For unpaired surrogates `utf8ByteLength` is null,
+because there is no valid UTF-8 representation. Non-string values have null
+lengths and are never coerced, enumerated or stringified. Measurement is capped at
+65,536 UTF-16 units, without splitting a surrogate pair; `lengthsCapped` indicates
+lower-bound measurements. Rejected source text is never trimmed, replaced,
+normalized or accepted. The pre-existing NFKC privacy-pattern check remains a
+comparison only and never supplies output text.
+
+Explicit diagnostics additionally refuse labels above 320 UTF-8 bytes, malformed
+Unicode, Markdown/table/HTML delimiters, Unicode line separators, formula-like
+prefixes and quoted transaction/customer-shaped fields. These additional refusals
+are confined to this structural mode; they do not silently redefine ordinary
+export. Benign `+ Dip`-style prefixes, Danish characters and supported trailing
+spaces remain valid. A formula-like `+SUM(...)` is refused. There are no label
+previews or identifier values: a provider's catalogue-field name and permissive
+identifier syntax cannot establish that its contents contain no personal data or
+secret. This deliberately limits the human reviewer to structural clues.
+
+At most 12 distinct structural signatures are retained, sorted deterministically.
+The lexicographically smallest signatures are kept regardless of row order;
+`diagnosticsTruncated` and `omittedFields` disclose omissions. Kept signatures have
+exact occurrence counts. The envelope also includes fixed scope/traversal fields,
+`inRangeRows`, `excludedRows`, `rejectedRows`, `rejectedFields` and
+`diagnosticLimit`. Serialized output is capped at 16 KiB. There are no row numbers,
+raw object keys, product/group identifier values, label fragments, hashes, payload
+snapshots or partially accepted candidates.
+
+The strict lossless parser still rejects NUL and unpaired Unicode anywhere in a
+provider page before catalogue-field attribution. Such input returns only
+`INVALID_JSON`; it cannot safely be assigned a field role without changing that
+parser boundary. No malformed page is reparsed by a second scanner. Structural
+Unicode/control inspection is tested independently, but this mode makes no claim
+that pre-parser failures can be localized. It cannot reconstruct a value from an
+old failed run. The rejected Frederiksberg value was never retained and remains
+unknown; any future provider traversal needs separate explicit authorization.
