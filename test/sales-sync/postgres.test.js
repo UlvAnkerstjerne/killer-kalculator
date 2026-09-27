@@ -701,3 +701,30 @@ test('exact database verification detects empty versus nonempty even if a fact f
   assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
   assert.equal((await covered()).days.find(day => day.date === '2025-01-10').status, 'complete-single-pass');
 });
+
+// Catalogue identities are reviewed data; all transaction IDs/amounts below are
+// synthetic and all persistence is confined to disposable PostgreSQL 16.15.
+for (const storeSlug of ['norrebro', 'vesterbro', 'christianshavn', 'indre-by', 'fisketorvet', 'frederiksberg']) {
+  test('tracked catalogue mutations quarantine without replacing facts or coverage: ' + storeSlug, async () => {
+    const reviewed = require('../../catalogues/onlinepos-reviewed.json');
+    const product = reviewed.products.find(p => p.storeSlug === storeSlug && (storeSlug !== 'frederiksberg' || p.productLabel === ''));
+    const ctx = { identity: context.identity, catalog: createReviewedCatalog(reviewed) };
+    const scoped = { context: ctx, options: { ...options, storeSlug } };
+    const row = raw({ productid: product.productId, productname: product.productLabel,
+      productgroupid: product.groupId, productgroup: product.groupLabel,
+      paymenttype: 'Betalingskort', paymenttypecode: 'mixed 3' });
+    assert.equal((await scan([[row]], scoped)).status, 'published');
+    const facts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+    const coverage = (await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows;
+    for (const change of [{ productname: 'Synthetic unreviewed label' },
+      { paymenttype: 'Synthetic unreviewed payment' }, { paymenttypecode: 'UNREVIEWED' }]) {
+      await assert.rejects(scan([[{ ...row, ...change }]], scoped), { code: 'CATALOG_REVIEW' });
+      const attempt = await state();
+      assert.equal(attempt.status, 'quarantined'); assert.equal(attempt.error_code, 'CATALOG_REVIEW');
+      assert.equal(attempt.review_count, 1);
+      assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+      assert.deepEqual((await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows, coverage);
+      assert.equal(await count('sales_stage_line'), 0); assert.equal(await count('sales_import_discrepancy'), 0);
+    }
+  });
+}
