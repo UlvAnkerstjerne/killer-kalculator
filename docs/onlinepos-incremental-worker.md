@@ -148,6 +148,31 @@ The worker stops the run at the first failed unit, preserving the oldest gap.
 It does not continue to newer gaps or another store. A later explicit/scheduled
 invocation (scheduling is outside Stage 4A) derives its plan afresh from the DB.
 
+Worker publication also requires at least one logical in-range fact. After the
+genuine terminal page and declared-total validation, the shared importer counts
+its durable normalized, deduplicated, date-filtered snapshot. Exactly zero facts
+returns `ZERO_FACT_DAY_REVIEW` before reconciliation/publication: no successful
+coverage, publication bucket or fact is created, staging is purged, and no later
+unit is requested. Earlier committed units remain unchanged and session closure
+releases ownership. Refund-only days, zero-price lines and zero net revenue or
+quantity are nonempty when they contain a valid logical fact.
+
+The existing database error-code constraint is unchanged. This rejection is
+recorded as a terminal `failed` scan with `INVALID_RUN` and logical count zero;
+the worker's fixed structured output gives the specific `ZERO_FACT_DAY_REVIEW`
+reason. It increments `failed`, not catalogue quarantine. The rejected day
+remains missing for a later operator-controlled reassessment; there is no retry
+within this run. Stop/pause external scheduling after this review condition so
+the next scheduled invocation does not reassess it without operator review.
+No CLI/environment override or closed-store exception is provided. A legitimate
+closed-store day needs a separately reviewed process.
+
+The guard is an opt-in `requireNonEmpty` batch-import policy, always enabled by
+the worker. Manual importer commands retain their existing empty-day behavior;
+verification-only imports bypass the guard. Existing complete or verified-empty
+coverage stays a no-op. Pending publication still requires the unchanged manual
+resume workflow; guarded batch handles cannot resume a pending snapshot.
+
 | Interruption/failure | Durable result and next action |
 | --- | --- |
 | Before fetch | No provider request or facts; the next invocation replans. |
@@ -155,6 +180,7 @@ invocation (scheduling is outside Stage 4A) derives its plan afresh from the DB.
 | Terminal traversal but before publication | Existing staged/validated scan is marked interrupted and its staging purged by existing recovery; a later run fetches a new complete traversal. |
 | Staging transaction failure | Batch rollback, safe failed audit, no facts. A later run may retry. |
 | Unknown catalogue / invalid mixed candidate | Existing quarantine and fixed safe code; zero partial facts. Catalogue remains unchanged. Human review may be necessary; another invocation does not authorize catalogue admission. |
+| Zero logical in-range facts after terminal traversal | `ZERO_FACT_DAY_REVIEW`; failed audit, no facts/coverage/bucket, no staging residue and no later unit requested. Operator review is required before another invocation. |
 | Publication transaction failure | Atomic bucket rollback. `publication-pending` retains the validated snapshot and blocks the worker before any new fetch. |
 | Bucket committed but scan finalization lost | Facts/coverage may already exist, but pending scan still blocks the worker. No assumed rollback or duplicate fetch. |
 | Published scan, interruption during staging purge | Complete day remains a no-op; existing recovery purges leftover staging without fetching or changing facts. |

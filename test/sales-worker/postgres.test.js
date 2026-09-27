@@ -125,11 +125,14 @@ test('provider failure has no internal retry and does not advance past the oldes
   assert.equal((await worker(config)).published, 1); // Separate later invocation, not an internal retry.
 });
 test('later failure preserves completed work and every existing fact xmin', async () => {
-  await worker(config); const prior = await snapshot();
+  await worker(config); const prior = await snapshot(); let beforeFailure;
   let calls = 0;
   const result = await worker(config, { options: opts({ stores: ['norrebro', 'vesterbro'], end: '2026-09-23', maxDays: 4 }),
-    requestFor: () => async () => { calls++; if (calls === 2) throw Error('failure'); return body([]); } });
-  assert.equal(result.published, 1); assert.equal(result.failed, 1); assert.equal(result.attempted, 2); assert.ok(await snapshot() === prior);
+    requestFor: store => async () => { calls++; if (calls === 2) { beforeFailure = await snapshot(); throw Error('failure'); } return body([row(store)]); } });
+  assert.equal(result.published, 1); assert.equal(result.failed, 1); assert.equal(result.attempted, 2); assert.ok(await snapshot() === beforeFailure);
+  const original = (await db.query(`SELECT row_to_json(t)::text AS row, xmin::text AS version
+    FROM sales_foundation.sales_line t WHERE store_id = 6 ORDER BY store_id, source_key`)).rows;
+  assert.equal(JSON.stringify(original), prior);
   assert.equal((await counts()).sales_day_state, 2);
 });
 test('successful restart and duplicate invocation use durable coverage and do not rewrite facts/audit', async () => {
@@ -332,4 +335,112 @@ test('batch callback exit cancels and drains an unawaited import before releasin
   await assert.rejects(unfinished, { code: 'INTERRUPTED' });
   assert.equal(requests, 0); assert.equal((await counts()).sales_line, 0);
   assert.equal((await worker(config)).published, 1);
+});
+
+test('six-unit empty-first reproduction stops before publication or the next traversal', async () => {
+  let calls = 0;
+  const result = await worker(config, { options: opts({ start: '2026-09-21', end: '2026-09-27', maxDays: 6 }),
+    requestFor: () => async () => { calls++; return body([]); } });
+  assert.equal(calls, 1); assert.equal(result.planned, 6); assert.equal(result.attempted, 1);
+  assert.equal(result.status, 'incomplete'); assert.equal(result.code, 'ZERO_FACT_DAY_REVIEW');
+  assert.equal(result.published, 0); assert.equal(result.failed, 1); assert.equal(result.logicalRows, 0);
+  assert.deepEqual(await counts(), { sales_line: 0, sales_stage_line: 0, sales_day_state: 0,
+    sales_import_scan: 1, sales_import_bucket: 0, sales_import_discrepancy: 0, sales_sync_run: 1 });
+  const scan = (await db.query('SELECT status, error_code, terminal, logical_count FROM sales_foundation.sales_import_scan')).rows[0];
+  assert.deepEqual(scan, { status: 'failed', error_code: 'INVALID_RUN', terminal: true, logical_count: 0 });
+});
+
+test('middle empty unit preserves prior committed facts and stops before later dates', async () => {
+  let calls = 0, committed;
+  const result = await worker(config, { options: opts({ end: '2026-09-23', maxDays: 3 }), requestFor: () => async () => {
+    calls++;
+    if (calls === 1) return body([row()]);
+    committed = await snapshot(); return body([]);
+  } });
+  assert.equal(calls, 2); assert.equal(result.code, 'ZERO_FACT_DAY_REVIEW');
+  assert.equal(result.published, 1); assert.equal(result.attempted, 2); assert.equal(result.failed, 1);
+  assert.ok(await snapshot() === committed);
+  const state = await counts(); assert.equal(state.sales_line, 1); assert.equal(state.sales_day_state, 1);
+  assert.equal(state.sales_import_bucket, 1); assert.equal(state.sales_stage_line, 0);
+  const next = await plan({ end: '2026-09-23', maxDays: 3 });
+  assert.deepEqual(next.plan.map(unit => unit.start), ['2026-09-21', '2026-09-22']);
+});
+
+for (const outside of [false, true]) test('empty guard waits for terminal pagination with ' + (outside ? 'out-of-range provider rows' : 'empty source pages'), async () => {
+  let calls = 0;
+  const result = await worker(config, { requestFor: () => async url => {
+    calls++;
+    const rows = outside ? [row('norrebro', calls === 1 ? '2026-09-19' : '2026-09-21',
+      { productname: 'unreviewed outside the day', price: 'not-money' })] : [];
+    return body(rows, calls, calls === 1 ? url + '?page=2' : null);
+  } });
+  assert.equal(calls, 2); assert.equal(result.pages, 2); assert.equal(result.rows, outside ? 2 : 0);
+  assert.equal(result.code, 'ZERO_FACT_DAY_REVIEW'); assert.equal(result.published, 0);
+  assert.equal((await counts()).sales_stage_line, 0); assert.equal((await counts()).sales_day_state, 0);
+});
+
+test('empty first page does not reject a later nonempty in-range terminal page', async () => {
+  let calls = 0;
+  const result = await worker(config, { requestFor: () => async url => ++calls === 1
+    ? body([], 1, url + '?page=2') : body([row()], 2) });
+  assert.equal(calls, 2); assert.equal(result.status, 'complete'); assert.equal(result.logicalRows, 1);
+  assert.equal(result.published, 1);
+});
+
+for (const kind of ['zero-net', 'refund-only', 'zero-price']) test('nonempty ' + kind + ' day does not trigger the zero-fact guard', async () => {
+  const rows = kind === 'zero-net'
+    ? [row(), row('norrebro', scope.start, { orderlineid: 'synthetic-refund', price: '-10', priceexclvat: '-8', count: '-1' })]
+    : [row('norrebro', scope.start, { price: kind === 'refund-only' ? '-10' : '0', priceexclvat: kind === 'refund-only' ? '-8' : '0', count: kind === 'refund-only' ? '-1' : '1' })];
+  const result = await worker(config, { requestFor: () => async () => body(rows) });
+  assert.equal(result.status, 'complete'); assert.equal(result.published, 1); assert.equal(result.logicalRows, rows.length);
+  assert.equal((await counts()).sales_line, rows.length); assert.equal((await counts()).sales_stage_line, 0);
+});
+
+test('empty rejection releases ownership and a separate operator run can reassess the missing day', async () => {
+  let calls = 0;
+  const rejected = await worker(config, { requestFor: () => async () => { calls++; return body([]); } });
+  assert.equal(rejected.code, 'ZERO_FACT_DAY_REVIEW'); assert.equal(calls, 1);
+  await withImportOwner(config, async () => {});
+  const audit = await counts(); const next = await plan({});
+  assert.equal(next.planned, 1); assert.equal(next.noOp, 0); assert.deepEqual(await counts(), audit);
+  assert.equal(next.plan[0].start, scope.start);
+  const later = await worker(config); assert.equal(later.published, 1); assert.equal((await counts()).sales_stage_line, 0);
+});
+
+test('terminal total validation and catalogue quarantine take precedence over empty guard', async () => {
+  const invalid = await worker(config, { requestFor: () => async () => body([]).replace('"current_page":1', '"total":1,"current_page":1') });
+  assert.equal(invalid.code, 'INVALID_PAGE'); assert.equal(invalid.published, 0);
+  const quarantine = await worker(config, { requestFor: () => async () => body([row('norrebro', scope.start, { productname: 'unreviewed synthetic' })]) });
+  assert.equal(quarantine.code, 'CATALOG_REVIEW'); assert.equal(quarantine.quarantined, 1);
+  assert.equal((await counts()).sales_line, 0); assert.equal((await counts()).sales_stage_line, 0);
+});
+
+test('empty guard CLI output is fixed and omits provider fields, catalogue values and credentials', async () => {
+  const canary = ['SYNTHETIC', 'PRIVATE', 'IMPORTER', 'CANARY'].join('_');
+  const output = []; let calls = 0;
+  const env = { KK_SALES_SYNC_ENABLED: 'true', KK_SALES_DB_ENABLED: 'true', KK_SALES_DB_URL: config.connectionString,
+    KK_SALES_IDENTITY_KEY_HEX: '07'.repeat(32), KK_SALES_IDENTITY_KEY_VERSION: '1',
+    KK_SYNC_TOKEN_NORREBRO: canary, KK_SYNC_COMPANY_ID_NORREBRO: credentials.get('norrebro').companyId };
+  const exitCode = await main(['--apply', '--store', 'norrebro', '--from', scope.start, '--through', scope.end], env, line => output.push(line), {
+    now, requestFor: () => async () => { calls++; return body([row('norrebro', scope.end,
+      { orderlineid: canary, customer: canary, clerk: canary, card: canary, productname: canary })]); },
+  });
+  assert.equal(exitCode, 1); assert.equal(calls, 1); assert.equal(output.length, 1);
+  assert.equal(JSON.parse(output[0]).code, 'ZERO_FACT_DAY_REVIEW');
+  assert.ok(!output[0].includes(canary)); assert.ok(!output[0].includes(row().productname));
+  assert.equal(/sourceKey|fingerprint|runId|orderlineid|postgres:|token|[a-f0-9]{64}/.test(output[0]), false);
+});
+
+test('manual empty publication and verification retain their previous behavior', async () => {
+  const published = await seed('norrebro', scope.start, scope.end); assert.equal(published.status, 'published');
+  const beforeState = await snapshot();
+  const id = (await db.query("SELECT run_id FROM sales_foundation.sales_import_scan WHERE status = 'published'")).rows[0].run_id;
+  const verified = await withImportBatch({ config, context, requireNonEmpty: true }, ({ importOne }) => importOne({
+    options: { storeSlug: 'norrebro', start: scope.start, end: scope.end, companyId: credentials.get('norrebro').companyId, verificationOf: id },
+    now, request: async () => body([]),
+  }));
+  assert.equal(verified.status, 'verified'); assert.ok(await snapshot() === beforeState);
+  const noop = await worker(config, { requestFor: () => { throw Error('No worker rescan of verified empty coverage'); } });
+  assert.equal(noop.attempted, 0); assert.equal(noop.noOp, 1); assert.equal((await counts()).sales_stage_line, 0);
+  assert.equal((await db.query('SELECT evidence FROM sales_foundation.sales_day_state')).rows[0].evidence, 'verified-empty');
 });
