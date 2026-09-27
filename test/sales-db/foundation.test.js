@@ -9,7 +9,7 @@ const { decimal, date, range, saleTime, identifier, paymentCode } = require('../
 const { sanitized } = require('../../lib/sales-db/errors');
 const { identity, context, input, line } = require('./helpers');
 
-test('immutable migration files match the recovered production checksums', () => {
+test('immutable migration files match the recorded checksums', () => {
   const { readFileSync } = require('node:fs');
   const { createHash } = require('node:crypto');
   const path = require('node:path');
