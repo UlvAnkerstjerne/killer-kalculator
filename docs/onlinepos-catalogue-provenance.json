@@ -1,0 +1,90 @@
+{
+  "baseCommit": "8cb21cc726dc60114ea737a66b495358d1c4c37f",
+  "observation": {
+    "start": "2026-09-20",
+    "end": "2026-09-21",
+    "timezone": "Europe/Copenhagen"
+  },
+  "approval": "Ulv: exact catalogue admission only; no metric or channel classification",
+  "discoveryTraversals": 7,
+  "stage3ATraversals": 0,
+  "catalogSha256": "ba139d3e871f72b058a074c665f6c49c47ca101552474e0a4ec69488f9430cec",
+  "productsSha256": "d9a97b659b52bddf0a5d90d6c7587c3d0229ae29c1b817a5c472d301dabb53a6",
+  "paymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
+  "sources": [
+    {
+      "store": "christianshavn",
+      "artifact": "outputs/pr14-catalogue-discovery/christianshavn-unapproved-candidates.json",
+      "sourceSha256": "0998c3e2a95c5f0827d0ffe33fd76e39013153c10749473415a3de4cd27c919c",
+      "productCount": 54,
+      "paymentCount": 6,
+      "productsSha256": "44a119fe1915627e66bfef3aad4010aa3b3d31662347c0a42679b2096707431a",
+      "paymentsSha256": "5bca7a99d612d992645265c0777fea6a6fc0baab448b36b87784748183adeadb",
+      "pages": 1,
+      "rows": 4419,
+      "inRangeRows": 548,
+      "excludedRows": 3871
+    },
+    {
+      "store": "fisketorvet",
+      "artifact": "outputs/pr14-catalogue-discovery/fisketorvet-unapproved-candidates.json",
+      "sourceSha256": "0e7e01259b092bbaff5105fe1b4639f471c89522749a09f282dd157f0a9833a0",
+      "productCount": 61,
+      "paymentCount": 7,
+      "productsSha256": "748f141960770cd6d184efa6b309edd0aa504c05907bbd3eb6a7185fe83e91d2",
+      "paymentsSha256": "672671efde51816387a42ad5f805fe2bf2fb48f5341d8a74108eab95b9e0b167",
+      "pages": 1,
+      "rows": 5253,
+      "inRangeRows": 845,
+      "excludedRows": 4408
+    },
+    {
+      "store": "frederiksberg",
+      "artifact": "outputs/pr15-production/frederiksberg-unapproved-candidates.json",
+      "sourceSha256": "110212be60c95fda4cfed6fa34718ae3203c1ba6861f99d82d33b83240f24374",
+      "productCount": 50,
+      "paymentCount": 5,
+      "productsSha256": "a00de1a12de4dd770578fd1056e5db91c2c829ad25717cfea28fead936065b1b",
+      "paymentsSha256": "4f6bee38cf35fc3f55b1bbf10fb8a44cf322798274feb6a1c747ba2938bc0d89",
+      "pages": 1,
+      "rows": 3377,
+      "inRangeRows": 533,
+      "excludedRows": 2844
+    },
+    {
+      "store": "indre-by",
+      "artifact": "outputs/pr14-catalogue-discovery/indre-by-unapproved-candidates.json",
+      "sourceSha256": "a3a98a4368d207520a82ec7e7239db335e7b83f1b59bd7bbbcd1509109b4c43a",
+      "productCount": 46,
+      "paymentCount": 4,
+      "productsSha256": "29df0f2fa9dfb01fce834f7e138b98817613b1243d9e8284cf7732c669532d92",
+      "paymentsSha256": "67009e00857052d4f3236ff867e42244808ef2c1a05d4352ce7177bd1b067ec4",
+      "pages": 1,
+      "rows": 4821,
+      "inRangeRows": 604,
+      "excludedRows": 4217
+    },
+    {
+      "store": "norrebro",
+      "artifact": "work/catalog-production-baseline.json",
+      "sourceSha256": "b9036f5e8ba08e1636d932a4766c85c4df84e2fc6a22c2fdd31923aed1338aa1",
+      "productCount": 69,
+      "paymentCount": 7,
+      "productsSha256": "20f0fd784b573551e1dbb9680a697896deb9e3b23e1637b30654a4722acafc2d",
+      "paymentsSha256": "156275e8e433a4bf9f3e2742c426a33f127d2f7c7d2d720c890d5a679ec1cb6f"
+    },
+    {
+      "store": "vesterbro",
+      "artifact": "outputs/resumed-catalogue-discovery/vesterbro-unapproved-candidates.json",
+      "sourceSha256": "8c0fc5f8d7071684afdaf44b23521c651a2db9c46f47eb7626a33ccfa637f83b",
+      "productCount": 48,
+      "paymentCount": 6,
+      "productsSha256": "3faaaad09f35b04b38da827f0b0e2517ee9f5227e7a5289fc295b0c83ac0a213",
+      "paymentsSha256": "606c489b95c2e5ab428bdb37eb3eddca9f94bbdf43b6e0dcdf62854bbb422c22",
+      "pages": 1,
+      "rows": 2388,
+      "inRangeRows": 456,
+      "excludedRows": 1932
+    }
+  ]
+}

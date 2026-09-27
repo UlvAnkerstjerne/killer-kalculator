@@ -87,9 +87,11 @@ terminal/table/pax information, raw line IDs, raw responses and credentials.
 Product/group IDs are bounded identifiers. Product/group labels and payment
 values must match `createReviewedCatalog` entries **exactly**, including reviewed
 historical variants. The catalog is trusted reviewed configuration, never a list
-learned from provider payloads. No production catalog is supplied. The test-only
-catalog contains the 54 inspected menu tuples and five payment labels from the
-existing anonymized fixture; fixture transaction/source metadata never enters DB.
+learned from provider payloads. The [reviewed six-store catalogue](onlinepos-reviewed-catalogue.md)
+is supplied as explicit trusted input at `catalogues/onlinepos-reviewed.json`; it
+does not enable any database or importer operation. The separate test-only catalog
+contains the 54 inspected menu tuples and five payment labels from the existing
+anonymized fixture; fixture transaction/source metadata never enters DB.
 Unreviewed names fail closed rather than silently changing top-item semantics.
 
 `createIdentity` uses a 32-byte secret and HMAC-SHA-256 with distinct domains and
@@ -270,7 +272,8 @@ JSON, headers, credentials, URLs and response/error bodies are never persisted.
 Raw line IDs are discarded after the Stage 1 domain-separated, length-framed
 HMAC derivation. Fingerprints cover only canonical ordered safe fields, excluding
 private properties, input property order, ingestion time and derived metrics.
-No new production catalog, source identifiers, credentials or payload is supplied.
+The importer implementation supplies no source identifiers, credentials or payload.
+The separately reviewed catalogue is documented above and selected explicitly by path.
 
 ### Runs, evidence and recovery
 
