@@ -57,5 +57,9 @@ jobs:
         env:
           KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
         run: npm run test:importer:db
+      - name: Dormant worker PostgreSQL, recovery and overlap suite
+        env:
+          KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
+        run: npm run test:worker:db
       # No persistent volumes, repository secrets, provider access, deployment,
       # artifact uploads or database dumps. The service dies with this job.
