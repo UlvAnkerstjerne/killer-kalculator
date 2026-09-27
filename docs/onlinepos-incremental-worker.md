@@ -212,6 +212,10 @@ resource bounds. The existing full foundation/importer/verification suites and
 large synthetic importer heap simulation also remain required. CI has only
 `contents: read`, pinned actions/PG16 image, public synthetic credentials, a public
 network blocker inside tests, no repository secrets and no persistent artifacts.
+Restricted synthetic roles have only narrow [parameter SET grants](https://www.postgresql.org/docs/16/sql-grant.html)
+for `log_min_messages` and `log_min_error_statement`, so CI's privacy `PGOPTIONS`
+work without superuser rights. The same logging settings are enforced locally.
+These test-only grants do not add any table or schema privileges.
 
 A future least-privilege worker needs schema USAGE, table SELECT, importer table
 INSERT, UPDATE only on sync runs/import scans/day state, and DELETE only on

@@ -14,7 +14,10 @@ const { parseLossless } = require('../../lib/sales-sync/parse');
 const { disposableConfig } = require('../sales-sync/disposable');
 const { main } = require('../../scripts/sales-sync');
 const { STORES, identity, context, credentials, now, scope, row, body, worker } = require('./helpers');
-const config = disposableConfig(), db = createDatabase(config);
+const config = disposableConfig();
+// Exercise the same privacy settings locally and in CI, including restricted-role connections.
+process.env.PGOPTIONS = '-c log_min_messages=panic -c log_min_error_statement=panic';
+const db = createDatabase(config);
 const opts = change => ({ apply: true, enabled: true, scope: { ...scope, ...change } });
 const plan = change => worker(config, { options: { ...opts(change), apply: false } });
 const scalar = async sql => (await db.query(sql)).rows[0].n;
@@ -232,7 +235,7 @@ test('century-wide planning returns a bounded plan independent of date history l
   assert.ok(Buffer.byteLength(JSON.stringify(wide)) < 3000);
 });
 test('worker crash by SIGKILL releases session ownership and restart recovers staging', { timeout: 20000 }, async () => {
-  const child = fork(require.resolve('./worker-child'), [], { env: { PATH: process.env.PATH, KK_TEST_DATABASE_URL: process.env.KK_TEST_DATABASE_URL },
+  const child = fork(require.resolve('./worker-child'), [], { env: { PATH: process.env.PATH, PGOPTIONS: process.env.PGOPTIONS, KK_TEST_DATABASE_URL: process.env.KK_TEST_DATABASE_URL },
     execArgv: ['--require', require.resolve('../sales-sync/network-guard')], stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
   try {
     await Promise.race([once(child, 'message'), new Promise((_, reject) => { const t = setTimeout(() => reject(Error('Synthetic child timeout')), 10000); t.unref(); })]);
@@ -262,7 +265,8 @@ test('narrow writer role needs no schema ownership, fact UPDATE/DELETE or migrat
   // Public disposable test password, matching CI's SCRAM authentication.
   await db.query("CREATE ROLE kk_worker_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD 'disposable_test_only'");
   try {
-    await db.query(`GRANT USAGE ON SCHEMA sales_foundation TO kk_worker_test;
+    await db.query(`GRANT SET ON PARAMETER log_min_messages, log_min_error_statement TO kk_worker_test;
+      GRANT USAGE ON SCHEMA sales_foundation TO kk_worker_test;
       GRANT SELECT ON ALL TABLES IN SCHEMA sales_foundation TO kk_worker_test;
       GRANT INSERT ON sales_foundation.identity_key_check, sales_foundation.sales_sync_run,
         sales_foundation.sales_import_scan, sales_foundation.sales_stage_line, sales_foundation.sales_import_day,
@@ -283,7 +287,9 @@ test('narrow writer role needs no schema ownership, fact UPDATE/DELETE or migrat
 test('plan-only works with SELECT privileges and no worker write grants', async () => {
   await db.query("CREATE ROLE kk_plan_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD 'disposable_test_only'");
   try {
-    await db.query('GRANT USAGE ON SCHEMA sales_foundation TO kk_plan_test; GRANT SELECT ON ALL TABLES IN SCHEMA sales_foundation TO kk_plan_test');
+    await db.query(`GRANT SET ON PARAMETER log_min_messages, log_min_error_statement TO kk_plan_test;
+      GRANT USAGE ON SCHEMA sales_foundation TO kk_plan_test;
+      GRANT SELECT ON ALL TABLES IN SCHEMA sales_foundation TO kk_plan_test`);
     const target = new URL(config.connectionString); target.username = 'kk_plan_test'; target.password = 'disposable_test_only';
     const result = await worker({ enabled: true, connectionString: target.href }, { options: { ...opts({}), apply: false } });
     assert.equal(result.status, 'planned'); assert.equal(result.planned, 1); assert.equal(result.attempted, 0);
