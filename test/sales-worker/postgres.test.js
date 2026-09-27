@@ -259,7 +259,8 @@ test('a full seven-unit run releases each day before fetching the next and retai
   console.log('Synthetic worker memory result: ' + JSON.stringify({ units: 7, rowsPerUnit: 300, logicalRows: 2100, stagedRowsBeforeNextUnit: 0, maxPlanUnits: 7, maxPlannerCandidates: 48 }));
 });
 test('narrow writer role needs no schema ownership, fact UPDATE/DELETE or migration privileges', async () => {
-  await db.query('CREATE ROLE kk_worker_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT');
+  // Public disposable test password, matching CI's SCRAM authentication.
+  await db.query("CREATE ROLE kk_worker_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD 'disposable_test_only'");
   try {
     await db.query(`GRANT USAGE ON SCHEMA sales_foundation TO kk_worker_test;
       GRANT SELECT ON ALL TABLES IN SCHEMA sales_foundation TO kk_worker_test;
@@ -270,7 +271,7 @@ test('narrow writer role needs no schema ownership, fact UPDATE/DELETE or migrat
       GRANT UPDATE ON sales_foundation.sales_sync_run, sales_foundation.sales_import_scan,
         sales_foundation.sales_day_state TO kk_worker_test;
       GRANT DELETE ON sales_foundation.sales_stage_line TO kk_worker_test`);
-    const target = new URL(config.connectionString); target.username = 'kk_worker_test';
+    const target = new URL(config.connectionString); target.username = 'kk_worker_test'; target.password = 'disposable_test_only';
     const restricted = { enabled: true, connectionString: target.href };
     assert.equal((await worker(restricted)).published, 1);
     const rights = (await db.query(`SELECT has_table_privilege('kk_worker_test', 'sales_foundation.sales_line', 'UPDATE') AS update,
@@ -280,10 +281,10 @@ test('narrow writer role needs no schema ownership, fact UPDATE/DELETE or migrat
   } finally { await db.query('DROP OWNED BY kk_worker_test; DROP ROLE kk_worker_test'); }
 });
 test('plan-only works with SELECT privileges and no worker write grants', async () => {
-  await db.query('CREATE ROLE kk_plan_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT');
+  await db.query("CREATE ROLE kk_plan_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD 'disposable_test_only'");
   try {
     await db.query('GRANT USAGE ON SCHEMA sales_foundation TO kk_plan_test; GRANT SELECT ON ALL TABLES IN SCHEMA sales_foundation TO kk_plan_test');
-    const target = new URL(config.connectionString); target.username = 'kk_plan_test';
+    const target = new URL(config.connectionString); target.username = 'kk_plan_test'; target.password = 'disposable_test_only';
     const result = await worker({ enabled: true, connectionString: target.href }, { options: { ...opts({}), apply: false } });
     assert.equal(result.status, 'planned'); assert.equal(result.planned, 1); assert.equal(result.attempted, 0);
   } finally { await db.query('DROP OWNED BY kk_plan_test; DROP ROLE kk_plan_test'); }
