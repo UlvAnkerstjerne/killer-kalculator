@@ -631,3 +631,73 @@ test('catalogue review export leaves every populated foundation table and row ve
     assert.ok(!output.join('').includes(CANARY), 'review-export privacy canary');
   } finally { await fs.rm(directory, { recursive: true }); }
 });
+
+function emptyLabelContext(includeNonempty = false) {
+  return { identity: context.identity, catalog: createReviewedCatalog({
+    products: (includeNonempty ? ['', 'Synthetic product'] : ['']).map(productLabel => ({
+      storeSlug: 'norrebro', productId: 'synthetic-product', productLabel, groupId: 'synthetic-group', groupLabel: 'Synthetic group' })),
+    payments: [{ paymentType: 'Synthetic payment', paymentCode: 'TEST' }],
+  }) };
+}
+test('reviewed empty labels stage losslessly, publish, replay idempotently and verify without fact writes', async () => {
+  const ctx = emptyLabelContext();
+  const row = raw({ productname: '' });
+  const mock = provider([[row], []]); let inspectedStaging = false;
+  const first = await scan(undefined, { context: ctx, request: async url => {
+    if (mock.calls.length === 1) {
+      const staged = (await db.query('SELECT product_label, fingerprint FROM sales_foundation.sales_stage_line')).rows;
+      assert.equal(staged.length, 1); assert.equal(staged[0].product_label, '');
+      assert.ok(staged[0].fingerprint.equals(normalizeLine(row, { ...options, context: ctx }).fingerprint));
+      inspectedStaging = true;
+    }
+    return mock.request(url);
+  } });
+  assert.equal(inspectedStaging, true); assert.equal(first.status, 'published');
+  const facts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  assert.equal(facts[0].product_label, '');
+  const repo = createRepository(db, ctx);
+  assert.equal((await repo.lines({ storeSlug: 'norrebro', start, end })).lines[0].productLabel, '');
+  await scan([[row, row]], { context: ctx });
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+  await db.query(`CREATE FUNCTION sales_foundation.forbid_empty_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'verification attempted fact mutation'; END $$;
+    CREATE TRIGGER forbid_empty_fact_mutation BEFORE INSERT OR UPDATE OR DELETE ON sales_foundation.sales_line
+      FOR EACH STATEMENT EXECUTE FUNCTION sales_foundation.forbid_empty_fact_mutation()`);
+  const second = await scan([[row]], { context: ctx, options: { ...options, verificationOf: first.runId } });
+  assert.equal(second.status, 'verified'); assert.equal(second.verified, true);
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+  assert.equal(await count('sales_stage_line'), 0); assert.equal(await count('sales_import_discrepancy'), 0);
+  assert.equal((await covered()).days.find(day => day.date === '2025-01-10').status, 'independently-verified');
+});
+test('unreviewed empty replacement quarantines and preserves prior facts and coverage', async () => {
+  await scan();
+  const facts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  const coverage = (await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows;
+  await assert.rejects(scan([[raw({ productname: '' })]]), { code: 'CATALOG_REVIEW' });
+  assert.equal((await state()).status, 'quarantined'); assert.equal((await state()).review_count, 1);
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+  assert.deepEqual((await db.query('SELECT * FROM sales_foundation.sales_day_state ORDER BY business_date')).rows, coverage);
+  assert.equal(await count('sales_stage_line'), 0); assert.equal(await count('sales_import_discrepancy'), 0);
+});
+test('independent verification distinguishes reviewed empty from reviewed nonempty despite identical monetary totals', async () => {
+  const ctx = emptyLabelContext(true);
+  const first = await scan([[raw({ productname: '' })]], { context: ctx });
+  const facts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  await assert.rejects(scan([[raw()]], { context: ctx, options: { ...options, verificationOf: first.runId } }),
+    { code: 'RECONCILIATION_REQUIRED' });
+  assert.equal((await state()).status, 'quarantined'); assert.equal(await count('sales_import_discrepancy'), 1);
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+  assert.equal((await covered()).days.find(day => day.date === '2025-01-10').status, 'complete-single-pass');
+});
+test('exact database verification detects empty versus nonempty even if a fact fingerprint is left untouched', async () => {
+  const ctx = emptyLabelContext(true);
+  const first = await scan([[raw({ productname: '' })]], { context: ctx });
+  // Synthetic corruption demonstrates the final exact column comparison rather
+  // than trusting only fingerprints or equal revenue/count aggregates.
+  await db.query("UPDATE sales_foundation.sales_line SET product_label = 'Synthetic product'");
+  const facts = (await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows;
+  await assert.rejects(scan([[raw({ productname: '' })]], { context: ctx, options: { ...options, verificationOf: first.runId } }),
+    { code: 'VERIFICATION_MISMATCH' });
+  assert.deepEqual((await db.query('SELECT xmin::text, * FROM sales_foundation.sales_line')).rows, facts);
+  assert.equal((await covered()).days.find(day => day.date === '2025-01-10').status, 'complete-single-pass');
+});

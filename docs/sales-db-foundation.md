@@ -498,8 +498,10 @@ format is `kk-catalog-text-diagnostic-v1`, with `redacted: true` and
 `approvalRequired: true`. If any field is rejected, it reports `status:
 incomplete`, `code: CATALOG_TEXT_REVIEW`, and exits **1**. If none is rejected it
 reports `status: catalog-text-diagnostic` and exits 0; this is not catalogue
-approval or verification. The ordinary command without this flag retains PR #13's
-acceptance boundary, fixed error envelope and exact valid-candidate output.
+approval or verification. The ordinary command retains its fixed error envelope
+and exact non-empty candidate output. Migration 004's field-aware empty-label
+exception and whitespace rejection are described below; structural diagnostics
+retain their original text boundary.
 
 Each retained diagnostic has only these properties:
 
@@ -558,3 +560,63 @@ Unicode/control inspection is tested independently, but this mode makes no claim
 that pre-parser failures can be localized. It cannot reconstruct a value from an
 old failed run. The rejected Frederiksberg value was never retained and remains
 unknown; any future provider traversal needs separate explicit authorization.
+
+## Explicitly reviewed empty product labels (migration 004)
+
+`004_empty_product_labels.sql` replaces only the product-label check on
+`sales_line` and `sales_stage_line`. Migrations 001–003 remain byte-unchanged.
+Both columns stay `text NOT NULL`. Exact `''` is allowed; non-empty labels must
+have 1–160 PostgreSQL characters, contain no `[[:cntrl:]]` characters, and include
+at least one character outside Unicode White_Space plus U+FEFF (BOM). An explicit
+Unicode character set in a `btrim` predicate makes whitespace-only rejection
+independent of locale whitespace classes. This never trims or rewrites data;
+`Killer Kebab `, `+ Harissa, a little `, internal spaces and Danish letters survive
+exactly. Application label length remains the existing 160 UTF-16-unit bound.
+
+The migration locks both tables and requires exactly one validated, local,
+single-column check of the expected PostgreSQL 16 canonical old shape on each.
+Missing, extra, altered, unvalidated or multi-column product-label checks, or a
+nullable product-label column, cause a fixed error. Constraint names are read
+from verified catalog metadata and retained. The existing migration runner owns
+the atomic transaction, advisory lock and checksum ledger; a repeat applies zero.
+Fresh 001–004 and upgraded 001–003 schemas must be structurally identical.
+Validation scans existing rows without copying or rewriting them. If existing
+whitespace-only data violates the new check, the entire migration rolls back;
+this migration never repairs, deletes or changes such data. It requires explicit
+migration authorization separately from application deployment.
+
+Only the product-label field receives the exact-empty exception in candidate
+export and reviewed catalogue validation. Other labels remain nonempty and now
+reject whitespace-only text. Group fields remain nullable; identifiers and
+payment types remain nonempty. Payment codes retain their existing space/null
+contract. All existing sensitive-pattern, Unicode, control and length checks
+remain at their respective boundaries. Structural-only text diagnostics still
+report `EMPTY_TEXT` for `""`; `UNSAFE_OUTPUT_SEQUENCE` remains diagnostic-only.
+
+The ordinary exporter retains `kk-catalog-review-v1`: `productLabel: ""` is
+unambiguous, and `approvalRequired: true` already requires human review. No extra
+property or format version is needed. Candidates retain the exact store/product/
+group tuple and affected-row count; an empty label cannot be mechanically
+equivalent to a non-empty label. The envelope cannot load as trusted catalogue
+input. Unsafe other fields fail the entire export with no partial candidates.
+No candidate is automatically approved, including cross-store equivalents.
+
+Only a deliberately supplied exact reviewed tuple admits an empty label. Approval
+does not cross stores, product IDs, group IDs/labels or label variants. Normal
+staging and publication keep `""`; an unreviewed replacement quarantines without
+changing prior facts or coverage. Fingerprints include the label, content digests
+include fingerprints, and independent verification compares exact stored columns
+in addition to summaries. Empty and non-empty variants therefore differ even
+when counts and monetary totals match. Replays remain idempotent.
+
+The existing API allowlist preserves empty text. The existing UI may display
+`Unknown` without mutating API or stored values. Product metrics continue using
+registered IDs only, with no label inference or empty-label exclusion. No UI,
+metric IDs, payment/channel rules, worker or web read activation changed. All new
+catalogue fixtures are synthetic; no real Frederiksberg identifiers are supplied.
+
+Disposable PostgreSQL 16 tests cover fresh/upgrade schema equality, unchanged
+rows (including fingerprints, row locations/versions and table identity), ledger
+idempotency, old checksums, both-table acceptance/rejection matrices, schema drift,
+atomic rollback, staging/publication, exact verification, and prior-fact retention.
+These tests use no provider or production database access.

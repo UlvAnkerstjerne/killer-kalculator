@@ -127,7 +127,7 @@ test('classification requires exact reviewed membership or cross-store equivalen
 });
 for (const label of ['alice@example.invalid', 'søren@eksempel.dk', '+45 12 34 56 78', '4111 1111 1111 1111',
   'customer: Example Person', 'navn: Example Person', 'CPR: 010101-1234', 'Mr. Example Person', 'Bearer synthetic-token',
-  'https://example.invalid/private', 'a'.repeat(64), 'bad\nlabel', 'hidden\u200Blabel', 'x'.repeat(161), '']) {
+  'https://example.invalid/private', 'a'.repeat(64), 'bad\nlabel', 'hidden\u200Blabel', 'x'.repeat(161), ' ']) {
   test('suspicious or malformed labels fail closed without echoing or partially exporting candidates', async () => {
     await cli([raw(), raw({ productname: label })], async (args, request) => {
       const output = [];

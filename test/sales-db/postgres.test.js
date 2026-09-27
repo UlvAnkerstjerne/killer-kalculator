@@ -52,7 +52,7 @@ after(async () => {
   assert.equal(db.health().total, 0); assert.equal(independent.health().total, 0);
 });
 
-test('empty bootstrap creates six stores and three exact checksum-ledger entries', async () => {
+test('empty bootstrap creates six stores and four exact checksum-ledger entries', async () => {
   assert.equal(await count('sales_store'), 6);
   assert.deepEqual((await db.query('SELECT version, checksum FROM sales_foundation.schema_migration ORDER BY version')).rows,
     require('./migration-checksums.json'));
@@ -60,16 +60,19 @@ test('empty bootstrap creates six stores and three exact checksum-ledger entries
 });
 test('repeated migrations are an exact no-op', async () => {
   const before = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
-  assert.deepEqual(await migrate(db), { applied: 0, total: 3 });
+  assert.deepEqual(await migrate(db), { applied: 0, total: 4 });
   assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, before);
 });
 test('migration 003 widens only payment-code validation and preserves existing facts and staging', async () => {
-  const freshSchema = await schemaSnapshot(db);
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-migration-upgrade-'));
   try {
-    for (const name of ['001_foundation.sql', '002_backfill.sql']) {
+    for (const name of ['001_foundation.sql', '002_backfill.sql', '003_payment_code_spaces.sql']) {
       await fs.copyFile(path.join(migrationDir, name), path.join(temp, name));
     }
+    await db.query('DROP SCHEMA sales_foundation CASCADE');
+    await migrate(db, temp);
+    const freshSchema = await schemaSnapshot(db);
+    await fs.unlink(path.join(temp, '003_payment_code_spaces.sql'));
     await db.query('DROP SCHEMA sales_foundation CASCADE');
     assert.deepEqual(await migrate(db, temp), { applied: 2, total: 2 });
     const published = run(); await repository.publishCompletedRun(published);
@@ -84,7 +87,8 @@ test('migration 003 widens only payment-code validation and preserves existing f
     for (const table of ['sales_line', 'sales_stage_line']) {
       await rejected(db.query(`UPDATE sales_foundation.${table} SET payment_code = $1`, ['mixed 1']));
     }
-    assert.deepEqual(await migrate(db), { applied: 1, total: 3 });
+    await fs.copyFile(path.join(migrationDir, '003_payment_code_spaces.sql'), path.join(temp, '003_payment_code_spaces.sql'));
+    assert.deepEqual(await migrate(db, temp), { applied: 1, total: 3 });
     assert.deepEqual(await snapshot(), before);
     const upgradedSchema = await schemaSnapshot(db);
     assert.deepEqual(upgradedSchema, freshSchema, 'fresh and upgraded schemas must match');
@@ -95,7 +99,7 @@ test('migration 003 widens only payment-code validation and preserves existing f
     assert.deepEqual({ ...upgradedSchema, constraints: upgradedSchema.constraints.filter(row => !paymentCheck(row)) },
       { ...schemaBefore, constraints: schemaBefore.constraints.filter(row => !paymentCheck(row)) },
       'migration 003 must change only the two payment-code checks');
-    assert.deepEqual(await migrate(db), { applied: 0, total: 3 });
+    assert.deepEqual(await migrate(db, temp), { applied: 0, total: 3 });
     assert.deepEqual(await snapshot(), before);
     assert.deepEqual(await schemaSnapshot(db), upgradedSchema, 'repeated migrations must not drift');
     for (const table of ['sales_line', 'sales_stage_line']) {
@@ -129,7 +133,7 @@ test('reviewed spaced payment codes round-trip through foundation publication un
 test('concurrent independent migration sessions serialize empty bootstrap', async () => {
   await db.query('DROP SCHEMA sales_foundation CASCADE');
   const results = await Promise.all([migrate(db), migrate(independent)]);
-  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 3);
+  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 4);
   assert.equal(await count('sales_store'), 6);
 });
 test('migration runner waits on the real advisory lock and releases it at commit', async () => {
@@ -163,7 +167,7 @@ test('changed applied migration checksum fails closed', async () => {
     const name = '001_foundation.sql';
     await fs.writeFile(path.join(temp, name), await fs.readFile(path.join(migrationDir, name), 'utf8') + '\n-- changed\n');
     await assert.rejects(migrate(db, temp), { code: 'MIGRATION_MISMATCH' });
-    assert.equal(await count('schema_migration'), 3);
+    assert.equal(await count('schema_migration'), 4);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('failed migration rolls back schema and ledger and frees migration lock', async () => {
@@ -173,7 +177,7 @@ test('failed migration rolls back schema and ledger and frees migration lock', a
     await fs.writeFile(path.join(temp, '001_failure.sql'), 'CREATE TABLE sales_foundation.transient (id int); SELECT missing_synthetic_function();');
     await rejected(migrate(db, temp));
     assert.equal((await db.query("SELECT to_regnamespace('sales_foundation') IS NULL AS absent")).rows[0].absent, true);
-    assert.equal((await migrate(independent)).applied, 3);
+    assert.equal((await migrate(independent)).applied, 4);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('PK, FK, typed state, bounds and fact check constraints are enforced', async () => {
@@ -384,4 +388,119 @@ test('unchanged anonymized reference fixture preserves exact totals and canonica
   assert.equal(metrics.komboPct, computeMetrics(fixture.lines).komboPct);
   assert.equal(Math.round(metrics.komboPct * 10000) / 10000, 55);
   assert.equal(metrics.lemUnits, 20);
+});
+
+// Disposable upgrade fixtures only; immutable migration files are copied, never edited.
+async function schema003(work) {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'kk-migration-004-'));
+  try {
+    for (const name of ['001_foundation.sql', '002_backfill.sql', '003_payment_code_spaces.sql']) {
+      await fs.copyFile(path.join(migrationDir, name), path.join(temp, name));
+    }
+    await db.query('DROP SCHEMA sales_foundation CASCADE');
+    assert.deepEqual(await migrate(db, temp), { applied: 3, total: 3 });
+    await work();
+  } finally { await fs.rm(temp, { recursive: true }); }
+}
+async function seedUpgradeRows() {
+  const ctx = { identity: context.identity, catalog: createReviewedCatalog({
+    products: ['Killer Kebab ', '+ Harissa, a little ', 'Æble, øl & blåbær!'].map(productLabel => ({
+      storeSlug: 'norrebro', productId: 'synthetic-product', productLabel, groupId: 'synthetic-group', groupLabel: 'Synthetic group' })),
+    payments: [{ paymentType: 'Synthetic payment', paymentCode: 'TEST' }],
+  }) };
+  const published = run(['Killer Kebab ', '+ Harissa, a little ', 'Æble, øl & blåbær!'].map((productLabel, i) =>
+    line({ productLabel, sourceLineId: 'synthetic-upgrade-' + i }, ctx)));
+  await createRepository(db, ctx).publishCompletedRun(published);
+  await db.query('INSERT INTO sales_foundation.sales_stage_line SELECT l.*, $1::uuid, 1, 0 FROM sales_foundation.sales_line l', [published.runId]);
+}
+async function upgradeData() {
+  const result = {};
+  for (const table of ['sales_line', 'sales_stage_line', 'sales_day_state', 'sales_sync_run', 'identity_key_check']) {
+    result[table] = (await db.query(`SELECT xmin::text AS row_version, ctid::text AS row_location, * FROM sales_foundation.${table} ORDER BY 1, 2`)).rows;
+  }
+  return result;
+}
+const labelCheck = row => ['sales_line', 'sales_stage_line'].includes(row.relname) && row.contype === 'c' && row.definition.includes('length(product_label)');
+
+test('004 fresh/upgrade schemas match; only two checks change, all rows and prior ledger entries remain byte-exact', async () => {
+  const freshSchema = await schemaSnapshot(db);
+  await schema003(async () => {
+    await seedUpgradeRows();
+    const before = await upgradeData(), oldSchema = await schemaSnapshot(db);
+    const ledger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+    const physical = async () => (await db.query(`SELECT oid, relfilenode FROM pg_class WHERE oid IN
+      ('sales_foundation.sales_line'::regclass, 'sales_foundation.sales_stage_line'::regclass) ORDER BY oid`)).rows;
+    const physicalBefore = await physical();
+    assert.deepEqual(await migrate(db), { applied: 1, total: 4 });
+    assert.deepEqual(await upgradeData(), before, 'values, fingerprints, physical row versions/locations unchanged');
+    assert.deepEqual(await physical(), physicalBefore, 'no table recreation or rewrite');
+    assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version LIMIT 3')).rows, ledger);
+    const upgraded = await schemaSnapshot(db);
+    assert.deepEqual(upgraded, freshSchema);
+    assert.equal(oldSchema.constraints.filter(labelCheck).length, 2); assert.equal(upgraded.constraints.filter(labelCheck).length, 2);
+    assert.deepEqual({ ...upgraded, constraints: upgraded.constraints.filter(row => !labelCheck(row)) },
+      { ...oldSchema, constraints: oldSchema.constraints.filter(row => !labelCheck(row)) });
+    const newLedger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+    assert.deepEqual(await migrate(db), { applied: 0, total: 4 });
+    assert.deepEqual(await schemaSnapshot(db), freshSchema); assert.deepEqual(await upgradeData(), before);
+    assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, newLedger);
+  });
+});
+for (const table of ['sales_line', 'sales_stage_line']) {
+  test('004 ' + table + ' accepts exact empty and meaningful spaces, rejects whitespace/control/oversize/null without weakening other checks', async () => {
+    await seedUpgradeRows();
+    for (const value of ['', 'Synthetic product', 'Killer Kebab ', '+ Harissa, a little ', 'Æble, øl & blåbær!', 'ø'.repeat(160)]) {
+      await db.query(`UPDATE sales_foundation.${table} SET product_label = $1`, [value]);
+      assert.ok((await db.query(`SELECT product_label FROM sales_foundation.${table}`)).rows.every(row => row.product_label === value));
+    }
+    const white = [' ', '\t', '\n', '\r', '\v', '\f', '\u0085', '\u00a0', '\u1680',
+      ...Array.from({ length: 11 }, (_, i) => String.fromCodePoint(0x2000 + i)),
+      '\u2028', '\u2029', '\u202f', '\u205f', '\u3000', '\ufeff'];
+    for (const value of [...white, white.join(''), '  \u00a0 ', '\u0000', 'a\u0001b', 'a\u007fb', 'ø'.repeat(161), null]) {
+      await rejected(db.query(`UPDATE sales_foundation.${table} SET product_label = $1`, [value]));
+    }
+    for (const [column, value] of [['product_id', ''], ['payment_type', ''], ['payment_code', ''],
+      ['group_id', ''], ['group_label', ''], ['payment_type', 'bad\ntext'], ['group_label', 'bad\ntext'],
+      ['source_key', Buffer.alloc(1)], ['key_version', 0], ['revenue_excl', null], ['second_of_day', 86400]]) {
+      await rejected(db.query(`UPDATE sales_foundation.${table} SET ${column} = $1`, [value]));
+    }
+    const baseline = await schemaSnapshot(db);
+    const check = baseline.constraints.find(row => row.relname === table && labelCheck(row));
+    await db.query(`ALTER TABLE sales_foundation.${table} DROP CONSTRAINT "${check.conname}"`);
+    assert.notDeepEqual(await schemaSnapshot(db), baseline, '004 constraint drift is visible');
+  });
+}
+for (const drift of ['missing', 'ambiguous', 'altered', 'unvalidated', 'nullable', 'multi-column']) {
+  test('004 safely rolls back on ' + drift + ' staging product-label shape without changing facts, schema or ledger', async () => {
+    await schema003(async () => {
+      await seedUpgradeRows();
+      const snapshot = await schemaSnapshot(db);
+      const check = snapshot.constraints.find(row => row.relname === 'sales_stage_line' && labelCheck(row));
+      const tbl = 'sales_foundation.sales_stage_line';
+      if (['missing', 'altered', 'unvalidated'].includes(drift)) await db.query(`ALTER TABLE ${tbl} DROP CONSTRAINT "${check.conname}"`);
+      if (drift === 'ambiguous') await db.query(`ALTER TABLE ${tbl} ADD CONSTRAINT synthetic_extra CHECK (length(product_label) <= 160)`);
+      if (drift === 'altered') await db.query(`ALTER TABLE ${tbl} ADD CONSTRAINT "${check.conname}" CHECK (length(product_label) BETWEEN 1 AND 159 AND product_label !~ '[[:cntrl:]]')`);
+      if (drift === 'unvalidated') await db.query(`ALTER TABLE ${tbl} ADD CONSTRAINT "${check.conname}" ${check.definition} NOT VALID`);
+      if (drift === 'nullable') await db.query(`ALTER TABLE ${tbl} ALTER COLUMN product_label DROP NOT NULL`);
+      if (drift === 'multi-column') await db.query(`ALTER TABLE ${tbl} ADD CONSTRAINT synthetic_extra CHECK (product_label <> payment_type)`);
+      const before = await schemaSnapshot(db), data = await upgradeData();
+      const ledger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+      await rejected(migrate(db));
+      assert.deepEqual(await schemaSnapshot(db), before); assert.deepEqual(await upgradeData(), data);
+      assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, ledger);
+    });
+  });
+}
+test('004 invalid existing whitespace data aborts atomically without cleaning or rewriting it', async () => {
+  await schema003(async () => {
+    await seedUpgradeRows();
+    // Earlier schema permits spaces. A later staging failure must roll back the
+    // already-replaced fact check as well as the migration ledger transaction.
+    await db.query("UPDATE sales_foundation.sales_stage_line SET product_label = ' '");
+    const before = await schemaSnapshot(db), data = await upgradeData();
+    const ledger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+    await rejected(migrate(db));
+    assert.deepEqual(await schemaSnapshot(db), before); assert.deepEqual(await upgradeData(), data);
+    assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, ledger);
+  });
 });
