@@ -52,3 +52,48 @@ The deployed exporter also lacked a combined candidate/structural contract: norm
 export returned only a fixed `CATALOG_TEXT_REVIEW` error, while structural mode
 never returned candidate values. This opt-in contract addresses both problems
 without reconstructing or asserting the cause of that historical failure.
+
+## Encoded review transport
+
+`--diagnose-catalog-encoded` adds the explicit `kk-catalog-encoded-v1` contract.
+It preserves eligible exact catalogue UTF-8 bytes as canonical base64url, with
+field roles, byte/code-point lengths, SHA-256 of the UTF-8 bytes, fixed rendering
+categories and occurrence counts. It is bounded to 64 KiB and twenty combined
+product/payment candidates. Nothing in this envelope grants catalogue admission.
+`decodeReview` is the purpose-built review boundary: schema, canonical encoding,
+fatal UTF-8 decoding, lengths, digest, privacy rules and duplicate/collision checks
+all pass before any decoded tuple can be returned. Never print decoded review
+values or interpolate them into SQL, shell commands, markup or reports.
+
+The existing privacy, identifier, blank-label, control-character and invalid
+Unicode refusals still apply. Only the explicit diagnostic's extra rendering
+refusal for pipe/backtick/angle brackets, Unicode line separators and
+formula-like prefixes is replaced by neutral encoding. Quoted provider-field-like
+shapes remain a privacy refusal: encoding must not conceal customer data, secrets
+or source identifiers. Rendering syntax alone does not establish unsafe business data. Rejected sensitive or malformed text is never encoded; only fixed
+field/reason/count evidence is returned, and candidates are withheld if any field
+is refused, a collision occurs, or the candidate limit is exceeded.
+
+Applied importer and completed-day worker catalogue quarantines now retain this
+same review envelope from their existing traversal. Observation runs after date
+filtering, alongside the unchanged normalizer. Terminal pagination and totals are
+validated before candidate evidence is available. Import still throws catalogue
+review, purges staging and publishes nothing for the blocked day. A worker emits
+the envelope only in its failed unit summary and stops before later gaps. There
+is no extra request, retry, trusted catalogue update or change to successful output.
+The subprocess retainer accepts either explicit version, retains the canonical
+safe envelope before interpreting process status, and atomically persists it
+before runtime cleanup. Controllers must retain the worker's failed summary before
+acting on its nonzero exit as well.
+
+Raw provider rows stay in memory. The diagnostic performs no DB or identity
+operation; importer quarantine retains its existing DB audit behavior. Catalogue
+admission remains a separate reviewed repository change. Existing catalogue,
+classifications, migrations, decimal/identity handling, and publication and
+verification rules are unchanged by this transport.
+
+Up to 64 rendering-sensitive field signatures also record catalogue tuple/field
+digests, lengths, reviewed/unreviewed status and occurrences, without decoded
+text. This distinguishes repeated occurrences of an already reviewed tuple from
+a new candidate in the same traversal. Overflow withholds candidate admission.
+These digests cover public catalogue fields only, never source or fact identity.

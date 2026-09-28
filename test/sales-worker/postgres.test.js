@@ -444,3 +444,11 @@ test('manual empty publication and verification retain their previous behavior',
   assert.equal(noop.attempted, 0); assert.equal(noop.noOp, 1); assert.equal((await counts()).sales_stage_line, 0);
   assert.equal((await db.query('SELECT evidence FROM sales_foundation.sales_day_state')).rows[0].evidence, 'verified-empty');
 });
+
+test('worker retains bounded encoded review on quarantine without a second request',async()=>{
+ let requests=0;
+ const result=await worker(config,{requestFor:()=>async()=>{requests++;return body([row('norrebro',scope.start,{productid:'new-synthetic',productname:'<b>inert</b>'})]);}});
+ assert.equal(requests,1);assert.equal(result.quarantined,1);assert.equal(result.code,'CATALOG_REVIEW');assert.equal(result.published,0);
+ const decoded=require('../../lib/sales-sync/catalog-encoded').decodeReview(result.catalogReview);assert.equal(decoded.products[0].productLabel,'<b>inert</b>');assert.equal(result.catalogReview.traversal.requests,1);assert(result.catalogReview.traversal.terminal);
+ assert(!JSON.stringify(result).includes('<b>inert</b>'));const c=await counts();assert.equal(c.sales_line,0);assert.equal(c.sales_stage_line,0);assert.equal(c.sales_day_state,0);assert.equal(c.sales_import_discrepancy,0);
+});

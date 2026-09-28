@@ -728,3 +728,30 @@ for (const storeSlug of ['norrebro', 'vesterbro', 'christianshavn', 'indre-by', 
     }
   });
 }
+
+test('catalogue quarantine retains encoded candidates from its sole terminal traversal', async () => {
+  const reports=[];let calls=0;
+  await assert.rejects(scan(undefined,{request:async()=>{calls++;return body([raw(),raw({orderlineid:'synthetic-new',productid:'synthetic-new',productname:'<b>inert</b>'})]);},report:v=>reports.push(v)}),{code:'CATALOG_REVIEW'});
+  assert.equal(calls,1);await noPublished();assert.equal(await count('sales_stage_line'),0);assert.equal((await state()).status,'quarantined');
+  const envelope=reports.find(r=>r.status==='catalog-review').catalogReview;
+  const decoded=require('../../lib/sales-sync/catalog-encoded').decodeReview(envelope);
+  assert.equal(decoded.products.length,1);assert.equal(decoded.products[0].productLabel,'<b>inert</b>');assert(envelope.traversal.terminal);assert.equal(envelope.traversal.requests,1);assert.equal(envelope.traversal.inRangeRows,2);
+  assert(!JSON.stringify(reports).includes('<b>inert</b>'));
+});
+test('encoded review round trip stays exact through PostgreSQL, API JSON and escaped UI', async () => {
+  const label=' <script>synthetic()</script> e\u0301 🥙 \\" ';
+  const product={storeSlug:'norrebro',productId:'synthetic-product',productLabel:label,groupId:'synthetic-group',groupLabel:'Synthetic group'};
+  const reviewed={products:[product],payments:[{paymentType:'Synthetic payment',paymentCode:'7'}]};
+  // Use the fixture payment code and keep the exact label unclassified.
+  reviewed.payments[0].paymentCode=raw().paymenttypecode;
+  const ctx={identity:context.identity,catalog:createReviewedCatalog(reviewed)};
+  const first=await scan([[raw({productname:label})]],{context:ctx});
+  const stored=(await db.query('SELECT product_label, xmin::text FROM sales_foundation.sales_line')).rows;
+  assert(Buffer.from(stored[0].product_label).equals(Buffer.from(label)));
+  const line=normalizeLine(raw({productname:label}),{...options,context:ctx});
+  const serialized=JSON.parse(JSON.stringify(publicLine(line,ctx)));assert(Buffer.from(serialized.productLabel).equals(Buffer.from(label)));
+  const html=await fs.readFile(path.join(__dirname,'../../index.html'),'utf8');const source=html.slice(html.indexOf('function topItemsTable('),html.indexOf('// ── Sidebar'));
+  const render=require('node:vm').runInNewContext(source+'\ntopItemsTable;');const displayed=render([{name:label,count:1}]);assert(!displayed.includes('<script>'));assert(displayed.includes('&lt;script&gt;'));assert(displayed.includes('e\u0301 🥙'));
+  await scan([[raw({productname:label})]],{context:ctx,options:{...options,verificationOf:first.runId}});
+  assert.deepEqual((await db.query('SELECT product_label, xmin::text FROM sales_foundation.sales_line')).rows,stored);
+});

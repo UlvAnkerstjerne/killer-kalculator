@@ -9,7 +9,7 @@ const { fail, safeError } = require('../lib/sales-sync/errors');
 
 function parseArgs(args) {
   const valueFlags = new Set(['--store', '--from', '--through', '--catalog', '--verify-run', '--resume-publication', '--max-pages', '--max-rows', '--batch-size']);
-  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--diagnose-catalog-review', '--help']);
+  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--diagnose-catalog-review', '--diagnose-catalog-encoded', '--help']);
   const values = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -29,6 +29,7 @@ function parseArgs(args) {
   if (values['--diagnose-catalog-text'] && !values['--export-catalog-review']) fail('INVALID_OPTIONS');
   if (values['--diagnose-catalog-review'] && ['--apply', '--dry-run', '--validate', '--verify-run', '--resume-publication', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--help']
     .some(flag => values[flag] !== undefined)) fail('INVALID_OPTIONS');
+  if (values['--diagnose-catalog-encoded'] && ['--apply', '--dry-run', '--validate', '--verify-run', '--resume-publication', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--diagnose-catalog-review', '--help'].some(flag => values[flag] !== undefined)) fail('INVALID_OPTIONS');
   const options = { storeSlug: values['--store'], start: values['--from'], end: values['--through'],
     verificationOf: values['--verify-run'], resumePublication: values['--resume-publication'] };
   const limits = {};
@@ -39,7 +40,7 @@ function parseArgs(args) {
   }
   return { options, limits, apply: values['--apply'] === true, diagnose: values['--diagnose-catalog'] === true,
     exportReview: values['--export-catalog-review'] === true, diagnoseText: values['--diagnose-catalog-text'] === true,
-    safeReview: values['--diagnose-catalog-review'] === true, catalogPath: values['--catalog'], help: values['--help'] === true };
+    encodedReview: values['--diagnose-catalog-encoded'] === true, safeReview: values['--diagnose-catalog-review'] === true, catalogPath: values['--catalog'], help: values['--help'] === true };
 }
 async function readReviewedCatalog(filePath) {
   try {
@@ -63,15 +64,15 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
   try {
     const parsed = parseArgs(args);
     if (parsed.help) {
-      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply | --diagnose-catalog | --export-catalog-review [--diagnose-catalog-text] | --diagnose-catalog-review] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
+      output('Usage: node scripts/sales-backfill.js --store <internal-store> --from <YYYY-MM-DD> --catalog <reviewed-file> [--through <exclusive-date>] [--dry-run | --apply | --diagnose-catalog | --export-catalog-review [--diagnose-catalog-text] | --diagnose-catalog-review | --diagnose-catalog-encoded] [--verify-run <run-uuid> | --resume-publication <run-uuid>]');
       return 0;
     }
     validateOptions(parsed.options);
-    if (parsed.exportReview || parsed.safeReview) {
+    if (parsed.exportReview || parsed.safeReview || parsed.encodedReview) {
       const reviewed = await readReviewedCatalog(parsed.catalogPath);
       const companyId = env.KK_BACKFILL_COMPANY_ID;
       const request = dependencies.request || createHttpRequest({ token: env.KK_BACKFILL_TOKEN, companyId });
-      const review = parsed.safeReview ? require('../lib/sales-sync/catalog-diagnostic').diagnoseCatalogReview : parsed.diagnoseText ? require('../lib/sales-sync/catalog-text-diagnostic').diagnoseCatalogText : exportCatalogReview;
+      const review = parsed.encodedReview ? require('../lib/sales-sync/catalog-encoded').diagnoseEncodedCatalog : parsed.safeReview ? require('../lib/sales-sync/catalog-diagnostic').diagnoseCatalogReview : parsed.diagnoseText ? require('../lib/sales-sync/catalog-text-diagnostic').diagnoseCatalogText : exportCatalogReview;
       const result = await review({ reviewed, request, options: { ...parsed.options, companyId },
         limits: parsed.limits, signal: controller.signal });
       output(JSON.stringify(result)); return result.status === 'incomplete' || ['structural-review', 'operational-failure'].includes(result.outcome) ? 1 : 0;
