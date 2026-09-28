@@ -100,8 +100,22 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859840",
+      "productLabel": "+ Water, sparkling (+0kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859843",
       "productLabel": "+ Water, still (+0kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859846",
+      "productLabel": "Faxe Kondi (25kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -130,6 +144,13 @@
       "storeSlug": "christianshavn",
       "productId": "27859873",
       "productLabel": "+ Killer Lemonade (+10kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859876",
+      "productLabel": "+ Pale Ale (+20kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -375,6 +396,13 @@
       "storeSlug": "christianshavn",
       "productId": "28714270",
       "productLabel": "+ PREMIUM ",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714285",
+      "productLabel": "+ Booster (+10kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
