@@ -58,22 +58,22 @@ function withFiles(f, work) {
 const accepts = f => withFiles(f, () => assert.equal(typeof loadCatalog().validate, 'function'));
 const rejects = f => withFiles(f, () => assert.throws(() => loadCatalog(), { code: 'INVALID_CATALOG' }));
 
-test('fixed repository catalogue remains byte-identical with 328 products, nine payments and all six stores', () => {
-  assert.equal(current.products.length, 328); assert.equal(current.payments.length, 9);
-  assert.equal(sha(currentBytes), 'ba139d3e871f72b058a074c665f6c49c47ca101552474e0a4ec69488f9430cec');
+test('fixed repository catalogue remains byte-identical with 329 products, nine payments and all six stores', () => {
+  assert.equal(current.products.length, 329); assert.equal(current.payments.length, 9);
+  assert.equal(sha(currentBytes), '3458bc32bc9cefdbd4667440b0c679bc26e3ff89aafbb58fff69a160c5b8d92c');
   assert.deepEqual([...new Set(current.products.map(p => p.storeSlug))].sort(), [...STORES].sort());
   accepts({ bytes: currentBytes, provenance });
 });
-test('reviewed synthetic 329-product catalogue loads without a runtime count edit', () => {
-  const f = fixture(); assert.equal(f.provenance.counts.products, 329);
+test('reviewed synthetic larger catalogue loads without a runtime count edit', () => {
+  const f = fixture(); assert.equal(f.provenance.counts.products, current.products.length + 1);
   withFiles(f, () => loadCatalog().validate({ ...extra, storeId: storeId(extra.storeSlug), ...current.payments[0] }));
 });
-test('reviewed future growth is not special-cased to 329', () => {
+test('reviewed future growth is not special-cased to the baseline', () => {
   const c = expanded(); c.products.push({ ...extra, productId: 'synthetic-second-growth' });
-  assert.equal(c.products.length, 330); accepts(fixture(c));
+  assert.equal(c.products.length, current.products.length + 2); accepts(fixture(c));
 });
 for (const [name, edit] of [
-  ['stale product count', f => { f.provenance.counts.products = 328; }],
+  ['stale product count', f => { f.provenance.counts.products = current.products.length; }],
   ['stale payment count', f => { f.provenance.counts.payments--; }],
   ['stale store count', f => { f.provenance.counts.stores--; }],
   ['stale byte digest', f => { f.provenance.catalogSha256 = provenance.catalogSha256; }],
