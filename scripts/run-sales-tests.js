@@ -5,7 +5,8 @@ const mode = process.argv[2];
 const files = mode === 'regression' ? require('../package.json').scripts.test.split(' ').slice(2)
   : mode === 'foundation' ? ['test/sales-db/postgres.test.js']
     : mode === 'importer' ? ['test/sales-sync/postgres.test.js']
-      : mode === 'worker' ? ['test/sales-worker/postgres.test.js'] : null;
+      : mode === 'worker' ? ['test/sales-worker/postgres.test.js']
+        : mode === 'daily' ? ['test/sales-worker/daily-postgres.test.js'] : null;
 if (!files) throw new Error('Unknown test suite');
 // Buffer diagnostics before displaying them. A failed assertion must not print
 // row values, private canaries or an upstream object into durable Actions logs.
