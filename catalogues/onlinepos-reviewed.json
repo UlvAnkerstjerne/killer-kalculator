@@ -212,6 +212,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859969",
+      "productLabel": "Extra Mayo",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859981",
       "productLabel": "Hummus in flatbread",
       "groupId": "2938906",
@@ -240,6 +247,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859996",
+      "productLabel": "w/ Yogurt ",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859999",
       "productLabel": "No Mayo",
       "groupId": "2938906",
@@ -247,8 +261,22 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27860002",
+      "productLabel": "w/ Mayo",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27860005",
       "productLabel": "No Parsley",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860008",
+      "productLabel": "No Apple",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
