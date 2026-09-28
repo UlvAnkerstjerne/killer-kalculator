@@ -2,7 +2,7 @@
   "provenanceVersion": 1,
   "catalogueVersion": 1,
   "counts": {
-    "products": 328,
+    "products": 329,
     "payments": 9,
     "stores": 6
   },
@@ -29,8 +29,8 @@
     },
     {
       "storeSlug": "norrebro",
-      "productCount": 69,
-      "productsSha256": "20f0fd784b573551e1dbb9680a697896deb9e3b23e1637b30654a4722acafc2d"
+      "productCount": 70,
+      "productsSha256": "2a9ca6a0556f835bd228e52b0bf3379cdb185ea705c27058025b36e1c9647eaa"
     },
     {
       "storeSlug": "vesterbro",
@@ -47,8 +47,8 @@
   "approval": "Ulv: exact catalogue admission only; no metric or channel classification",
   "discoveryTraversals": 7,
   "stage3ATraversals": 0,
-  "catalogSha256": "ba139d3e871f72b058a074c665f6c49c47ca101552474e0a4ec69488f9430cec",
-  "productsSha256": "d9a97b659b52bddf0a5d90d6c7587c3d0229ae29c1b817a5c472d301dabb53a6",
+  "catalogSha256": "3458bc32bc9cefdbd4667440b0c679bc26e3ff89aafbb58fff69a160c5b8d92c",
+  "productsSha256": "1cae25442dd58081cdc407f19b7ed1d3862384db06c8d84d9d12735f145b9cd1",
   "paymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
   "sources": [
     {
@@ -124,6 +124,65 @@
       "rows": 2388,
       "inRangeRows": 456,
       "excludedRows": 1932
+    }
+  ],
+  "additions": [
+    {
+      "baseCommit": "f9c9ae4d992ada9d238ecee87e182f0b552cba84",
+      "store": "norrebro",
+      "start": "2026-09-25",
+      "end": "2026-09-26",
+      "timezone": "Europe/Copenhagen",
+      "approval": "Ulv delegated exact product admission after all automatic policy gates; no metric or channel classification",
+      "traversal": 8,
+      "requests": 1,
+      "pages": 1,
+      "providerRows": 1170,
+      "inRangeRows": 392,
+      "terminal": true,
+      "declaredTotal": "absent",
+      "products": [
+        {
+          "productId": "28715749",
+          "groupId": "2911748",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "c8da1b602a86f41f42035b4bf45ee90156ae1988cb84e5a22266276a9c30148d",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 17,
+              "codePointLength": 17,
+              "sha256": "1208e9dc5b4fa497beeb3a294a9c0201d626ca825bcb82adce06fbfd52e4f421",
+              "category": "rendering-sensitive"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "c49dde40a308e14ac3aff609228721d432e9d34fc3ed006a0c588972133ac063",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "c29cc6f115f1b2e51003af433dbab1974bf596bccceb912a1fde7bac69aabbed",
+              "category": "ordinary"
+            }
+          }
+        }
+      ]
     }
   ]
 }

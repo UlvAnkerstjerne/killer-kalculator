@@ -19,7 +19,7 @@ const catalogPath = path.join(__dirname, '../../catalogues/onlinepos-reviewed.js
 const catalog = createReviewedCatalog(reviewed), context = { identity, catalog };
 const productFields = ['storeSlug', 'productId', 'productLabel', 'groupId', 'groupLabel'];
 const paymentFields = ['paymentType', 'paymentCode'];
-const expectedCounts = { christianshavn: 54, fisketorvet: 61, frederiksberg: 50, 'indre-by': 46, norrebro: 69, vesterbro: 48 };
+const expectedCounts = { christianshavn: 54, fisketorvet: 61, frederiksberg: 50, 'indre-by': 46, norrebro: 70, vesterbro: 48 };
 const key = (p, fields) => JSON.stringify(fields.map(f => p[f]));
 const sort = (rows, fields) => [...rows].sort((a, b) => key(a, fields) < key(b, fields) ? -1 : key(a, fields) > key(b, fields) ? 1 : 0);
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -28,22 +28,22 @@ const line = (product, payment = reviewed.payments[0]) => createSafeLine(input({
 const emptyProduct = { storeSlug: 'frederiksberg', productId: '27241352', productLabel: '', groupId: '2911684', groupLabel: 'Drinks ' };
 
 test('trusted catalogue serialization and approved tuple checksums are deterministic', () => {
-  assert.equal(reviewed.products.length, 328); assert.equal(reviewed.payments.length, 9);
-  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 328);
+  assert.equal(reviewed.products.length, 329); assert.equal(reviewed.payments.length, 9);
+  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 329);
   assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 9);
   assert.deepEqual([...new Set(reviewed.products.map(p => p.storeSlug))].sort(), Object.keys(expectedCounts));
   const canonical = { products: sort([...reviewed.products].reverse(), productFields), payments: sort([...reviewed.payments].reverse(), paymentFields) };
   const text = JSON.stringify(canonical, null, 2) + '\n';
   assert.equal(fs.readFileSync(catalogPath, 'utf8'), text);
   assert.equal(sha(text), provenance.catalogSha256);
-  assert.equal(sha(text), 'ba139d3e871f72b058a074c665f6c49c47ca101552474e0a4ec69488f9430cec');
+  assert.equal(sha(text), '3458bc32bc9cefdbd4667440b0c679bc26e3ff89aafbb58fff69a160c5b8d92c');
   assert.equal(digest(reviewed.products, productFields), provenance.productsSha256);
   assert.equal(digest(reviewed.payments, paymentFields), provenance.paymentsSha256);
 });
 for (const [store, expected] of Object.entries(expectedCounts)) {
   test('exact approved tuples load with source checksum and coverage: ' + store, () => {
     const products = reviewed.products.filter(p => p.storeSlug === store);
-    const source = provenance.sources.find(p => p.store === store);
+    const source = provenance.reviewedStores.find(p => p.storeSlug === store);
     assert.equal(products.length, expected); assert.equal(source.productCount, expected);
     assert.equal(digest(products, productFields), source.productsSha256);
     for (const product of products) for (const payment of reviewed.payments) {
@@ -137,7 +137,8 @@ test('approved Huuray and Splitbetaling remain unattributed in actual applicatio
   }
 });
 test('all 69 Norrebro production identities and seven prior global payments remain exact', () => {
-  const products = reviewed.products.filter(p => p.storeSlug === 'norrebro');
+  const addedIds = new Set((provenance.additions || []).filter(a => a.store === 'norrebro').flatMap(a => a.products.map(p => p.productId)));
+  const products = reviewed.products.filter(p => p.storeSlug === 'norrebro' && !addedIds.has(p.productId));
   const payments = reviewed.payments.filter(p => !['Huuray', 'Splitbetaling'].includes(p.paymentType));
   const source = provenance.sources.find(p => p.store === 'norrebro');
   assert.equal(source.sourceSha256, 'b9036f5e8ba08e1636d932a4766c85c4df84e2fc6a22c2fdd31923aed1338aa1');
@@ -159,4 +160,17 @@ test('unreviewed or altered product and payment tuples still reach catalogue qua
       assert.throws(() => normalizeLine({ ...item, ...change }, { ...options, storeSlug: p.storeSlug, context }), { code: 'CATALOG_REVIEW' });
     }
   }
+});
+
+test('delegated September 25 product admission remains exact, inert and unclassified', () => {
+  const p=reviewed.products.find(p=>p.storeSlug==='norrebro'&&p.productId==='28715749');assert.ok(p);
+  assert.equal(Buffer.byteLength(p.productLabel),17);
+  assert.equal(sha(Buffer.from(p.productLabel)),'1208e9dc5b4fa497beeb3a294a9c0201d626ca825bcb82adce06fbfd52e4f421');
+  const bytes=Buffer.from(p.productLabel);assert.ok(Buffer.from(bytes.toString('base64url'),'base64url').equals(bytes));
+  assert.ok(Buffer.from(JSON.parse(JSON.stringify(line(p))).productLabel).equals(bytes));
+  assert.equal(metrics.ALL_KNOWN_IDS.has(p.productId),false);
+  assert.deepEqual(metrics.computeMetrics([{productid:p.productId,count:1,price:100}]),metrics.computeMetrics([]));
+  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+  const esc=vm.runInNewContext(html.match(/^function escHtml\([^]*?^}/m)[0]+'\nescHtml;');
+  assert.ok(esc(p.productLabel)===p.productLabel.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
 });
