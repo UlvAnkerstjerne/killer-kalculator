@@ -142,6 +142,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859867",
+      "productLabel": "Extra Meat (35 kr)",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859873",
       "productLabel": "+ Killer Lemonade (+10kr)",
       "groupId": "2938894",
@@ -172,6 +179,13 @@
       "storeSlug": "christianshavn",
       "productId": "27859885",
       "productLabel": "Killer Lemonade (35kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859888",
+      "productLabel": "Killer Pale Ale (45kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -214,6 +228,13 @@
       "storeSlug": "christianshavn",
       "productId": "27859969",
       "productLabel": "Extra Mayo",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859975",
+      "productLabel": "Falafel as kebab",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -284,6 +305,13 @@
       "storeSlug": "christianshavn",
       "productId": "27860011",
       "productLabel": "No Mint",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860017",
+      "productLabel": "Split in Half",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -450,8 +478,22 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28714321",
+      "productLabel": "BEER (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28714327",
       "productLabel": "+ Killer Pale Ale (+20kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714336",
+      "productLabel": "Pilsner (45kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -590,6 +632,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27240944",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27240956",
       "productLabel": "+ Faxe Kondi (+0kr)",
       "groupId": "2911652",
@@ -643,6 +692,13 @@
       "productLabel": "+ Pilsner (+30kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27240996",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons "
     },
     {
       "storeSlug": "fisketorvet",
@@ -737,6 +793,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241100",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241120",
       "productLabel": "Hummus in flatbread",
       "groupId": "2911668",
@@ -774,6 +837,13 @@
       "storeSlug": "fisketorvet",
       "productId": "27241144",
       "productLabel": "No Mayo",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241148",
+      "productLabel": "w/ Mayo",
       "groupId": "2911668",
       "groupLabel": "Messages"
     },
@@ -891,6 +961,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241240",
+      "productLabel": "Napkin",
+      "groupId": "2911648",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27340362",
       "productLabel": "Legally required bag fee",
       "groupId": "2911664",
@@ -914,6 +991,13 @@
       "storeSlug": "fisketorvet",
       "productId": "28717342",
       "productLabel": "Blanche (55kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28717345",
+      "productLabel": "+ IPA (+30kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
     },
@@ -956,6 +1040,13 @@
       "storeSlug": "fisketorvet",
       "productId": "29838706",
       "productLabel": "Lover",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "29843302",
+      "productLabel": "+ Lover (+10 kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
     },
@@ -1059,6 +1150,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241308",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2911676",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241320",
       "productLabel": "+ Faxe Kondi (+0kr)",
       "groupId": "2911684",
@@ -1068,6 +1166,13 @@
       "storeSlug": "frederiksberg",
       "productId": "27241324",
       "productLabel": "+ Pepsi Max (+0kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241328",
+      "productLabel": "+ Water, sparkling (+0kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
     },
@@ -1122,6 +1227,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241376",
+      "productLabel": "+ Pale Ale (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241380",
       "productLabel": "+ SOFT DRINK (+0kr)",
       "groupId": "2911684",
@@ -1171,6 +1283,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241452",
+      "productLabel": "Børnebab",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241456",
       "productLabel": "EAT NOW",
       "groupId": "2911700",
@@ -1185,8 +1304,22 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241468",
+      "productLabel": "Extra Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241472",
       "productLabel": "Extra yogurt",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241484",
+      "productLabel": "Hummus in flatbread",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
@@ -1220,6 +1353,20 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241508",
+      "productLabel": "No Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241512",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241516",
       "productLabel": "No Parsley",
       "groupId": "2911700",
@@ -1243,6 +1390,13 @@
       "storeSlug": "frederiksberg",
       "productId": "27241532",
       "productLabel": "Split in Half",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241536",
+      "productLabel": "Serve on a plate",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
@@ -1283,8 +1437,22 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241564",
+      "productLabel": "1 x Falafel Ball",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241568",
       "productLabel": "3 x Falafel Balls/Mayo",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241576",
+      "productLabel": "Flat Bread",
       "groupId": "2911680",
       "groupLabel": "Sides "
     },
@@ -1313,6 +1481,13 @@
       "storeSlug": "frederiksberg",
       "productId": "28714447",
       "productLabel": "+ BEER (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714450",
+      "productLabel": "+ Blå Thor (+20kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
     },
@@ -1348,6 +1523,13 @@
       "storeSlug": "frederiksberg",
       "productId": "28714483",
       "productLabel": "Blanche (45kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714489",
+      "productLabel": "Blå Thor (45kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
     },
@@ -1535,6 +1717,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241752",
+      "productLabel": "",
+      "groupId": "2911716",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241756",
       "productLabel": "+ Killer Lemonade (+10 kr)",
       "groupId": "2911716",
@@ -1591,8 +1780,29 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241836",
+      "productLabel": "Børnebab",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241840",
       "productLabel": "EAT NOW",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241848",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241856",
+      "productLabel": "Extra yogurt",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1640,6 +1850,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241896",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241900",
       "productLabel": "No Parsley",
       "groupId": "2911732",
@@ -1649,6 +1866,13 @@
       "storeSlug": "indre-by",
       "productId": "27241904",
       "productLabel": "No Apple",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241916",
+      "productLabel": "Split in Half",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1705,6 +1929,20 @@
       "storeSlug": "indre-by",
       "productId": "27241952",
       "productLabel": "3 x Falafel Balls/Mayo",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241956",
+      "productLabel": "Dip",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241960",
+      "productLabel": "Flat Bread",
       "groupId": "2911712",
       "groupLabel": "Sides "
     },
@@ -2501,6 +2739,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240712",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240732",
       "productLabel": "Hummus in flatbread",
       "groupId": "2911636",
@@ -2536,8 +2781,22 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240756",
+      "productLabel": "No Mayo",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240760",
       "productLabel": "w/ Mayo",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240764",
+      "productLabel": "No Parsley",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2550,8 +2809,22 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240772",
+      "productLabel": "No Mint",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240776",
       "productLabel": "No Celery",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240780",
+      "productLabel": "Split in Half",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2648,6 +2921,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "28718305",
+      "productLabel": "Blanche (45kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "28718308",
       "productLabel": "+ Blå Thor (+20kr)",
       "groupId": "2911620",
@@ -2664,6 +2944,13 @@
       "storeSlug": "vesterbro",
       "productId": "28718314",
       "productLabel": "+ Heineken 0,0% (+20kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718320",
+      "productLabel": "Heineken 0,0% (45kr)",
       "groupId": "2911620",
       "groupLabel": "Drinks "
     },
