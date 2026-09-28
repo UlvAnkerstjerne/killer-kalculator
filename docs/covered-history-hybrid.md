@@ -48,3 +48,9 @@ JSON boundary. The browser already uses floating-point sums (and Float32 heatmap
 cells); a change in summation order can produce display-order noise only. Shadow
 validation must compare signed exact totals and displayed metric semantics, and
 record any such numeric differences explicitly before deployment.
+
+Individually validated source decimals can sum to more digits than a JSON number
+can represent. Aggregate conversion permits at most 0.0000001 absolute rounding
+at that final numeric boundary; larger loss fails closed. Exact fixed-scale daily
+reconciliation happens first and is never rounded. This affects response
+serialization only; stored facts, quantities and checksums are unchanged.

@@ -47,3 +47,7 @@ test('compact revenue keeps signed exact boundary seconds and rejects coverage d
  function cursor(bad=false){let fetched=false;return{async query(q){if(q.includes('sales_day_state'))return{rows:[bad?{...state2,lineCount:3}:state2]};if(q.startsWith('FETCH')){if(fetched)return{rows:[]};fetched=true;return{rows};}return{rows:[]};}};}
  const r=await readSnapshot(cursor(),{...args,projection:'revenue',boundary:row.date});assert.equal(r.summary.completeRevenue,66);assert.deepEqual(r.summary.daily[0].seconds,[[50400,76],[50401,-10]]);await assert.rejects(readSnapshot(cursor(true),{...args,projection:'revenue',boundary:row.date}));
 });
+test('exact aggregate decimals allow only bounded JSON display rounding after reconciliation',async()=>{
+ const rows=[{...row,revenueIncl:'1.2345678901234567',revenueExcl:'1.2345678901234567'},{...row,revenueIncl:'1',revenueExcl:'1'}];
+ for(const projection of ['dashboard','revenue']){let fetched=false;const s={async query(q){if(q.includes('sales_day_state'))return{rows:[{...state,lineCount:2,revenueIncl:'2.2345678901234567',revenueExcl:'2.2345678901234567'}]};if(q.startsWith('FETCH')){if(fetched)return{rows:[]};fetched=true;return{rows};}return{rows:[]};}};const r=await readSnapshot(s,{...args,projection,boundary:row.date});assert.equal(projection==='dashboard'?r.lines[0].priceexclvat:r.summary.completeRevenue,1.2345678901234567+1);}
+});
