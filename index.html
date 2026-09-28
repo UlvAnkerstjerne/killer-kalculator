@@ -1519,7 +1519,8 @@ function recordSalesDataStatus(meta) {
   const key = meta.storeId + ':' + meta.start + ':' + meta.end;
   const storeName = STORES.find(s => s.id === meta.storeId)?.name || 'All stores';
   salesDataNotices.set(key, { meta, text: storeName + ' · ' + SalesDataStatus.rangeLabel(meta) + ': ' + SalesDataStatus.describe(meta) });
-  while (salesDataNotices.size > 12) salesDataNotices.delete(salesDataNotices.keys().next().value);
+  // Keep every notice for this view: comparisons must not evict warnings.
+  // Navigation/session changes clear the map.
   const el = document.getElementById('sales-data-status');
   if (el) {
     const notices = [...salesDataNotices.values()];

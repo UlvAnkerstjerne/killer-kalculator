@@ -21,3 +21,14 @@ test('readiness rejects unexpected migrations and privileged/writable roles',asy
 test('41 exact reviews are evidenced exclusions with one unresolved label; no new counted IDs',()=>{const review=require('../../catalogues/onlinepos-metric-review.json').products,metrics=require('../../lib/product-metrics');assert.equal(review.length,41);assert.equal(review.filter(p=>p.classification==='unresolved').length,1);for(const p of review){assert(cat.products.some(x=>['storeSlug','productId','productLabel','groupId','groupLabel'].every(k=>x[k]===p[k])));assert(!metrics.ALL_KNOWN_IDS.has(p.productId));}});
 test('a changed catalogue cannot silently claim complete metric classification',()=>{const source="const p=require.resolve('./catalogues/onlinepos-unresolved-metrics.json');require(p);require.cache[p].exports.reviewedCatalogueSha256='unreviewed';const c=require('./lib/sales-metric-coverage').metricCoverage([],'norrebro');if(c.productCountsComplete||c.catalogueReviewCurrent||!c.potentiallyIncomplete.includes('rolls'))process.exit(1);";assert.equal(cp.spawnSync(process.execPath,['-e',source],{cwd:require('node:path').join(__dirname,'../..')}).status,0);});
 test('status text distinguishes stored snapshots, unresolved counts and missing coverage',()=>{const m={source:'database',coverage:{days:[{date:'2026-09-20',status:'complete',independentlyVerified:false}]},freshness:{oldestObservation:'2026-09-28T10:00:00Z'},metrics:{potentiallyIncomplete:['lemonade']}};const text=describe(m);assert.match(text,/0\/1 days independently verified/);assert.match(text,/lemonade/);assert.match(text,/No live updates/);assert.equal(require('../../lib/sales-data-status').rangeLabel({start:'2026-09-20',end:'2026-09-21'}),'2026-09-20');});
+test('later comparisons cannot evict a visible product-classification warning',()=>{
+  const fs=require('node:fs'),vm=require('node:vm');
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../../index.html'),'utf8');
+  const elements=new Map();
+  const sandbox={SalesDataStatus:require('../../lib/sales-data-status'),STORES:[],document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}}};
+  vm.createContext(sandbox);
+  vm.runInContext(html.slice(html.indexOf('const salesDataNotices ='),html.indexOf('async function apiSalesRange')),sandbox);
+  for(let i=0;i<18;i++)vm.runInContext(`recordSalesDataStatus(${JSON.stringify({source:'database',storeId:'store-'+i,start:'2026-09-20',end:'2026-09-21',complete:true,coverage:{days:[]},metrics:{potentiallyIncomplete:i===0?['lemonade']:[]}})})`,sandbox);
+  assert.match(elements.get('sales-data-status-summary').textContent,/Product counts incomplete/);
+  assert.match(elements.get('sales-data-status-detail').textContent,/lemonade/);
+});
