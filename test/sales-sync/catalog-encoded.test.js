@@ -14,13 +14,13 @@ const CANARY=['SYNTHETIC','PRIVATE','IMPORTER','CANARY'].join('_');
 const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
 const inspect=(v,extra={})=>inspectProcessResult({stdout:JSON.stringify(v)+'\n',exitCode:0,...extra});
 async function temp(work){const d=await fs.mkdtemp(path.join(os.tmpdir(),'kk-encoded-test-'));try{return await work(d);}finally{await fs.rm(d,{recursive:true,force:true});}}
-const texts=['Ordinary product','pipe | and ``` fences','<script>synthetic()</script>','=SUM(A1)','+demo()','"orderid": example',`quotes ' " backslash \\`,'Kebab 🥙 æ ø å','e\u0301','  label  ','','line\u2028separator','dash\u2029separator'];
+const texts=['Ordinary product','pipe | and ``` fences','<script>synthetic()</script>','=SUM(A1)','+demo()',`quotes ' " backslash \\`,'Kebab 🥙 æ ø å','e\u0301','  label  ','','line\u2028separator','dash\u2029separator'];
 for(const [i,text] of texts.entries())test('encoded exact UTF-8 round trip fixture '+i,async()=>{
  const r=await run([row({productname:text})]);assert.equal(r.outcome,'candidates');const d=decodeReview(r);assert(Buffer.from(d.products[0].productLabel).equals(Buffer.from(text)));
  const f=r.review.products[0].fields.productLabel;assert.equal(f.sha256,digest(Buffer.from(text)));assert.equal(f.byteLength,Buffer.byteLength(text));assert.equal(f.codePointLength,[...text].length);
  assert(!JSON.stringify(r).includes('<script>'));assert.throws(()=>createReviewedCatalog(r));
 });
-for(const [name,text] of [['ansi','a\u001b[31m'],['newline','a\nb'],['carriage','a\rb'],['tab','a\tb'],['blank','  '],['nul','a\0b'],['surrogate','a\ud800'],['oversize','x'.repeat(161)],['bytes','🥙'.repeat(81)],['format','a\u200db'],['sensitive','customer:'+CANARY]])test('encoded refusal '+name+' cannot retain rejected bytes',async()=>{
+for(const [name,text] of [['ansi','a\u001b[31m'],['newline','a\nb'],['carriage','a\rb'],['tab','a\tb'],['blank','  '],['nul','a\0b'],['surrogate','a\ud800'],['oversize','x'.repeat(161)],['bytes','🥙'.repeat(81)],['format','a\u200db'],['sensitive','customer:'+CANARY],['quoted-provider-field','"orderid": example'],['quoted-personal-field','"customer":'+CANARY],['quoted-secret-field','"token":'+CANARY],['compatibility-provider-field','"ｃｕｓｔｏｍｅｒ":'+CANARY]])test('encoded refusal '+name+' cannot retain rejected bytes',async()=>{
  const r=await run([row({productname:text})]);assert(['structural-review','operational-failure'].includes(r.outcome));assert(!JSON.stringify(r).includes(CANARY));assert(!JSON.stringify(r).includes(Buffer.from(text).toString('base64url')));assert.equal(r.review?.products.length||0,0);
 });
 test('candidate duplicates aggregate occurrences; multiple tuples remain distinct',async()=>{

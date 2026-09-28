@@ -67,10 +67,10 @@ values or interpolate them into SQL, shell commands, markup or reports.
 
 The existing privacy, identifier, blank-label, control-character and invalid
 Unicode refusals still apply. Only the explicit diagnostic's extra rendering
-refusal is replaced by neutral encoding. That refusal covers pipe/backtick/angle
-bracket or Unicode line-separator shapes, formula-like prefixes, and certain
-quoted provider-field-like shapes. These shapes alone do not establish unsafe
-business data. Rejected sensitive or malformed text is never encoded; only fixed
+refusal for pipe/backtick/angle brackets, Unicode line separators and
+formula-like prefixes is replaced by neutral encoding. Quoted provider-field-like
+shapes remain a privacy refusal: encoding must not conceal customer data, secrets
+or source identifiers. Rendering syntax alone does not establish unsafe business data. Rejected sensitive or malformed text is never encoded; only fixed
 field/reason/count evidence is returned, and candidates are withheld if any field
 is refused, a collision occurs, or the candidate limit is exceeded.
 
