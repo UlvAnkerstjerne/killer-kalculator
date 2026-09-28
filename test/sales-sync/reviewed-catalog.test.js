@@ -19,7 +19,7 @@ const catalogPath = path.join(__dirname, '../../catalogues/onlinepos-reviewed.js
 const catalog = createReviewedCatalog(reviewed), context = { identity, catalog };
 const productFields = ['storeSlug', 'productId', 'productLabel', 'groupId', 'groupLabel'];
 const paymentFields = ['paymentType', 'paymentCode'];
-const expectedCounts = {"christianshavn":70,"fisketorvet":67,"frederiksberg":61,"indre-by":55,"norrebro":70,"vesterbro":61};
+const expectedCounts = {"christianshavn":76,"fisketorvet":74,"frederiksberg":74,"indre-by":63,"norrebro":70,"vesterbro":68};
 const key = (p, fields) => JSON.stringify(fields.map(f => p[f]));
 const sort = (rows, fields) => [...rows].sort((a, b) => key(a, fields) < key(b, fields) ? -1 : key(a, fields) > key(b, fields) ? 1 : 0);
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -28,15 +28,15 @@ const line = (product, payment = reviewed.payments[0]) => createSafeLine(input({
 const emptyProduct = { storeSlug: 'frederiksberg', productId: '27241352', productLabel: '', groupId: '2911684', groupLabel: 'Drinks ' };
 
 test('trusted catalogue serialization and approved tuple checksums are deterministic', () => {
-  assert.equal(reviewed.products.length, 384); assert.equal(reviewed.payments.length, 9);
-  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 384);
+  assert.equal(reviewed.products.length, 425); assert.equal(reviewed.payments.length, 9);
+  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 425);
   assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 9);
   assert.deepEqual([...new Set(reviewed.products.map(p => p.storeSlug))].sort(), Object.keys(expectedCounts));
   const canonical = { products: sort([...reviewed.products].reverse(), productFields), payments: sort([...reviewed.payments].reverse(), paymentFields) };
   const text = JSON.stringify(canonical, null, 2) + '\n';
   assert.equal(fs.readFileSync(catalogPath, 'utf8'), text);
   assert.equal(sha(text), provenance.catalogSha256);
-  assert.equal(sha(text), '03763c02e763ba34f7e468848865ca6bcb09bc31baa8bd5c4b442afce2735bec');
+  assert.equal(sha(text), '5ea040ba782e2a3247eae81bc5118af19621f3c8b25fe1c4189ff023c869593b');
   assert.equal(digest(reviewed.products, productFields), provenance.productsSha256);
   assert.equal(digest(reviewed.payments, paymentFields), provenance.paymentsSha256);
 });
@@ -86,15 +86,19 @@ test('trailing spaces are exact identities and trimming does not broaden approva
   }
   assert.ok(checks > 0);
 });
-test('only the complete approved Frederiksberg empty product tuple is accepted', () => {
-  assert.deepEqual(reviewed.products.filter(p => p.productLabel === ''), [emptyProduct]);
-  assert.equal(line(emptyProduct).productLabel, '');
-  for (const change of [{ storeSlug: 'norrebro' }, { productId: 'synthetic-other-product' },
-    { groupId: 'synthetic-other-group' }, { groupLabel: 'Drinks' }, { groupId: null }, { groupLabel: null }, { productLabel: 'Unknown' }]) {
-    assert.throws(() => line({ ...emptyProduct, ...change }), { code: 'UNREVIEWED_CATALOG' });
-  }
+test('only complete explicitly reviewed empty product tuples are accepted', () => {
+  const emptyProducts = reviewed.products.filter(p => p.productLabel === '');
+  assert.deepEqual(emptyProducts.map(p => [p.storeSlug, p.productId]), [['frederiksberg', '27241352'], ['indre-by', '27241752']]);
+  assert.deepEqual(emptyProducts[0], emptyProduct);
   const withoutEmpty = createReviewedCatalog({ products: reviewed.products.filter(p => p.productLabel !== ''), payments: reviewed.payments });
-  assert.throws(() => createSafeLine(input({ ...emptyProduct, ...reviewed.payments[0] }), { identity, catalog: withoutEmpty }), { code: 'UNREVIEWED_CATALOG' });
+  for (const approved of emptyProducts) {
+    assert.equal(line(approved).productLabel, '');
+    for (const change of [{ storeSlug: 'norrebro' }, { productId: 'synthetic-other-product' },
+      { groupId: 'synthetic-other-group' }, { groupLabel: 'Synthetic unreviewed group' }, { groupId: null }, { groupLabel: null }, { productLabel: 'Synthetic unreviewed label' }]) {
+      assert.throws(() => line({ ...approved, ...change }), { code: 'UNREVIEWED_CATALOG' });
+    }
+    assert.throws(() => createSafeLine(input({ ...approved, ...reviewed.payments[0] }), { identity, catalog: withoutEmpty }), { code: 'UNREVIEWED_CATALOG' });
+  }
 });
 test('whitespace-only product labels remain invalid even in an explicit reviewed entry', () => {
   for (const productLabel of [' ', '\t', '\r\n', '\u0085', '\u00a0', '\u1680', '\u2000\u200a', '\u2028\u2029', '\u202f', '\u205f', '\u3000', '\ufeff']) {
@@ -346,4 +350,14 @@ test('delegated traversal 32 products preserve exact unclassified values', () =>
     }
     assert.equal(metrics.ALL_KNOWN_IDS.has(p.productId), false); assert.deepEqual(metrics.computeMetrics([{productid:p.productId,count:1,price:100}]),metrics.computeMetrics([]));
   }
+});
+
+test('historical rollout bundle preserves exact unclassified tuples', () => {
+ const traversals=[35,36,37,38,39,40,41,42,43,44,45,46,48,49,50,51,52,54,55,58];
+ for(const traversal of traversals){const addition=provenance.additions.find(a=>a.traversal===traversal);assert.ok(addition);
+  for(const entry of addition.products){const p=reviewed.products.find(p=>p.storeSlug===addition.store&&p.productId===entry.productId);assert.ok(p);
+   for(const field of productFields.filter(f=>f!=='storeSlug')){if(p[field]===null){assert.equal(entry.fields[field],null);continue;}const bytes=Buffer.from(p[field]);assert.equal(bytes.length,entry.fields[field].byteLength);assert.equal(sha(bytes),entry.fields[field].sha256);assert.ok(Buffer.from(JSON.parse(JSON.stringify(line(p)))[field]).equals(bytes));}
+   assert.equal(metrics.ALL_KNOWN_IDS.has(p.productId),false);assert.deepEqual(metrics.computeMetrics([{productid:p.productId,count:1,price:100}]),metrics.computeMetrics([]));
+  }
+ }
 });
