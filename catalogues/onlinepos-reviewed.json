@@ -1514,8 +1514,22 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241892",
+      "productLabel": "No Mayo",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241900",
       "productLabel": "No Parsley",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241904",
+      "productLabel": "No Apple",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1595,6 +1609,13 @@
       "productLabel": "Legally Required Bag Fee",
       "groupId": "2911728",
       "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844046",
+      "productLabel": "+ Bread (25 kr)",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
     },
     {
       "storeSlug": "indre-by",
