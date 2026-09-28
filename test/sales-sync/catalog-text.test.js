@@ -184,3 +184,6 @@ test('diagnostic opt-in rejects every write/verification/aggregate-diagnostic co
     await assert.rejects(diagnose([], { options: { ...options, ...extra }, request: () => assert.fail('No request') }), { code: 'INVALID_OPTIONS' });
   }
 });
+
+// Keep the explicit safe diagnostic/controller contract in the standard CI suite.
+require("./catalog-diagnostic.test");
