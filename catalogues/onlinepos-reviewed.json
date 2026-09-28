@@ -947,6 +947,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241260",
+      "productLabel": "Killer Ketchup ",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241264",
       "productLabel": "Harissa Mayo",
       "groupId": "2911680",
@@ -1066,6 +1073,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241364",
+      "productLabel": "Extra Meat (35 kr)",
+      "groupId": "2911676",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241368",
       "productLabel": "Pepsi Max (25kr)",
       "groupId": "2911684",
@@ -1096,6 +1110,13 @@
       "storeSlug": "frederiksberg",
       "productId": "27241388",
       "productLabel": "Killer Lemonade (35 kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241392",
+      "productLabel": "Killer Pale Ale (45kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
     },
@@ -1159,6 +1180,13 @@
       "storeSlug": "frederiksberg",
       "productId": "27241500",
       "productLabel": "No yogurt",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241504",
+      "productLabel": "w/ Yogurt ",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
