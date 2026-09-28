@@ -1297,6 +1297,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241748",
+      "productLabel": "Extra Meat (35 kr)",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241756",
       "productLabel": "+ Killer Lemonade (+10 kr)",
       "groupId": "2911716",
@@ -1327,6 +1334,13 @@
       "storeSlug": "indre-by",
       "productId": "27241776",
       "productLabel": "Killer Pale Ale (45 kr)",
+      "groupId": "2911716",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241784",
+      "productLabel": "SOFT DRINK (25kr)",
       "groupId": "2911716",
       "groupLabel": "Drinks "
     },
@@ -1374,6 +1388,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241884",
+      "productLabel": "No yogurt",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241888",
       "productLabel": "w/ Yogurt ",
       "groupId": "2911732",
@@ -1390,6 +1411,13 @@
       "storeSlug": "indre-by",
       "productId": "27241920",
       "productLabel": "Serve on a plate",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241924",
+      "productLabel": "No Dukkah",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1423,8 +1451,22 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241948",
+      "productLabel": "1 x Falafel Ball",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241952",
       "productLabel": "3 x Falafel Balls/Mayo",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241964",
+      "productLabel": "Hummus TO-GO (35 kr)",
       "groupId": "2911712",
       "groupLabel": "Sides "
     },
