@@ -14,6 +14,9 @@ const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
 const databaseSales = require('./lib/sales-read-source').createSalesReadSource();
+const { selectSalesRead, providerReadMeta } = require('./lib/sales-read-policy');
+const { metricCoverage } = require('./lib/sales-metric-coverage');
+const databaseOnly = databaseSales && databaseSales.policy !== 'covered-history';
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
 const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
 const { createSharedSalesFetcher } = require('./lib/shared-sales-fetcher');
@@ -468,7 +471,7 @@ app.locals.revenueSummaryCache = revenueSummaryCache;
  */
 app.get('/api/sales-readiness', requireAuth, async (_req, res) => {
   if (!databaseSales) return res.json({ ready: true, source: 'onlinepos' });
-  try { return res.json(await databaseSales.ready()); }
+  try { return res.json({ ...await databaseSales.ready(), source: databaseOnly ? 'database' : 'onlinepos', readPolicy: databaseSales.policy || 'database-only' }); }
   catch { return res.status(503).json({ ready: false, source: 'database', code: 'DB_READ_UNAVAILABLE' }); }
 });
 
@@ -497,9 +500,11 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     });
   }
 
+  let selection;
   try {
-    if (databaseSales) {
-      const result = await databaseSales.read({ storeSlug: storeId, start, end });
+    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr() });
+    if (selection.source === 'database') {
+      const result = selection.result;
       return res.status(result.meta.complete ? 200 : 503).json(result);
     }
     const cached = await salesRangeCache.get({ storeId, store, start, end });
@@ -510,6 +515,8 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     // Raw conflict records and orderlineids are never sent to the browser;
     // only the conflict count is exposed so completeness can be assessed.
     const meta = {
+      ...providerReadMeta(selection, result.meta.complete),
+      metrics: metricCoverage(lines, storeId),
       complete:           result.meta.complete,
       pages:              result.meta.pages,
       rawLineCount:       result.meta.rawLineCount,
@@ -529,9 +536,10 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     return res.json({ lines, meta });
   } catch (err) {
     // Log the message only — never the store token, firmaid or upstream body
-    if (databaseSales) return res.status(503).json({ error: 'Stored sales unavailable', code: 'DB_READ_UNAVAILABLE' });
-    console.error('[sales-range] upstream error:', err.message);
-    return res.status(502).json({ error: 'Upstream data fetch failed' });
+    if (!err.salesReadMeta && selection?.source === 'database') err.salesReadMeta = { source: 'database', storeId, start, end, complete: false, code: 'DB_READ_UNAVAILABLE', routeReason: 'database-error' };
+    if (err.salesReadMeta) return res.status(503).json({ error: 'Stored sales unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', lines: [], meta: err.salesReadMeta });
+    console.error('[sales-range] upstream unavailable');
+    return res.status(502).json({ error: 'Upstream data fetch failed', ...(selection ? { meta: { ...providerReadMeta(selection, false), code: 'PROVIDER_READ_UNAVAILABLE' } } : {}) });
   }
 });
 
@@ -567,9 +575,11 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
     return res.status(400).json({ error: 'boundary must be a valid date inside the range' });
   }
 
+  let selection;
   try {
-    if (databaseSales) {
-      const result = await databaseSales.read({ storeSlug: storeId, start, end });
+    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr() });
+    if (selection.source === 'database') {
+      const result = selection.result;
       if (!result.meta.complete) return res.status(503).json({ summary: null, meta: result.meta });
       const source = { lines: result.lines.map(databaseInternalLine), meta: result.meta };
       return res.json({ summary: publicRevenueSummary(buildRevenueSummaryResult(source), boundary), meta: result.meta });
@@ -577,6 +587,7 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
     const cached = await revenueSummaryCache.get({ storeId, store, start, end });
     const result = cached.result;
     const meta = {
+      ...providerReadMeta(selection, result.meta.complete),
       complete: result.meta.complete,
       pages: result.meta.pages,
       rawLineCount: result.meta.rawLineCount,
@@ -592,9 +603,10 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
     };
     return res.json({ summary: publicRevenueSummary(result, boundary), meta });
   } catch (err) {
-    if (databaseSales) return res.status(503).json({ error: 'Stored revenue unavailable', code: 'DB_READ_UNAVAILABLE' });
-    console.error('[revenue-summary] upstream error:', err.message);
-    return res.status(502).json({ error: 'Upstream data fetch failed' });
+    if (!err.salesReadMeta && selection?.source === 'database') err.salesReadMeta = { source: 'database', storeId, start, end, complete: false, code: 'DB_READ_UNAVAILABLE', routeReason: 'database-error' };
+    if (err.salesReadMeta) return res.status(503).json({ error: 'Stored revenue unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', summary: null, meta: err.salesReadMeta });
+    console.error('[revenue-summary] upstream unavailable');
+    return res.status(502).json({ error: 'Upstream data fetch failed', ...(selection ? { meta: { ...providerReadMeta(selection, false), code: 'PROVIDER_READ_UNAVAILABLE' } } : {}) });
   }
 });
 
@@ -911,7 +923,7 @@ function databaseInternalLine(line) {
 async function fetchLemonadeToday() {
   const today    = cphDateStr();
   const tomorrow = cphDateNextDay(today);   // exclusive end — today only
-  if (databaseSales) return { date: today, stores: {}, total: null, complete: false, meta: {
+  if (databaseOnly) return { date: today, stores: {}, total: null, complete: false, meta: {
     source: 'database', storeId: 'all-stores', start: today, end: tomorrow, complete: false,
     coverage: { complete: false, days: [{ date: today, status: 'open-day-unsupported' }] },
     freshness: { live: false, status: 'incomplete' } } };
@@ -920,9 +932,7 @@ async function fetchLemonadeToday() {
     Object.entries(STORES).map(async ([id, store]) => {
       // History snapshots must wait for a fresh result. This still shares any
       // dashboard refresh already in flight for the identical range.
-      const { result } = databaseSales
-        ? { result: await databaseSales.read({ storeSlug: id, start: today, end: tomorrow }) }
-        : await salesRangeCache.get({ storeId: id, store, start: today, end: tomorrow });
+      const { result } = await salesRangeCache.get({ storeId: id, store, start: today, end: tomorrow });
       // Incomplete result (conflicts / invalids) must not corrupt totals.
       if (!result.meta.complete) {
         throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${(result.meta.conflicts || []).length})`);
@@ -931,7 +941,7 @@ async function fetchLemonadeToday() {
       // computeMetrics handles all three lemonade variants (addon, upgrade,
       // standalone) by product ID — no fuzzy product-name matching.
       const count = computeMetrics(result.lines).lemUnits;
-      return { id, count };
+      return { id, count, meta: { ...providerReadMeta(await selectSalesRead(databaseSales, { storeSlug: id, start: today, end: tomorrow, today }), true), metrics: metricCoverage(result.lines.map(sanitiseSalesLine), id) } };
     })
   );
 
@@ -944,18 +954,22 @@ async function fetchLemonadeToday() {
       stores[r.value.id] = r.value.count;
       total += r.value.count;
     } else {
-      console.warn('[lemonade] fetch error:', r.reason?.message);
+      console.warn('[lemonade] provider data unavailable');
       complete = false;   // partial data — do not save to history
     }
   }
 
-  return { date: today, stores, total, complete };
+  return { date: today, stores, total: complete ? total : null, complete, meta: { source: 'onlinepos', storeId: 'all-stores', start: today, end: tomorrow, complete,
+    readPolicy: databaseSales?.policy || 'provider-only', routeReason: 'includes-open-day',
+    coverage: { kind: 'provider-range', complete, start: today, end: tomorrow },
+    stores: results.filter(r=>r.status === 'fulfilled').map(r=>r.value.meta),
+    metrics: { potentiallyIncomplete: [...new Set(results.flatMap(r=>r.status === 'fulfilled' ? r.value.meta.metrics.potentiallyIncomplete : []))] } } };
 }
 
 // Warm This Week without delaying server readiness. Every complete weekly
 // result safely primes Today from its CPH-dated lines, avoiding a second export.
 async function warmCurrentSalesRanges() {
-  if (databaseSales) return { skipped: true, source: 'database' };
+  if (databaseOnly) return { skipped: true, source: 'database' };
   const today = cphDateStr();
   const tomorrow = cphDateNextDay(today);
   const monday = cphWeekMonday(today);
@@ -1023,7 +1037,7 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
 }
 
 async function warmStartupData() {
-  if (databaseSales) return { skipped: true, source: 'database' };
+  if (databaseOnly) return { skipped: true, source: 'database' };
   const started = performance.now();
   await warmCurrentSalesRanges();
   const currentFinished = performance.now();
