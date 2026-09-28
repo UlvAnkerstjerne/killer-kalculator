@@ -19,7 +19,7 @@ const catalogPath = path.join(__dirname, '../../catalogues/onlinepos-reviewed.js
 const catalog = createReviewedCatalog(reviewed), context = { identity, catalog };
 const productFields = ['storeSlug', 'productId', 'productLabel', 'groupId', 'groupLabel'];
 const paymentFields = ['paymentType', 'paymentCode'];
-const expectedCounts = { christianshavn: 54, fisketorvet: 61, frederiksberg: 50, 'indre-by': 46, norrebro: 70, vesterbro: 48 };
+const expectedCounts = { christianshavn: 54, fisketorvet: 61, frederiksberg: 50, 'indre-by': 52, norrebro: 70, vesterbro: 48 };
 const key = (p, fields) => JSON.stringify(fields.map(f => p[f]));
 const sort = (rows, fields) => [...rows].sort((a, b) => key(a, fields) < key(b, fields) ? -1 : key(a, fields) > key(b, fields) ? 1 : 0);
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -28,15 +28,15 @@ const line = (product, payment = reviewed.payments[0]) => createSafeLine(input({
 const emptyProduct = { storeSlug: 'frederiksberg', productId: '27241352', productLabel: '', groupId: '2911684', groupLabel: 'Drinks ' };
 
 test('trusted catalogue serialization and approved tuple checksums are deterministic', () => {
-  assert.equal(reviewed.products.length, 329); assert.equal(reviewed.payments.length, 9);
-  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 329);
+  assert.equal(reviewed.products.length, 335); assert.equal(reviewed.payments.length, 9);
+  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 335);
   assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 9);
   assert.deepEqual([...new Set(reviewed.products.map(p => p.storeSlug))].sort(), Object.keys(expectedCounts));
   const canonical = { products: sort([...reviewed.products].reverse(), productFields), payments: sort([...reviewed.payments].reverse(), paymentFields) };
   const text = JSON.stringify(canonical, null, 2) + '\n';
   assert.equal(fs.readFileSync(catalogPath, 'utf8'), text);
   assert.equal(sha(text), provenance.catalogSha256);
-  assert.equal(sha(text), '3458bc32bc9cefdbd4667440b0c679bc26e3ff89aafbb58fff69a160c5b8d92c');
+  assert.equal(sha(text), '36a375ab3c9360b56963f1a9568517e94b946aad564ddee65052e3ee386bd88d');
   assert.equal(digest(reviewed.products, productFields), provenance.productsSha256);
   assert.equal(digest(reviewed.payments, paymentFields), provenance.paymentsSha256);
 });
@@ -173,4 +173,23 @@ test('delegated September 25 product admission remains exact, inert and unclassi
   const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
   const esc=vm.runInNewContext(html.match(/^function escHtml\([^]*?^}/m)[0]+'\nescHtml;');
   assert.ok(esc(p.productLabel)===p.productLabel.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+});
+
+test('delegated Indre By September 21 additions preserve exact inert unclassified values', () => {
+  const addition = provenance.additions.find(a => a.store === 'indre-by' && a.start === '2026-09-21');
+  assert.equal(addition.products.length, 6);
+  for (const entry of addition.products) {
+    const p = reviewed.products.find(p => p.storeSlug === 'indre-by' && p.productId === entry.productId);
+    assert.ok(p);
+    for (const field of productFields.filter(f => f !== 'storeSlug')) {
+      if (p[field] === null) { assert.equal(entry.fields[field], null); continue; }
+      const bytes = Buffer.from(p[field]);
+      assert.equal(bytes.length, entry.fields[field].byteLength);
+      assert.equal(sha(bytes), entry.fields[field].sha256);
+      assert.ok(Buffer.from(bytes.toString('base64url'), 'base64url').equals(bytes));
+      assert.ok(Buffer.from(JSON.parse(JSON.stringify(line(p)))[field]).equals(bytes));
+    }
+    assert.equal(metrics.ALL_KNOWN_IDS.has(p.productId), false);
+    assert.deepEqual(metrics.computeMetrics([{productid:p.productId,count:1,price:100}]),metrics.computeMetrics([]));
+  }
 });
