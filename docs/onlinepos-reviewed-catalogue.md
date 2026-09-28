@@ -3,7 +3,39 @@
 `catalogues/onlinepos-reviewed.json` is trusted catalogue admission data for the
 existing explicit `--catalog` file loader. It contains 328 product tuples and nine
 global payment tuples. It does not activate an importer, database read path,
-worker, schedule or deployment. No loader or runtime validation rules change.
+worker, schedule or deployment.
+
+## Worker trust and catalogue growth
+
+The worker reads only the fixed repository catalogue and provenance paths via
+`lib/sales-worker/catalog.js`. No argument, environment variable, provider result
+or external file can supply its catalogue or provenance. Trust comes from the
+reviewed deployment artifact containing both files, not from a provider response
+or a count. Their checksums are integrity checks within that trusted artifact,
+not signatures authenticating arbitrary external catalogues. Deployments must
+remain pinned to reviewed source; replacing both files outside that process is
+not an authorized catalogue update.
+
+Provenance version 1 declares catalogue version 1: the existing exact
+`products`/`payments` JSON shape. The version lives in provenance so the original
+catalogue bytes do not change. The loader requires the byte checksum, canonical
+UTF-8 serialization (including exact field order and trailing newline), sorted
+tuple digests, global product/payment/store counts and each store's product count
+and digest to agree. `reviewedStores` describes the current reviewed catalogue;
+`sources` retains the original discovery provenance. All six existing store slugs
+are required. Duplicate payment tuples, duplicate products and differing tuples
+under one store/product ID fail closed. Existing exact tuple, safe catalogue text,
+empty-label and whitespace rules still apply; text is never normalized.
+
+This replaces the worker's unrelated literal 328-product/nine-payment count
+check. Future repository-reviewed additions must update the catalogue and its
+committed digests/counts together, but need no worker code edit. This loader
+change itself preserves all 328 products and nine payments byte-for-byte and
+grants no new admission or metric/channel classification. The manual importer,
+verification and review diagnostics retain their existing explicit reviewed-file
+workflow and shared tuple validator. Plan-only retains its read-only,
+catalogue-independent contract; activated apply validates the committed catalogue
+before opening its database session or requesting provider data.
 
 ## Approval and source correction
 

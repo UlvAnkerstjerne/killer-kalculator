@@ -1,4 +1,7 @@
 'use strict';
+// Included here so the focused loader checks run in the existing regression
+// command and CI without changing dependencies or the suite runner.
+require('./catalog.test');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
