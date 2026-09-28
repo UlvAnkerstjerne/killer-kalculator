@@ -2515,6 +2515,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240768",
+      "productLabel": "No Apple",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240776",
       "productLabel": "No Celery",
       "groupId": "2911636",
@@ -2606,8 +2613,22 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "28718302",
+      "productLabel": "+ Blanche (+20kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "28718308",
       "productLabel": "+ Blå Thor (+20kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718311",
+      "productLabel": "Blå Thor (45kr)",
       "groupId": "2911620",
       "groupLabel": "Drinks "
     },
@@ -2624,6 +2645,20 @@
       "productLabel": "Unknown external product",
       "groupId": "3035113",
       "groupLabel": "Unknown external product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29838742",
+      "productLabel": "Lover",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29843296",
+      "productLabel": "+ Lover (+10 kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
     }
   ],
   "payments": [
