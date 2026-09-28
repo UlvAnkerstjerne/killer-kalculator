@@ -91,7 +91,7 @@ test('atomic replacement and invalid evidence preserve previous artifact',async(
  await persistEvidence(file,inspect(await run([row({productname:'bad\ntext'})]),{exitCode:1}));assert.deepEqual(await fs.readdir(dir),['result.json']);
 }));
 for(const stream of ['stdout','stderr'])test('actual '+stream+' overflow is killed and discarded',async()=>{
- const r=await captureProcess(process.execPath,['-e',`process.${stream}.write('x'.repeat(100000));setInterval(()=>{},1000);`],{env:{},timeoutMs:5000});assert.equal(r.failure,'OUTPUT_LIMIT');assert.equal(r.process.outputLimitExceeded,true);assert.equal(r.envelope,null);
+ const r=await captureProcess(process.execPath,['-e',`process.${stream}.write('x'.repeat(${require('../../lib/sales-sync/diagnostic-process').MAX_STREAM_BYTES+1}));setInterval(()=>{},1000);`],{env:{},timeoutMs:5000});assert.equal(r.failure,'OUTPUT_LIMIT');assert.equal(r.process.outputLimitExceeded,true);assert.equal(r.envelope,null);
 });
 for(const partial of [false,true])test('actual timeout '+(partial?'after partial output':'before output'),async()=>{
  const r=await captureProcess(process.execPath,['-e',(partial?"process.stdout.write('{');":"")+'setInterval(()=>{},1000);'],{env:{},timeoutMs:100});assert.equal(r.failure,'TIMEOUT');assert.equal(r.envelope,null);
