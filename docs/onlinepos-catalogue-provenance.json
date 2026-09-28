@@ -1,4 +1,43 @@
 {
+  "provenanceVersion": 1,
+  "catalogueVersion": 1,
+  "counts": {
+    "products": 328,
+    "payments": 9,
+    "stores": 6
+  },
+  "reviewedStores": [
+    {
+      "storeSlug": "christianshavn",
+      "productCount": 54,
+      "productsSha256": "44a119fe1915627e66bfef3aad4010aa3b3d31662347c0a42679b2096707431a"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productCount": 61,
+      "productsSha256": "748f141960770cd6d184efa6b309edd0aa504c05907bbd3eb6a7185fe83e91d2"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productCount": 50,
+      "productsSha256": "a00de1a12de4dd770578fd1056e5db91c2c829ad25717cfea28fead936065b1b"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productCount": 46,
+      "productsSha256": "29df0f2fa9dfb01fce834f7e138b98817613b1243d9e8284cf7732c669532d92"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productCount": 69,
+      "productsSha256": "20f0fd784b573551e1dbb9680a697896deb9e3b23e1637b30654a4722acafc2d"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productCount": 48,
+      "productsSha256": "3faaaad09f35b04b38da827f0b0e2517ee9f5227e7a5289fc295b0c83ac0a213"
+    }
+  ],
   "baseCommit": "8cb21cc726dc60114ea737a66b495358d1c4c37f",
   "observation": {
     "start": "2026-09-20",
