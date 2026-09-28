@@ -2410,6 +2410,20 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240752",
+      "productLabel": "w/ Yogurt ",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240760",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240776",
       "productLabel": "No Celery",
       "groupId": "2911636",
