@@ -58,9 +58,9 @@ function withFiles(f, work) {
 const accepts = f => withFiles(f, () => assert.equal(typeof loadCatalog().validate, 'function'));
 const rejects = f => withFiles(f, () => assert.throws(() => loadCatalog(), { code: 'INVALID_CATALOG' }));
 
-test('fixed repository catalogue remains byte-identical with 362 products, nine payments and all six stores', () => {
-  assert.equal(current.products.length, 362); assert.equal(current.payments.length, 9);
-  assert.equal(sha(currentBytes), '774fb988c2d0145369cb2ca7d97ebdc4570de81adadcc0f0fc6b79eb6ed8288b');
+test('fixed repository catalogue remains byte-identical with 366 products, nine payments and all six stores', () => {
+  assert.equal(current.products.length, 366); assert.equal(current.payments.length, 9);
+  assert.equal(sha(currentBytes), 'a7117760ba385522b753b6d664b261bb54c0098ae7499171f0a37396e68395db');
   assert.deepEqual([...new Set(current.products.map(p => p.storeSlug))].sort(), [...STORES].sort());
   accepts({ bytes: currentBytes, provenance });
 });
