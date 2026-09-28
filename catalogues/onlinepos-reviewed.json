@@ -478,6 +478,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27240896",
+      "productLabel": "Killer Ketchup ",
+      "groupId": "2911648",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27240900",
       "productLabel": "Harissa Mayo",
       "groupId": "2911648",
@@ -632,6 +639,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241012",
+      "productLabel": "+ Killer Pale Ale (+20kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241016",
       "productLabel": "+ SOFT DRINK (+0kr)",
       "groupId": "2911652",
@@ -772,6 +786,20 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241176",
+      "productLabel": "No Dukkah",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241180",
+      "productLabel": "No Cabbage",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241188",
       "productLabel": "TO GO",
       "groupId": "2911668",
@@ -844,6 +872,13 @@
       "storeSlug": "fisketorvet",
       "productId": "27400883",
       "productLabel": "DRAFT (55kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28717339",
+      "productLabel": "+ Blanche (+30kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
     },
