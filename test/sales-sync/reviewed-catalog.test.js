@@ -19,7 +19,7 @@ const catalogPath = path.join(__dirname, '../../catalogues/onlinepos-reviewed.js
 const catalog = createReviewedCatalog(reviewed), context = { identity, catalog };
 const productFields = ['storeSlug', 'productId', 'productLabel', 'groupId', 'groupLabel'];
 const paymentFields = ['paymentType', 'paymentCode'];
-const expectedCounts = {"christianshavn":66,"fisketorvet":62,"frederiksberg":57,"indre-by":55,"norrebro":70,"vesterbro":56};
+const expectedCounts = {"christianshavn":66,"fisketorvet":67,"frederiksberg":57,"indre-by":55,"norrebro":70,"vesterbro":56};
 const key = (p, fields) => JSON.stringify(fields.map(f => p[f]));
 const sort = (rows, fields) => [...rows].sort((a, b) => key(a, fields) < key(b, fields) ? -1 : key(a, fields) > key(b, fields) ? 1 : 0);
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -28,15 +28,15 @@ const line = (product, payment = reviewed.payments[0]) => createSafeLine(input({
 const emptyProduct = { storeSlug: 'frederiksberg', productId: '27241352', productLabel: '', groupId: '2911684', groupLabel: 'Drinks ' };
 
 test('trusted catalogue serialization and approved tuple checksums are deterministic', () => {
-  assert.equal(reviewed.products.length, 366); assert.equal(reviewed.payments.length, 9);
-  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 366);
+  assert.equal(reviewed.products.length, 371); assert.equal(reviewed.payments.length, 9);
+  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 371);
   assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 9);
   assert.deepEqual([...new Set(reviewed.products.map(p => p.storeSlug))].sort(), Object.keys(expectedCounts));
   const canonical = { products: sort([...reviewed.products].reverse(), productFields), payments: sort([...reviewed.payments].reverse(), paymentFields) };
   const text = JSON.stringify(canonical, null, 2) + '\n';
   assert.equal(fs.readFileSync(catalogPath, 'utf8'), text);
   assert.equal(sha(text), provenance.catalogSha256);
-  assert.equal(sha(text), 'a7117760ba385522b753b6d664b261bb54c0098ae7499171f0a37396e68395db');
+  assert.equal(sha(text), '04fb7b8f03bbd962dabc880ead5c6bc7c66f9ee174fe11aa2884389fa0a857e4');
   assert.equal(digest(reviewed.products, productFields), provenance.productsSha256);
   assert.equal(digest(reviewed.payments, paymentFields), provenance.paymentsSha256);
 });
@@ -281,6 +281,20 @@ test('delegated traversal 21 products preserve exact unclassified values', () =>
 test('delegated traversal 23 products preserve exact unclassified values', () => {
   const addition = provenance.additions.find(a => a.traversal === 23);
   assert.equal(addition.products.length, 4);
+  for (const entry of addition.products) {
+    const p = reviewed.products.find(p => p.storeSlug === addition.store && p.productId === entry.productId); assert.ok(p);
+    for (const field of productFields.filter(f => f !== 'storeSlug')) {
+      if (p[field] === null) { assert.equal(entry.fields[field], null); continue; }
+      const bytes = Buffer.from(p[field]); assert.equal(bytes.length, entry.fields[field].byteLength); assert.equal(sha(bytes), entry.fields[field].sha256);
+      assert.ok(Buffer.from(bytes.toString('base64url'), 'base64url').equals(bytes)); assert.ok(Buffer.from(JSON.parse(JSON.stringify(line(p)))[field]).equals(bytes));
+    }
+    assert.equal(metrics.ALL_KNOWN_IDS.has(p.productId), false); assert.deepEqual(metrics.computeMetrics([{productid:p.productId,count:1,price:100}]),metrics.computeMetrics([]));
+  }
+});
+
+test('delegated traversal 25 products preserve exact unclassified values', () => {
+  const addition = provenance.additions.find(a => a.traversal === 25);
+  assert.equal(addition.products.length, 5);
   for (const entry of addition.products) {
     const p = reviewed.products.find(p => p.storeSlug === addition.store && p.productId === entry.productId); assert.ok(p);
     for (const field of productFields.filter(f => f !== 'storeSlug')) {
