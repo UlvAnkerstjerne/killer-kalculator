@@ -187,3 +187,5 @@ test('diagnostic opt-in rejects every write/verification/aggregate-diagnostic co
 
 // Keep the explicit safe diagnostic/controller contract in the standard CI suite.
 require("./catalog-diagnostic.test");
+
+require('./catalog-encoded.test');
