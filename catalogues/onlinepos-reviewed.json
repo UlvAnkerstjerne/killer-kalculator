@@ -2214,6 +2214,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240644",
+      "productLabel": "+ Pilsner (+20kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240648",
       "productLabel": "SOFT DRINK (25 kr)",
       "groupId": "2911620",
@@ -2242,6 +2249,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240732",
+      "productLabel": "Hummus in flatbread",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240740",
       "productLabel": "Messages",
       "groupId": "2911636",
@@ -2256,6 +2270,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240748",
+      "productLabel": "No yogurt",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240776",
       "productLabel": "No Celery",
       "groupId": "2911636",
@@ -2265,6 +2286,13 @@
       "storeSlug": "vesterbro",
       "productId": "27240784",
       "productLabel": "Serve on a plate",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240792",
+      "productLabel": "No Cabbage",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2330,6 +2358,20 @@
       "productLabel": "Legally required bag fee",
       "groupId": "2911632",
       "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718293",
+      "productLabel": "Pilsner (45kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718308",
+      "productLabel": "+ Blå Thor (+20kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks "
     },
     {
       "storeSlug": "vesterbro",
