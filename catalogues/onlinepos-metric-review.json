@@ -1,0 +1,415 @@
+{
+  "sourceCommit": "e18a1b4475a6155fcd4c4fc8b4f3033aa1e773c7",
+  "products": [
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859867",
+      "productLabel": "Extra Meat (35 kr)",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons ",
+      "classification": "addon",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859888",
+      "productLabel": "Killer Pale Ale (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859975",
+      "productLabel": "Falafel as kebab",
+      "groupId": "2938906",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860017",
+      "productLabel": "Split in Half",
+      "groupId": "2938906",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714321",
+      "productLabel": "BEER (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714336",
+      "productLabel": "Pilsner (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27240944",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons ",
+      "classification": "addon",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27240996",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons ",
+      "classification": "addon",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241100",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911668",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241148",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911668",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241240",
+      "productLabel": "Napkin",
+      "groupId": "2911648",
+      "groupLabel": "Sides ",
+      "classification": "side",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28717345",
+      "productLabel": "+ IPA (+30kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "29843302",
+      "productLabel": "+ Lover (+10 kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241308",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2911676",
+      "groupLabel": "Add-ons ",
+      "classification": "addon",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241328",
+      "productLabel": "+ Water, sparkling (+0kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241376",
+      "productLabel": "+ Pale Ale (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241452",
+      "productLabel": "Børnebab",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241468",
+      "productLabel": "Extra Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241484",
+      "productLabel": "Hummus in flatbread",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241508",
+      "productLabel": "No Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241512",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241536",
+      "productLabel": "Serve on a plate",
+      "groupId": "2911700",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241564",
+      "productLabel": "1 x Falafel Ball",
+      "groupId": "2911680",
+      "groupLabel": "Sides ",
+      "classification": "side",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241576",
+      "productLabel": "Flat Bread",
+      "groupId": "2911680",
+      "groupLabel": "Sides ",
+      "classification": "side",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714450",
+      "productLabel": "+ Blå Thor (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714489",
+      "productLabel": "Blå Thor (45kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241752",
+      "productLabel": "",
+      "groupId": "2911716",
+      "groupLabel": "Drinks ",
+      "classification": "unresolved",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; empty label does not identify the drink."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241836",
+      "productLabel": "Børnebab",
+      "groupId": "2911732",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241848",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911732",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241856",
+      "productLabel": "Extra yogurt",
+      "groupId": "2911732",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241896",
+      "productLabel": "w/ Mayo",
+      "groupId": "2911732",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241916",
+      "productLabel": "Split in Half",
+      "groupId": "2911732",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241956",
+      "productLabel": "Dip",
+      "groupId": "2911712",
+      "groupLabel": "Sides ",
+      "classification": "side",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241960",
+      "productLabel": "Flat Bread",
+      "groupId": "2911712",
+      "groupLabel": "Sides ",
+      "classification": "side",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240712",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911636",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240756",
+      "productLabel": "No Mayo",
+      "groupId": "2911636",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240764",
+      "productLabel": "No Parsley",
+      "groupId": "2911636",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240772",
+      "productLabel": "No Mint",
+      "groupId": "2911636",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240780",
+      "productLabel": "Split in Half",
+      "groupId": "2911636",
+      "groupLabel": "Messages",
+      "classification": "modifier",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718305",
+      "productLabel": "Blanche (45kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "28718320",
+      "productLabel": "Heineken 0,0% (45kr)",
+      "groupId": "2911620",
+      "groupLabel": "Drinks ",
+      "classification": "other-drink",
+      "countedMetrics": [],
+      "evidence": "Exact reviewed product and group tuple from PR #35; modifier/side/add-on/other drink, not a standalone roll, combo or lemonade."
+    }
+  ]
+}
