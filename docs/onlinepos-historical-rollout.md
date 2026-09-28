@@ -79,3 +79,21 @@ The natural daily jobs remain separately bounded and observable. Their readiness
 or deployment status is not proof of an actual scheduled publication. Phase 3
 must report the six actual September 29 runs and compare durable September 28
 coverage before the rollout is declared complete.
+
+## Historical catalogue review capacity
+
+The first terminal Vesterbro 2025 traversal received 232,712 rows in 24 pages,
+including 134,886 in-range rows and 17,038 rows requiring catalogue review.
+Publication remained blocked with no facts or coverage written. Its retained
+review reported candidate overflow at the former 20-tuple limit, so it contained
+no recoverable exact tuples. No raw source payload was retained.
+
+The encoded review transport now permits at most **512 candidate tuples and
+2 MiB**, sufficient for a bounded historical catalogue review while remaining
+independent of source-row count. The same strict decoder, terminal/declared-total
+validation, protected-text refusals, collisions, field allowlist and explicit
+review requirement apply. Exceeding either bound still rejects the envelope;
+there is no truncation, automatic admission, payment approval or classification.
+One controlled repeat of the blocked scope after deploying this capacity repair
+is necessary to obtain reviewable exact tuples, and must be charged to the
+historical campaign. It is not permission for a blind transport retry.

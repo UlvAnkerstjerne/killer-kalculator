@@ -26,8 +26,8 @@ for(const [name,text] of [['ansi','a\u001b[31m'],['newline','a\nb'],['carriage',
 test('candidate duplicates aggregate occurrences; multiple tuples remain distinct',async()=>{
  const r=await run([row(),row(),row({productid:'other',productname:'Other'})]);assert.equal(r.review.products.length,2);assert.deepEqual(r.review.products.map(p=>p.occurrences).sort(),[1,2]);assert.equal(r.traversal.inRangeRows,3);
 });
-test('candidate bound permits twenty, refuses twenty-one without truncating traversal',async()=>{
- for(const n of [20,21]){const r=await run(Array.from({length:n},(_,i)=>row({productid:'product-'+i})));assert.equal(r.traversal.rows,n);assert(r.traversal.terminal);assert.equal(r.outcome,n===20?'candidates':'structural-review');assert.equal(r.review.candidateOverflow,n===21);assert(Buffer.byteLength(JSON.stringify(r))<=MAX_OUTPUT_BYTES);}
+test('historical candidate bound permits 512, refuses 513 without truncating traversal',async()=>{
+ for(const n of [MAX_CANDIDATES,MAX_CANDIDATES+1]){const r=await run(Array.from({length:n},(_,i)=>row({productid:'product-'+i})));assert.equal(r.traversal.rows,n);assert(r.traversal.terminal);assert.equal(r.outcome,n===MAX_CANDIDATES?'candidates':'structural-review');assert.equal(r.review.candidateOverflow,n>MAX_CANDIDATES);assert(Buffer.byteLength(JSON.stringify(r))<=MAX_OUTPUT_BYTES);}
 });
 test('identifier and group collisions refuse all candidate output',async()=>{
  for(const second of [{productname:'Changed'},{productid:'different',productgroup:'Changed group'}]){const r=await run([row(),row(second)]);assert.equal(r.outcome,'structural-review');assert(r.review.identifierCollision);assert.deepEqual(r.review.products,[]);}
@@ -67,4 +67,11 @@ test('rendering metadata distinguishes reviewed and novel tuple occurrences with
  const product={storeSlug:options.storeSlug,productId:'synthetic-product',productLabel:'<b>known</b>',groupId:'synthetic-group',groupLabel:'Synthetic group'};
  const r=await run([row({productname:product.productLabel}),row({productname:product.productLabel}),row({productid:'new',productname:'=new'})],{reviewed:{...reviewed,products:[product]}});
  assert.equal(r.review.products.length,1);assert.equal(r.review.renderingFields.length,2);assert.deepEqual(r.review.renderingFields.map(f=>f.occurrences).sort(),[1,2]);assert.deepEqual(r.review.renderingFields.map(f=>f.catalogueStatus).sort(),['reviewed','unreviewed']);assert(!JSON.stringify(r).includes('<b>known</b>'));
+});
+
+test('larger historical envelope still refuses every candidate when protected text occurs late',async()=>{
+ const rows=Array.from({length:100},(_,i)=>row({productid:'history-'+i}));rows.push(row({productid:'late-refusal',productname:'customer:'+CANARY}));const r=await run(rows);assert.equal(r.outcome,'structural-review');assert.equal(r.review.products.length,0);assert(!JSON.stringify(r).includes(CANARY));assert.equal(r.review.refusals[0].reason,'SENSITIVE_PATTERN');
+});
+test('historical capacity covers maximum UTF-8 field lengths and strict subprocess retention',async()=>{
+ const label='ø'.repeat(160);const rows=Array.from({length:MAX_CANDIDATES},(_,i)=>row({productid:'history-'+i,productname:label,productgroup:label}));const r=await run(rows);assert.equal(r.outcome,'candidates');assert.equal(decodeReview(r).products.length,MAX_CANDIDATES);assert(Buffer.byteLength(JSON.stringify(r))<MAX_OUTPUT_BYTES);assert.equal(inspect(r).envelope.review.products.length,MAX_CANDIDATES);
 });
