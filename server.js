@@ -15,6 +15,7 @@ const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
 const databaseSales = require('./lib/sales-read-source').createSalesReadSource();
 const { selectSalesRead, providerReadMeta } = require('./lib/sales-read-policy');
+const hybridSales = require('./lib/sales-hybrid');
 const { metricCoverage } = require('./lib/sales-metric-coverage');
 const databaseOnly = databaseSales && databaseSales.policy !== 'covered-history';
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
@@ -477,6 +478,7 @@ app.get('/api/sales-readiness', requireAuth, async (_req, res) => {
 
 app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) => {
   const { storeId, start, end } = req.params;
+  if (req.query.view !== undefined && req.query.view !== 'dashboard') return res.status(400).json({error:'Unknown sales view'});
 
   const store = findStore(storeId);
   if (!store) return res.status(404).json({ error: 'Unknown store' });
@@ -502,10 +504,14 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
 
   let selection;
   try {
-    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr() });
+    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr(), projection: req.query.view || null });
     if (selection.source === 'database') {
       const result = selection.result;
       return res.status(result.meta.complete ? 200 : 503).json(result);
+    }
+    if (selection.source === 'hybrid') {
+      const cached = await salesRangeCache.get({ storeId, store, ...selection.providerRange });
+      return res.json(hybridSales.composeLines(selection,cached,cached.result.lines.map(sanitiseSalesLine)));
     }
     const cached = await salesRangeCache.get({ storeId, store, start, end });
     const result = cached.result;
@@ -536,6 +542,8 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     return res.json({ lines, meta });
   } catch (err) {
     // Log the message only — never the store token, firmaid or upstream body
+    if (selection?.source === 'hybrid') return res.status(502).json({ error: 'Hybrid sales unavailable; no partial figures are shown',
+      code: 'HYBRID_READ_UNAVAILABLE', lines: [], meta: err.hybridReadMeta || hybridSales.unavailable(selection) });
     if (!err.salesReadMeta && selection?.source === 'database') err.salesReadMeta = { source: 'database', storeId, start, end, complete: false, code: 'DB_READ_UNAVAILABLE', routeReason: 'database-error' };
     if (err.salesReadMeta) return res.status(503).json({ error: 'Stored sales unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', lines: [], meta: err.salesReadMeta });
     console.error('[sales-range] upstream unavailable');
@@ -577,12 +585,18 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
 
   let selection;
   try {
-    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr() });
+    selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr(), projection: 'revenue', boundary });
     if (selection.source === 'database') {
       const result = selection.result;
       if (!result.meta.complete) return res.status(503).json({ summary: null, meta: result.meta });
       const source = { lines: result.lines.map(databaseInternalLine), meta: result.meta };
-      return res.json({ summary: publicRevenueSummary(buildRevenueSummaryResult(source), boundary), meta: result.meta });
+      return res.json({ summary: publicRevenueSummary(result.summary ? result : buildRevenueSummaryResult(source), boundary), meta: result.meta });
+    }
+    if (selection.source === 'hybrid') {
+      const cached = await revenueSummaryCache.get({ storeId, store, ...selection.providerRange });
+      const source = { lines: selection.result.lines.map(databaseInternalLine), meta: selection.result.meta };
+      const combined = hybridSales.composeRevenue(selection,cached,selection.result.summary ? selection.result : buildRevenueSummaryResult(source));
+      return res.json({ summary: publicRevenueSummary(combined,boundary), meta: combined.meta });
     }
     const cached = await revenueSummaryCache.get({ storeId, store, start, end });
     const result = cached.result;
@@ -603,6 +617,8 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
     };
     return res.json({ summary: publicRevenueSummary(result, boundary), meta });
   } catch (err) {
+    if (selection?.source === 'hybrid') return res.status(502).json({ error: 'Hybrid revenue unavailable; no partial figures are shown',
+      code: 'HYBRID_READ_UNAVAILABLE', summary: null, meta: err.hybridReadMeta || hybridSales.unavailable(selection) });
     if (!err.salesReadMeta && selection?.source === 'database') err.salesReadMeta = { source: 'database', storeId, start, end, complete: false, code: 'DB_READ_UNAVAILABLE', routeReason: 'database-error' };
     if (err.salesReadMeta) return res.status(503).json({ error: 'Stored revenue unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', summary: null, meta: err.salesReadMeta });
     console.error('[revenue-summary] upstream unavailable');

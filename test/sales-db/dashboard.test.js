@@ -32,3 +32,18 @@ test('later comparisons cannot evict a visible product-classification warning',(
   assert.match(elements.get('sales-data-status-summary').textContent,/Product counts incomplete/);
   assert.match(elements.get('sales-data-status-detail').textContent,/lemonade/);
 });
+test('dashboard cursor supports over 100,000 facts with bounded batches and exact displayed semantics',async()=>{
+ const count=100001,templates=[row,{...row,quantity:'-1',revenueIncl:'-95',revenueExcl:'-76'},{...row,quantity:'0',revenueIncl:'20',revenueExcl:'16'},{...row,quantity:'1',revenueIncl:'0',revenueExcl:'0'}];
+ const sums={incl:0,excl:0,top:0,paid:0};for(let i=0;i<count;i++){const r=templates[i%4];sums.incl+=Number(r.revenueIncl);sums.excl+=Number(r.revenueExcl);if(Number(r.revenueExcl))sums.top+=Number(r.quantity)||1;if(Number(r.revenueIncl))sums.paid+=Number(r.quantity);}
+ let offset=0,peak=0,closed=false;
+ const s={async query(q){if(q.includes('sales_day_state'))return{rows:[{...state,lineCount:count,revenueIncl:String(sums.incl),revenueExcl:String(sums.excl)}]};if(q.startsWith('FETCH')){const batch=[];for(let i=0;i<500&&offset<count;i++,offset++)batch.push(templates[offset%4]);peak=Math.max(peak,batch.length);return{rows:batch};}if(q.startsWith('CLOSE'))closed=true;return{rows:[]};}};
+ const projected=await readSnapshot(s,{...args,projection:'dashboard'});assert.equal(projected.meta.rawLineCount,count);assert.equal(projected.lines.length,4);assert.equal(peak,500);assert(closed);assert.equal(projected.lines.reduce((n,l)=>n+l.priceexclvat,0),sums.excl);
+ assert.equal(require('../../lib/product-metrics').computeMetrics(projected.lines).rollUnits,sums.paid);
+ const fs=require('fs'),vm=require('vm'),html=fs.readFileSync(require('path').join(__dirname,'../../index.html'),'utf8');const sandbox={};vm.createContext(sandbox);vm.runInContext(html.slice(html.indexOf('function buildTopItems('),html.indexOf('function topItemsTable(')),sandbox);assert.equal(sandbox.buildTopItems(projected.lines)[0].count,sums.top);
+});
+test('compact revenue keeps signed exact boundary seconds and rejects coverage disagreement',async()=>{
+ const rows=[row,{...row,quantity:'-1',revenueIncl:'-12.5',revenueExcl:'-10',saleLocal:'2026-09-24 14:00:01',secondOfDay:50401}];
+ const state2={...state,lineCount:2,revenueIncl:'82.5',revenueExcl:'66'};
+ function cursor(bad=false){let fetched=false;return{async query(q){if(q.includes('sales_day_state'))return{rows:[bad?{...state2,lineCount:3}:state2]};if(q.startsWith('FETCH')){if(fetched)return{rows:[]};fetched=true;return{rows};}return{rows:[]};}};}
+ const r=await readSnapshot(cursor(),{...args,projection:'revenue',boundary:row.date});assert.equal(r.summary.completeRevenue,66);assert.deepEqual(r.summary.daily[0].seconds,[[50400,76],[50401,-10]]);await assert.rejects(readSnapshot(cursor(true),{...args,projection:'revenue',boundary:row.date}));
+});

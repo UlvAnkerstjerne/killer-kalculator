@@ -1515,8 +1515,10 @@ function resetSalesDataNotices() {
   if (detail) detail.textContent = '';
 }
 function recordSalesDataStatus(meta) {
-  if (typeof SalesDataStatus === 'undefined' || !['database','onlinepos'].includes(meta?.source)) return;
+  if (typeof SalesDataStatus === 'undefined' || !['database','onlinepos','hybrid'].includes(meta?.source)) return;
   const key = meta.storeId + ':' + meta.start + ':' + meta.end;
+  const prior = salesDataNotices.get(key)?.meta;
+  if (!meta.metrics && prior?.metrics) meta = { ...meta, metrics: prior.metrics };
   const storeName = STORES.find(s => s.id === meta.storeId)?.name || 'All stores';
   salesDataNotices.set(key, { meta, text: storeName + ' · ' + SalesDataStatus.rangeLabel(meta) + ': ' + SalesDataStatus.describe(meta) });
   // Keep every notice for this view: comparisons must not evict warnings.
@@ -1526,7 +1528,7 @@ function recordSalesDataStatus(meta) {
     const notices = [...salesDataNotices.values()];
     const incomplete = notices.some(n => !n.meta.complete);
     const unresolved = notices.some(n => n.meta.metrics?.potentiallyIncomplete?.length);
-    const sources = [...new Set(notices.map(n=>n.meta.source === 'database' ? 'Stored snapshots' : 'OnlinePOS'))].join(' + ');
+    const sources = [...new Set(notices.map(n=>n.meta.source === 'database' ? 'Stored snapshots' : n.meta.source === 'hybrid' ? 'Stored history + Today' : 'OnlinePOS'))].join(' + ');
     document.getElementById('sales-data-status-summary').textContent =
       (incomplete ? 'Sales data unavailable · ' : unresolved ? 'Product counts incomplete · ' : '') + sources + ' · Source & coverage';
     document.getElementById('sales-data-status-detail').textContent = notices.map(n=>n.text).join('\n\n');
@@ -1555,7 +1557,7 @@ async function apiSalesRange(storeId, start, endExcl) {
   const requestStartedAt = Date.now();
   const promise = (async () => {
     try {
-      const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
+      const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}?view=dashboard`);
       if (!res) throw new Error('Session unavailable');
       const data = await res.json();
       promise.meta = data.meta;
@@ -1844,7 +1846,7 @@ function buildTopItems(items, limit = 10) {
     if (!item.priceexclvat || item.priceexclvat === 0) continue;
     const name = (item.productname || 'Unknown').trim();
     if (!agg[name]) agg[name] = { count: 0, revenue: 0 };
-    agg[name].count   += (item.count || 1);
+    agg[name].count   += item.topItemCount ?? (item.count || 1);
     agg[name].revenue += (item.priceexclvat || 0);
   }
   return Object.entries(agg)
