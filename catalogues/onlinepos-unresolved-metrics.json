@@ -1,0 +1,45 @@
+{
+  "reviewedCatalogueSha256": "5ea040ba782e2a3247eae81bc5118af19621f3c8b25fe1c4189ff023c869593b",
+  "products": [
+    {
+      "storeSlug": "christianshavn",
+      "productId": "29553679",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "29557357",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241352",
+      "reason": "empty-label"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "29561089",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241752",
+      "reason": "empty-label"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "30528491",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "29569042",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29561110",
+      "reason": "external-placeholder"
+    }
+  ]
+}

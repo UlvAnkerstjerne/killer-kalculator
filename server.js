@@ -13,6 +13,7 @@ const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { fetchSalesRange } = require('./lib/pos-fetcher');
 const { computeMetrics } = require('./lib/product-metrics');
+const databaseSales = require('./lib/sales-read-source').createSalesReadSource();
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
 const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
 const { createSharedSalesFetcher } = require('./lib/shared-sales-fetcher');
@@ -45,6 +46,7 @@ if (missingEnv.length && process.env.NODE_ENV !== 'test') {
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
+app.locals.databaseSalesReader = databaseSales;
 
 // Trust the first proxy hop (Railway reverse-proxy) so rate-limiter and
 // secure-cookie logic see the real client IP and the correct protocol.
@@ -118,6 +120,10 @@ app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.h
 // The UMD wrapper makes this module work in both Node.js and the browser.
 // Served via a specific hardcoded route, NOT express.static, so no other
 // repository files are reachable through this path.
+app.get('/js/sales-data-status.js', (_req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'lib', 'sales-data-status.js'));
+});
 app.get('/js/product-metrics.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.sendFile(path.join(__dirname, 'lib', 'product-metrics.js'));
@@ -460,6 +466,12 @@ app.locals.revenueSummaryCache = revenueSummaryCache;
  * 404  Unknown storeId
  * 502  Any upstream / network / pagination failure
  */
+app.get('/api/sales-readiness', requireAuth, async (_req, res) => {
+  if (!databaseSales) return res.json({ ready: true, source: 'onlinepos' });
+  try { return res.json(await databaseSales.ready()); }
+  catch { return res.status(503).json({ ready: false, source: 'database', code: 'DB_READ_UNAVAILABLE' }); }
+});
+
 app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) => {
   const { storeId, start, end } = req.params;
 
@@ -486,6 +498,10 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
   }
 
   try {
+    if (databaseSales) {
+      const result = await databaseSales.read({ storeSlug: storeId, start, end });
+      return res.status(result.meta.complete ? 200 : 503).json(result);
+    }
     const cached = await salesRangeCache.get({ storeId, store, start, end });
     const result = cached.result;
 
@@ -513,6 +529,7 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     return res.json({ lines, meta });
   } catch (err) {
     // Log the message only — never the store token, firmaid or upstream body
+    if (databaseSales) return res.status(503).json({ error: 'Stored sales unavailable', code: 'DB_READ_UNAVAILABLE' });
     console.error('[sales-range] upstream error:', err.message);
     return res.status(502).json({ error: 'Upstream data fetch failed' });
   }
@@ -551,6 +568,12 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
   }
 
   try {
+    if (databaseSales) {
+      const result = await databaseSales.read({ storeSlug: storeId, start, end });
+      if (!result.meta.complete) return res.status(503).json({ summary: null, meta: result.meta });
+      const source = { lines: result.lines.map(databaseInternalLine), meta: result.meta };
+      return res.json({ summary: publicRevenueSummary(buildRevenueSummaryResult(source), boundary), meta: result.meta });
+    }
     const cached = await revenueSummaryCache.get({ storeId, store, start, end });
     const result = cached.result;
     const meta = {
@@ -569,6 +592,7 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
     };
     return res.json({ summary: publicRevenueSummary(result, boundary), meta });
   } catch (err) {
+    if (databaseSales) return res.status(503).json({ error: 'Stored revenue unavailable', code: 'DB_READ_UNAVAILABLE' });
     console.error('[revenue-summary] upstream error:', err.message);
     return res.status(502).json({ error: 'Upstream data fetch failed' });
   }
@@ -878,20 +902,30 @@ function cphDateOffset(dateStr, days) {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+function databaseInternalLine(line) {
+  const timestamp = line.secondOfDay === null ? null : line.date + ' ' +
+    new Date(line.secondOfDay * 1000).toISOString().slice(11,19);
+  return { ...line, _cphDate: line.date, timestamp_pay: timestamp };
+}
+
 async function fetchLemonadeToday() {
   const today    = cphDateStr();
   const tomorrow = cphDateNextDay(today);   // exclusive end — today only
+  if (databaseSales) return { date: today, stores: {}, total: null, complete: false, meta: {
+    source: 'database', storeId: 'all-stores', start: today, end: tomorrow, complete: false,
+    coverage: { complete: false, days: [{ date: today, status: 'open-day-unsupported' }] },
+    freshness: { live: false, status: 'incomplete' } } };
 
   const results = await Promise.allSettled(
     Object.entries(STORES).map(async ([id, store]) => {
       // History snapshots must wait for a fresh result. This still shares any
       // dashboard refresh already in flight for the identical range.
-      const { result } = await salesRangeCache.get({
-        storeId: id, store, start: today, end: tomorrow,
-      });
+      const { result } = databaseSales
+        ? { result: await databaseSales.read({ storeSlug: id, start: today, end: tomorrow }) }
+        : await salesRangeCache.get({ storeId: id, store, start: today, end: tomorrow });
       // Incomplete result (conflicts / invalids) must not corrupt totals.
       if (!result.meta.complete) {
-        throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${result.meta.conflicts.length})`);
+        throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${(result.meta.conflicts || []).length})`);
       }
       // Count lemonade units using the canonical product ID engine.
       // computeMetrics handles all three lemonade variants (addon, upgrade,
@@ -921,6 +955,7 @@ async function fetchLemonadeToday() {
 // Warm This Week without delaying server readiness. Every complete weekly
 // result safely primes Today from its CPH-dated lines, avoiding a second export.
 async function warmCurrentSalesRanges() {
+  if (databaseSales) return { skipped: true, source: 'database' };
   const today = cphDateStr();
   const tomorrow = cphDateNextDay(today);
   const monday = cphWeekMonday(today);
@@ -955,6 +990,7 @@ app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 // summaries, so this is bounded to 18 entries and at most two concurrent
 // OnlinePOS exports. Current sales warming always completes before this starts.
 async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } = {}) {
+  if (databaseSales) return { skipped: true, source: 'database' };
   const tomorrow = cphDateNextDay(today);
   const ranges = [
     { name: 'today', start: today, end: tomorrow },
@@ -987,6 +1023,7 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
 }
 
 async function warmStartupData() {
+  if (databaseSales) return { skipped: true, source: 'database' };
   const started = performance.now();
   await warmCurrentSalesRanges();
   const currentFinished = performance.now();
@@ -997,6 +1034,7 @@ async function warmStartupData() {
     completedMs: performance.now() - lyFinished, totalMs: performance.now() - started, completed };
 }
 async function warmCompletedSalesRanges({ today = cphDateStr() } = {}) {
+  if (databaseSales) return { skipped: true, source: 'database' };
   return warmCompletedPeriods({ today, stores: STORES,
     salesCache: salesRangeCache, summaryCache: revenueSummaryCache });
 }
