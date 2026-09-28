@@ -43,6 +43,29 @@ beforeEach(async () => {
 });
 after(async () => db.close());
 
+test('bounded multi-day batch refuses one empty day before publishing any day', async () => {
+  await assert.rejects(withImportBatch({ config, context, requireNonEmpty: true }, ({ importOne }) => importOne({
+    options: { storeSlug: 'norrebro', start: '2026-09-20', end: '2026-09-22', companyId: credentials.get('norrebro').companyId },
+    now, request: async () => body([row('norrebro', '2026-09-20')]),
+  })), { code: 'ZERO_FACT_DAY_REVIEW' });
+  const state = await counts();
+  assert.equal(state.sales_line, 0); assert.equal(state.sales_day_state, 0); assert.equal(state.sales_stage_line, 0);
+  assert.deepEqual((await db.query('SELECT business_date::text AS date,line_count FROM sales_foundation.sales_import_day ORDER BY business_date')).rows,
+    [{ date: '2026-09-20', line_count: 1 }, { date: '2026-09-21', line_count: 0 }]);
+  assert.equal(await scalar("SELECT count(*)::int n FROM sales_foundation.sales_import_scan WHERE status='failed' AND error_code='INVALID_RUN' AND terminal"), 1);
+});
+
+test('bounded multi-day batch publishes all nonempty days and preserves existing facts', async () => {
+  await worker(config); const before = await snapshot();
+  const result = await withImportBatch({ config, context, requireNonEmpty: true }, ({ importOne }) => importOne({
+    options: { storeSlug: 'vesterbro', start: '2026-09-20', end: '2026-09-22', companyId: credentials.get('vesterbro').companyId },
+    now, request: async () => body([row('vesterbro', '2026-09-20'), row('vesterbro', '2026-09-21')]),
+  }));
+  assert.equal(result.status, 'published'); assert.equal((await counts()).sales_day_state, 3);
+  assert.equal(JSON.stringify((await db.query(`SELECT row_to_json(t)::text AS row,xmin::text AS version
+    FROM sales_foundation.sales_line t WHERE store_id=6 ORDER BY store_id,source_key`)).rows), before);
+});
+
 test('read-only plan has zero provider/audit writes, is deterministic and bounds all six stores', async () => {
   const beforeState = await counts();
   const a = await plan({ stores: STORES, maxDays: 7, end: '2026-09-23' });
