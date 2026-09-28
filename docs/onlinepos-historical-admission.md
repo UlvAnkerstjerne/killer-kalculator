@@ -26,3 +26,5 @@ All candidates passed privacy, identifier/collision, exact UTF-8/JSON, escaped U
 - frederiksberg 2026-09-27: traversal 58, 6 candidate tuples, 1 terminal page(s), 824 rows; declared total absent
 
 Only unpublished days may be retried after the exact reviewed deployment. New source verifications are deferred for this rollout; coverage stays complete-single-pass until independently verified.
+
+The newly observed Indre By empty product label passed the same delegated exact-tuple policy and actual PostgreSQL/API/UI checks; it remains unclassified. Tests now require each approved empty tuple exactly and reject any altered tuple. Provenance JSON uses compact whitespace to stay within the existing 128 KiB loader bound; no provenance values are removed or changed.

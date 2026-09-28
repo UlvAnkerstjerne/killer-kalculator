@@ -86,15 +86,19 @@ test('trailing spaces are exact identities and trimming does not broaden approva
   }
   assert.ok(checks > 0);
 });
-test('only the complete approved Frederiksberg empty product tuple is accepted', () => {
-  assert.deepEqual(reviewed.products.filter(p => p.productLabel === ''), [emptyProduct]);
-  assert.equal(line(emptyProduct).productLabel, '');
-  for (const change of [{ storeSlug: 'norrebro' }, { productId: 'synthetic-other-product' },
-    { groupId: 'synthetic-other-group' }, { groupLabel: 'Drinks' }, { groupId: null }, { groupLabel: null }, { productLabel: 'Unknown' }]) {
-    assert.throws(() => line({ ...emptyProduct, ...change }), { code: 'UNREVIEWED_CATALOG' });
-  }
+test('only complete explicitly reviewed empty product tuples are accepted', () => {
+  const emptyProducts = reviewed.products.filter(p => p.productLabel === '');
+  assert.deepEqual(emptyProducts.map(p => [p.storeSlug, p.productId]), [['frederiksberg', '27241352'], ['indre-by', '27241752']]);
+  assert.deepEqual(emptyProducts[0], emptyProduct);
   const withoutEmpty = createReviewedCatalog({ products: reviewed.products.filter(p => p.productLabel !== ''), payments: reviewed.payments });
-  assert.throws(() => createSafeLine(input({ ...emptyProduct, ...reviewed.payments[0] }), { identity, catalog: withoutEmpty }), { code: 'UNREVIEWED_CATALOG' });
+  for (const approved of emptyProducts) {
+    assert.equal(line(approved).productLabel, '');
+    for (const change of [{ storeSlug: 'norrebro' }, { productId: 'synthetic-other-product' },
+      { groupId: 'synthetic-other-group' }, { groupLabel: 'Synthetic unreviewed group' }, { groupId: null }, { groupLabel: null }, { productLabel: 'Synthetic unreviewed label' }]) {
+      assert.throws(() => line({ ...approved, ...change }), { code: 'UNREVIEWED_CATALOG' });
+    }
+    assert.throws(() => createSafeLine(input({ ...approved, ...reviewed.payments[0] }), { identity, catalog: withoutEmpty }), { code: 'UNREVIEWED_CATALOG' });
+  }
 });
 test('whitespace-only product labels remain invalid even in an explicit reviewed entry', () => {
   for (const productLabel of [' ', '\t', '\r\n', '\u0085', '\u00a0', '\u1680', '\u2000\u200a', '\u2028\u2029', '\u202f', '\u205f', '\u3000', '\ufeff']) {
