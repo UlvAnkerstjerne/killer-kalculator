@@ -30,6 +30,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859795",
+      "productLabel": "Truffle Mayo",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859798",
       "productLabel": "+ Truffle Mayo",
       "groupId": "2938888",
@@ -114,6 +121,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859864",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859873",
       "productLabel": "+ Killer Lemonade (+10kr)",
       "groupId": "2938894",
@@ -170,6 +184,20 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859966",
+      "productLabel": "Extra Hummus",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859981",
+      "productLabel": "Hummus in flatbread",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859987",
       "productLabel": "Messages",
       "groupId": "2938906",
@@ -193,6 +221,34 @@
       "storeSlug": "christianshavn",
       "productId": "27859999",
       "productLabel": "No Mayo",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860005",
+      "productLabel": "No Parsley",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860011",
+      "productLabel": "No Mint",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860023",
+      "productLabel": "No Dukkah",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860026",
+      "productLabel": "No Cabbage",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },

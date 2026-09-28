@@ -2,15 +2,15 @@
   "provenanceVersion": 1,
   "catalogueVersion": 1,
   "counts": {
-    "products": 341,
+    "products": 349,
     "payments": 9,
     "stores": 6
   },
   "reviewedStores": [
     {
       "storeSlug": "christianshavn",
-      "productCount": 54,
-      "productsSha256": "44a119fe1915627e66bfef3aad4010aa3b3d31662347c0a42679b2096707431a"
+      "productCount": 62,
+      "productsSha256": "44f9a13782a0b03f62d0906dce4d679832d33e0ae315bafb1485b199e892acdd"
     },
     {
       "storeSlug": "fisketorvet",
@@ -47,8 +47,8 @@
   "approval": "Ulv: exact catalogue admission only; no metric or channel classification",
   "discoveryTraversals": 7,
   "stage3ATraversals": 0,
-  "catalogSha256": "9998f826cb46400a10e83939f129cace009f4e70ede559db0021b527d8cef930",
-  "productsSha256": "2401335b55cff30c3bb3bb3e2b6f5ed6184e562d5c4e5156020d94584a3cb7ec",
+  "catalogSha256": "8614ff7f48ee57486528379549a2869da36b650271b299f0c82c5afafb87d7fa",
+  "productsSha256": "7661839068fa20afa52acc9dbda5bfdeedf2a8fc6fd3f352f77311dcff8cc052",
   "paymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
   "sources": [
     {
@@ -692,6 +692,343 @@
               "byteLength": 7,
               "codePointLength": 7,
               "sha256": "c29cc6f115f1b2e51003af433dbab1974bf596bccceb912a1fde7bac69aabbed",
+              "category": "ordinary"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "baseCommit": "142040d37a22f0fd83cc7e4a0bbf06692466d78b",
+      "store": "christianshavn",
+      "start": "2026-09-21",
+      "end": "2026-09-22",
+      "timezone": "Europe/Copenhagen",
+      "approval": "Ulv delegated exact product admission after all automatic policy gates; no metric or channel classification",
+      "traversal": 13,
+      "requests": 1,
+      "pages": 1,
+      "providerRows": 4640,
+      "inRangeRows": 583,
+      "terminal": true,
+      "declaredTotal": "absent",
+      "products": [
+        {
+          "productId": "27859795",
+          "groupId": "2938891",
+          "occurrences": 2,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "2eec4db92957474a39a1b46aac7fd4abfbd06b5f4e567de8cbde437e9fff1388",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 12,
+              "codePointLength": 12,
+              "sha256": "21dc438d05e7ef0814941d2a937f8189c79378d355fcc88dc8205b6bcb7a35ce",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "1061d99e2895da736961c261674f4ded810080ed2237c2623d3b8cfb2bc94a53",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 6,
+              "codePointLength": 6,
+              "sha256": "2740a8e2a1678c4d590a000175ecde371e9a9c2e94a191320f2fcfcdbbd8a011",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27859864",
+          "groupId": "2938888",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "c40811c1c70ed03580272e6a34b104e177944a3b16aa24f9b4833c2c7eb5afe1",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 20,
+              "codePointLength": 20,
+              "sha256": "6e6181787f640d8d1155a25fb1e219825061c5439e54386a32ded3f6568d0b6a",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "a39bb02b7e47637eb53e972001bb545dbe4c3edde126e408560496234cfa7f76",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "efe4bf9a8861aaeb1983c042b326fc708dfbf857820d1dccb1c54c716849b2e4",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27859966",
+          "groupId": "2938906",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "755481f961ab01894ed7b75b1c1eafd4b4892a8e446430a13cc23437a9096ceb",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 12,
+              "codePointLength": 12,
+              "sha256": "7882ace108fc9fe162312eaead43f042484f344de1263064b3f9e6a552305ccf",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27859981",
+          "groupId": "2938906",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "f09fe3148960658d72ad5b58d3661ec937f5140757a94c46ece5361cb41161ce",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 19,
+              "codePointLength": 19,
+              "sha256": "2e49832410f5bd04eaff85b54bc90ccee0d129223aa1dd26c490231b21374bc1",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27860005",
+          "groupId": "2938906",
+          "occurrences": 3,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "a15ed02e8677f16e7dfcfb0ee441251a04c2a2d68f16b0a32e0a9159c4ce55ec",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 10,
+              "codePointLength": 10,
+              "sha256": "319c606e20229305736447bda38470d8a6997a4f3625705012cbea5ebcfd188d",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27860011",
+          "groupId": "2938906",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "c0f8aafa1c0223a3e12ae9985a7bb3621a2d99e6d11b31351c3fd2bfd515d0ba",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "1e3190cd9f8d4e62a38ca8071c206c815b5e7b7df9c2e9266ba314422b7307fc",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27860023",
+          "groupId": "2938906",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "4899b2c78e35a12ccac464cf3ae858a256e666fe0ba3d71a6409498b73831d25",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 9,
+              "codePointLength": 9,
+              "sha256": "e8f0701a1a7215d9e7bc7d719b14a93f9d31be5379ebdd0fbbbf60d8eddc4c56",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        },
+        {
+          "productId": "27860026",
+          "groupId": "2938906",
+          "occurrences": 1,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "ff63afaaced57d4971d4a639aa032037704b8dace0f6e950f2f1c12b1abdf275",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 10,
+              "codePointLength": 10,
+              "sha256": "26bdd9f3718358c3d59205b451abdf37b2a8a2954d6a725f257ecca982dcb060",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "57d84d7cfec22c14f9382ebce8756105cfbbafb3e110693c5a7304deb5b51512",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
               "category": "ordinary"
             }
           }
