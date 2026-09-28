@@ -1515,7 +1515,7 @@ function resetSalesDataNotices() {
   if (detail) detail.textContent = '';
 }
 function recordSalesDataStatus(meta) {
-  if (typeof SalesDataStatus === 'undefined' || meta?.source !== 'database') return;
+  if (typeof SalesDataStatus === 'undefined' || !['database','onlinepos'].includes(meta?.source)) return;
   const key = meta.storeId + ':' + meta.start + ':' + meta.end;
   const storeName = STORES.find(s => s.id === meta.storeId)?.name || 'All stores';
   salesDataNotices.set(key, { meta, text: storeName + ' · ' + SalesDataStatus.rangeLabel(meta) + ': ' + SalesDataStatus.describe(meta) });
@@ -1526,8 +1526,9 @@ function recordSalesDataStatus(meta) {
     const notices = [...salesDataNotices.values()];
     const incomplete = notices.some(n => !n.meta.complete);
     const unresolved = notices.some(n => n.meta.metrics?.potentiallyIncomplete?.length);
+    const sources = [...new Set(notices.map(n=>n.meta.source === 'database' ? 'Stored snapshots' : 'OnlinePOS'))].join(' + ');
     document.getElementById('sales-data-status-summary').textContent =
-      (incomplete ? 'Stored data incomplete' : unresolved ? 'Product counts incomplete · stored snapshot' : 'Stored snapshot · no live updates') + ' · Details';
+      (incomplete ? 'Sales data unavailable · ' : unresolved ? 'Product counts incomplete · ' : '') + sources + ' · Source & coverage';
     document.getElementById('sales-data-status-detail').textContent = notices.map(n=>n.text).join('\n\n');
     el.hidden = false;
   }
@@ -1539,7 +1540,15 @@ async function apiSalesRange(storeId, start, endExcl) {
   if (cached) return cached;
 
   // Coalesce: if a request for this key is already in-flight, share its Promise.
-  if (_salesInFlight.has(key)) return _salesInFlight.get(key);
+  if (_salesInFlight.has(key)) {
+    const generation = salesNoticeGeneration, nonce = sessionNonce, pending = _salesInFlight.get(key);
+    try { return await _salesInFlight.get(key); } finally {
+      if (sessionActive && sessionNonce === nonce && generation === salesNoticeGeneration) {
+        const meta = _salesCache.get(key)?.meta || pending.meta;
+        if (meta) recordSalesDataStatus(meta);
+      }
+    }
+  }
 
   const requestNoticeGeneration = typeof salesNoticeGeneration === 'undefined' ? 0 : salesNoticeGeneration;
   const requestNonce = sessionNonce;
@@ -1549,6 +1558,7 @@ async function apiSalesRange(storeId, start, endExcl) {
       const res = await apiFetch(`/api/sales-range/${storeId}/${start}/${endExcl}`);
       if (!res) throw new Error('Session unavailable');
       const data = await res.json();
+      promise.meta = data.meta;
       if (sessionActive && sessionNonce === requestNonce && typeof recordSalesDataStatus === 'function' && requestNoticeGeneration === salesNoticeGeneration) recordSalesDataStatus(data.meta);
       if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable; see data status.' : data.error || 'API error');
       if (!data.meta || !data.meta.complete) {
@@ -1604,7 +1614,12 @@ async function apiRevenueSummary(storeId, start, endExcl, boundary = null) {
   const key = `revsum:${storeId}:${start}:${endExcl}:${boundary || ''}`;
   const cached = readRevenueSummaryCache(key);
   if (cached) return cached;
-  if (_revenueSummaryInFlight.has(key)) return _revenueSummaryInFlight.get(key);
+  if (_revenueSummaryInFlight.has(key)) {
+    const generation = salesNoticeGeneration, nonce = sessionNonce, pending = _revenueSummaryInFlight.get(key);
+    try { return await pending; } finally {
+      if (sessionActive && sessionNonce === nonce && generation === salesNoticeGeneration && pending.meta) recordSalesDataStatus(pending.meta);
+    }
+  }
 
   const requestNoticeGeneration = typeof salesNoticeGeneration === 'undefined' ? 0 : salesNoticeGeneration;
   const requestNonce = sessionNonce;
@@ -1615,6 +1630,7 @@ async function apiRevenueSummary(storeId, start, endExcl, boundary = null) {
       const res = await apiFetch(`/api/revenue-summary/${storeId}/${start}/${endExcl}${query}`);
       if (!res) throw new Error('Session unavailable');
       const data = await res.json();
+      promise.meta = data.meta;
       if (sessionActive && sessionNonce === requestNonce && typeof recordSalesDataStatus === 'function' && requestNoticeGeneration === salesNoticeGeneration) recordSalesDataStatus(data.meta);
       if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable; see data status.' : data.error || 'API error');
       if (!data.meta?.complete || !data.summary || !Array.isArray(data.summary.dailyRevenue)) {
@@ -3434,6 +3450,7 @@ async function loadGraphData() {
   if (!card || state.view !== 'graphs') return;
   card.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Loading…</div>';
 
+  resetSalesDataNotices();
   const selectedStores = [...state.graphStores];
   if (!selectedStores.length) {
     card.innerHTML = '<div class="empty">Select at least one store.</div>';
@@ -3449,27 +3466,27 @@ async function loadGraphData() {
   // ── Revenue: one apiSalesRange call per store; group priceexclvat by bucket ──
   // Six stores → six requests total, regardless of bucket count.
   const revByStore = {}; // storeId → { bucketKey: DKK ex VAT }
+  const allItems = {};
+  let salesFailed = false;
   await Promise.all(selectedStores.map(async storeId => {
     revByStore[storeId] = {};
     try {
       const lines = await apiSalesRange(storeId, state.graphFrom, cphDateNextDay(state.graphTo));
+      allItems[storeId] = lines;
       for (const line of lines) {
         const key = itemBucket(line.date, state.graphInterval);
         if (!key) continue;
         revByStore[storeId][key] = (revByStore[storeId][key] || 0) + (line.priceexclvat || 0);
       }
     } catch(e) {
-      console.warn('[graphs] revenue fetch failed for', storeId, ':', e.message);
+      salesFailed = true;
+      console.warn('[graphs] revenue unavailable for', storeId);
     }
   }));
 
-  // ── Rolls %: fetch whole period items, bucket by item.date ─────────────────
-  const allItems = {};
-  if (state.graphMetric === 'rolls' || state.graphMetric === 'produktmix') {
-    await Promise.all(selectedStores.map(async id => {
-      try { allItems[id] = await apiSalesRange(id, state.graphFrom, cphDateNextDay(state.graphTo)); }
-      catch(e) { allItems[id] = []; }
-    }));
+  if (salesFailed) {
+    card.innerHTML = '<div class="empty">Sales data unavailable for one or more stores. No partial graph is shown. See Source &amp; coverage, then retry.</div>';
+    return;
   }
 
   // ── Salary: one Planday call per bucket (week or month) ────────────────────
