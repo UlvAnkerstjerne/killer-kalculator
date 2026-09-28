@@ -61,6 +61,10 @@ jobs:
         env:
           KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
         run: npm run test:worker:db
+      - name: Daily import PostgreSQL, bounded retries and safe status
+        env:
+          KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
+        run: npm run test:daily:db
       - name: Dashboard read-only PostgreSQL and snapshot isolation
         env:
           KK_TEST_DATABASE_URL: postgresql://foundation_test:disposable_test_only@localhost:5432/kk_foundation_test
