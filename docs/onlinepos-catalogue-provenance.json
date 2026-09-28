@@ -2,7 +2,7 @@
   "provenanceVersion": 1,
   "catalogueVersion": 1,
   "counts": {
-    "products": 349,
+    "products": 350,
     "payments": 9,
     "stores": 6
   },
@@ -14,8 +14,8 @@
     },
     {
       "storeSlug": "fisketorvet",
-      "productCount": 61,
-      "productsSha256": "748f141960770cd6d184efa6b309edd0aa504c05907bbd3eb6a7185fe83e91d2"
+      "productCount": 62,
+      "productsSha256": "6ae382ed90757dc8f5a46d9fca228c2b2ccc865a687afd50d3a58f656e75d9b8"
     },
     {
       "storeSlug": "frederiksberg",
@@ -47,8 +47,8 @@
   "approval": "Ulv: exact catalogue admission only; no metric or channel classification",
   "discoveryTraversals": 7,
   "stage3ATraversals": 0,
-  "catalogSha256": "8614ff7f48ee57486528379549a2869da36b650271b299f0c82c5afafb87d7fa",
-  "productsSha256": "7661839068fa20afa52acc9dbda5bfdeedf2a8fc6fd3f352f77311dcff8cc052",
+  "catalogSha256": "22d5d68adabf988eb8f388c7ba6f7b9e3be1333404619e2df48702d986041f9a",
+  "productsSha256": "728bc112f97e18471af25e37f842db3d83534eebd709ffd9e63f9cc60eab1668",
   "paymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
   "sources": [
     {
@@ -1029,6 +1029,63 @@
               "byteLength": 8,
               "codePointLength": 8,
               "sha256": "04d7b48339271ea67d3c8493e07e90bc68dc565485eebe5e0b67c21c1586e3c0",
+              "category": "ordinary"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "baseCommit": "b599875d9a74e47eeb4d347bbaa6beb7da840b10",
+      "store": "fisketorvet",
+      "start": "2026-09-21",
+      "end": "2026-09-22",
+      "timezone": "Europe/Copenhagen",
+      "approval": "Ulv delegated exact product admission after all automatic policy gates; no metric or channel classification",
+      "traversal": 15,
+      "requests": 1,
+      "pages": 1,
+      "providerRows": 5384,
+      "inRangeRows": 613,
+      "terminal": true,
+      "declaredTotal": "absent",
+      "products": [
+        {
+          "productId": "27241000",
+          "groupId": "2911644",
+          "occurrences": 3,
+          "classification": "unclassified",
+          "fields": {
+            "productId": {
+              "role": "product-id",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "e57342ec352e0d43f1cc78a26e5cd83e21a52f67da19f426708bcff85e9d4c43",
+              "category": "ordinary"
+            },
+            "productLabel": {
+              "role": "product-label",
+              "encoding": "base64url",
+              "byteLength": 18,
+              "codePointLength": 18,
+              "sha256": "c343abc5aa149af37dd2c6179fa599940caa5b6c89b47833b64ac81e73e64c4a",
+              "category": "ordinary"
+            },
+            "groupId": {
+              "role": "product-group-id",
+              "encoding": "base64url",
+              "byteLength": 7,
+              "codePointLength": 7,
+              "sha256": "9e922ac472cef27361d1d0b9ce95b072cf98cd567328f8134f061ea5725c1d4c",
+              "category": "ordinary"
+            },
+            "groupLabel": {
+              "role": "product-group-label",
+              "encoding": "base64url",
+              "byteLength": 8,
+              "codePointLength": 8,
+              "sha256": "efe4bf9a8861aaeb1983c042b326fc708dfbf857820d1dccb1c54c716849b2e4",
               "category": "ordinary"
             }
           }

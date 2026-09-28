@@ -583,6 +583,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241000",
+      "productLabel": "Extra Meat (35 kr)",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241004",
       "productLabel": "Pepsi Max (25kr)",
       "groupId": "2911652",
