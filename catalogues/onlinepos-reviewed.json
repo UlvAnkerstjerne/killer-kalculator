@@ -1024,6 +1024,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241384",
+      "productLabel": "BEER (45kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241388",
       "productLabel": "Killer Lemonade (35 kr)",
       "groupId": "2911684",
@@ -1089,6 +1096,20 @@
       "storeSlug": "frederiksberg",
       "productId": "27241500",
       "productLabel": "No yogurt",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241516",
+      "productLabel": "No Parsley",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241520",
+      "productLabel": "No Apple",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
@@ -1187,6 +1208,34 @@
       "storeSlug": "frederiksberg",
       "productId": "28714462",
       "productLabel": "+ Killer Pale Ale (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714471",
+      "productLabel": "+ Blanche (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714477",
+      "productLabel": "Heineken 0,0% (45kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714483",
+      "productLabel": "Blanche (45kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "28714495",
+      "productLabel": "Pilsner (45kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
     },
