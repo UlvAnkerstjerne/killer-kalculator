@@ -577,7 +577,7 @@ describe('revenue-summary — compact LY response', () => {
     const result = await app.locals.warmLyRevenueSummaries({
       today: '2026-09-23', concurrency: 2,
     });
-    assert.deepEqual(result, { warmed: 18, attempted: 18, concurrency: 2 });
+    assert.deepEqual(result, { warmed: 18, attempted: 18, concurrency: 2, databaseCovered: 0, coverageFailed: 0 });
     assert.equal(mockConfig.calls, 18, 'six stores × three ranges');
     assert.ok(mockConfig.maxActive <= 2, `observed concurrency ${mockConfig.maxActive}`);
     const stats = app.locals.revenueSummaryCache.stats();
