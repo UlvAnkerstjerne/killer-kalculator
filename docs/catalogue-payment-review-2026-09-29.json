@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "startingCommit": "9ef01eb78916ec7fe3aba746b001f1c60f39e793",
+  "previousProducts": 559,
+  "previousProductsSha256": "5299e7389f66bfa0148d9243fa4aa2352df55c3e6b09fdc7243a0b94509847a5",
+  "previousPayments": 9,
+  "previousPaymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
+  "reviewPolicy": "Private inspection of retained exact tuples confirmed ordinary stable catalogue text. Product admission only, unclassified. Exact payments explicitly approved by Ulv as unattributed.",
+  "approved": 21,
+  "isolatedFromRetainedSet": 0,
+  "protectedAdmitted": 0,
+  "products": [
+    {
+      "reviewId": "R01",
+      "store": "christianshavn",
+      "productId": "27859942",
+      "tupleSha256": "b73a29c2682bb1ec5af5d9c181c75f163ae6c670b270875627df84660806ba74",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R02",
+      "store": "christianshavn",
+      "productId": "28418575",
+      "tupleSha256": "905680e449bdb2a04df95ede7e1b151439bb88776aa2e4e5c4fa97569aad986b",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R03",
+      "store": "christianshavn",
+      "productId": "28599371",
+      "tupleSha256": "31f1857e747da8c711b31b958864fba489483fcddaf1a76acd9ecc915203c11a",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R04",
+      "store": "christianshavn",
+      "productId": "28599380",
+      "tupleSha256": "88e37e19103c1b091b0073ed07792994b1480254485910e13984ba8ca12dbedc",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R05",
+      "store": "christianshavn",
+      "productId": "28599971",
+      "tupleSha256": "b50375699143e8f202d537d4bb7a75a095a77068832f33bd7fad6567db11fa47",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R06",
+      "store": "christianshavn",
+      "productId": "28714303",
+      "tupleSha256": "7d030403328396b983ae8dd2c3c265a06d2616e140b1a3981a4aa3860dbdbdd4",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R07",
+      "store": "christianshavn",
+      "productId": "28714306",
+      "tupleSha256": "c6deb71e8c3a2229c2a9987beef15ef80ec7f5588cfc1ba51a93d0c833694dac",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R08",
+      "store": "christianshavn",
+      "productId": "28812225",
+      "tupleSha256": "42d08ce8f544040ce84eb3ed490e8ca82237b830953b404cba792e459e80ced9",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R09",
+      "store": "christianshavn",
+      "productId": "28812228",
+      "tupleSha256": "ad28cce1e18a18aa276ba5f1673b4c42762af3380e6dc481004159645b118c5c",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R10",
+      "store": "christianshavn",
+      "productId": "28812231",
+      "tupleSha256": "f09da7b971f54bed12ffd7a0233e2d6ff61c742e598455fa4e2ee758f51086a9",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R11",
+      "store": "fisketorvet",
+      "productId": "25906560",
+      "tupleSha256": "2cb4f7b8913884efa96c55843fcbb164606ba532e1bbfd2dea12d8f5e80dea03",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R12",
+      "store": "fisketorvet",
+      "productId": "28620991",
+      "tupleSha256": "5414629d0816790fe0259e8ef11b7f452bed88d7606b8ec78edb96025f91e039",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R13",
+      "store": "fisketorvet",
+      "productId": "28620997",
+      "tupleSha256": "010409aba06fa61c4b06629c253690d5eadb92fa0a13cb4e76d9f901f8b73899",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R14",
+      "store": "frederiksberg",
+      "productId": "25906142",
+      "tupleSha256": "69a32aa7e784a9da665b8a41d131558bd799f5e0017536f773af2a5c4f09edcb",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R15",
+      "store": "indre-by",
+      "productId": "18694495",
+      "tupleSha256": "ddc30609098ab27ca7c82be34f0cede41ff088743da31b9c88edc07d88b56452",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R16",
+      "store": "norrebro",
+      "productId": "25279471",
+      "tupleSha256": "ec445f0d14401d0897bcccd0af29a2689bbe76b4c24dc3f5b13c8315316ddd98",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R17",
+      "store": "norrebro",
+      "productId": "28594153",
+      "tupleSha256": "49da16f6dd7f3b54003d32eb87a983c7fb7b1b5b2ab1e638f86c5d4e83f1203d",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R18",
+      "store": "norrebro",
+      "productId": "28594159",
+      "tupleSha256": "f0adcf3616195c53ea58f37728da500f20be77d85ed08e595324dd61aa3dba28",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R19",
+      "store": "norrebro",
+      "productId": "29259680",
+      "tupleSha256": "81b6199d07d72e9f8192bfb79802573830f86bd72859c38dae14ccee169a1504",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "reviewId": "R20",
+      "store": "norrebro",
+      "productId": "29259689",
+      "tupleSha256": "26c105414082fa48142593302710b184e6ea8f0fecbbd43267242fdc851a550a",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "reviewId": "R21",
+      "store": "vesterbro",
+      "productId": "17684143",
+      "tupleSha256": "d96f71d034344f426a8ea0de854a93feaa7632127af83fc00fa586942325e911",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    }
+  ],
+  "payments": [
+    {
+      "paymentType": "Gavekort",
+      "paymentCode": "mixed 25",
+      "treatment": "explicitly-unattributed"
+    },
+    {
+      "paymentType": "LifePeaks",
+      "paymentCode": "mixed 68",
+      "treatment": "explicitly-unattributed"
+    }
+  ]
+}

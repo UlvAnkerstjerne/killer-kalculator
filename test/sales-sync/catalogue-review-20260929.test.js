@@ -6,8 +6,8 @@ const F=['storeSlug','productId','productLabel','groupId','groupLabel'],key=p=>J
 const added=proof.products.map(e=>catalogue.products.find(p=>p.storeSlug===e.store&&p.productId===e.productId));
 test('review bundle preserves all 425 earlier products and all nine payments exactly',()=>{
  assert.equal(proof.approved,134);assert.equal(proof.isolated,21);assert.equal(added.length,134);assert(added.every(Boolean));
- const prior=catalogue.products.filter(p=>!added.includes(p));assert.equal(prior.length,425);assert.equal(sha(JSON.stringify(sort(prior).map(p=>F.map(k=>p[k])))),proof.previousProductsSha256);
- assert.equal(catalogue.payments.length,9);assert.equal(provenance.paymentsSha256,proof.previousPaymentsSha256);
+ const newer=require('../../docs/catalogue-payment-review-2026-09-29.json');const prior=catalogue.products.filter(p=>!added.includes(p)&&!newer.products.some(e=>e.store===p.storeSlug&&e.productId===p.productId));assert.equal(prior.length,425);assert.equal(sha(JSON.stringify(sort(prior).map(p=>F.map(k=>p[k])))),proof.previousProductsSha256);
+ const priorPayments=catalogue.payments.filter(p=>!newer.payments.some(e=>e.paymentType===p.paymentType&&e.paymentCode===p.paymentCode));assert.equal(priorPayments.length,9);assert.equal(sha(JSON.stringify(priorPayments.map(p=>[p.paymentType,p.paymentCode]))),proof.previousPaymentsSha256);
  assert.equal(sha(fs.readFileSync(root+'/docs/catalogue-review-2026-09-29.json')),provenance.productReview20260929.sha256);
  assert(fs.statSync(root+'/docs/onlinepos-catalogue-provenance.json').size<128*1024);
 });

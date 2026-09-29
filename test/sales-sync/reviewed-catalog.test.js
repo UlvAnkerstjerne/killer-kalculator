@@ -19,7 +19,7 @@ const catalogPath = path.join(__dirname, '../../catalogues/onlinepos-reviewed.js
 const catalog = createReviewedCatalog(reviewed), context = { identity, catalog };
 const productFields = ['storeSlug', 'productId', 'productLabel', 'groupId', 'groupLabel'];
 const paymentFields = ['paymentType', 'paymentCode'];
-const expectedCounts = {"christianshavn":113,"fisketorvet":87,"frederiksberg":95,"indre-by":87,"norrebro":89,"vesterbro":88};
+const expectedCounts = {"christianshavn":123,"fisketorvet":90,"frederiksberg":96,"indre-by":88,"norrebro":94,"vesterbro":89};
 const key = (p, fields) => JSON.stringify(fields.map(f => p[f]));
 const sort = (rows, fields) => [...rows].sort((a, b) => key(a, fields) < key(b, fields) ? -1 : key(a, fields) > key(b, fields) ? 1 : 0);
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -28,15 +28,15 @@ const line = (product, payment = reviewed.payments[0]) => createSafeLine(input({
 const emptyProduct = { storeSlug: 'frederiksberg', productId: '27241352', productLabel: '', groupId: '2911684', groupLabel: 'Drinks ' };
 
 test('trusted catalogue serialization and approved tuple checksums are deterministic', () => {
-  assert.equal(reviewed.products.length, 559); assert.equal(reviewed.payments.length, 9);
-  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 559);
-  assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 9);
+  assert.equal(reviewed.products.length, 580); assert.equal(reviewed.payments.length, 11);
+  assert.equal(new Set(reviewed.products.map(p => key(p, productFields))).size, 580);
+  assert.equal(new Set(reviewed.payments.map(p => key(p, paymentFields))).size, 11);
   assert.deepEqual([...new Set(reviewed.products.map(p => p.storeSlug))].sort(), Object.keys(expectedCounts));
   const canonical = { products: sort([...reviewed.products].reverse(), productFields), payments: sort([...reviewed.payments].reverse(), paymentFields) };
   const text = JSON.stringify(canonical, null, 2) + '\n';
   assert.equal(fs.readFileSync(catalogPath, 'utf8'), text);
   assert.equal(sha(text), provenance.catalogSha256);
-  assert.equal(sha(text), '1a7c73b1fb7c6ff67fe040d5118fe323f8e1e898e5e46a3378db37d6a89c34b7');
+  assert.equal(sha(text), '8a6232d8f42f52321ac128d41027283d1963495cf089f934106230e8b2b59094');
   assert.equal(digest(reviewed.products, productFields), provenance.productsSha256);
   assert.equal(digest(reviewed.payments, paymentFields), provenance.paymentsSha256);
 });
@@ -143,9 +143,9 @@ test('approved Huuray and Splitbetaling remain unattributed in actual applicatio
 });
 test('all 69 Norrebro production identities and seven prior global payments remain exact', () => {
   const addedIds = new Set((provenance.additions || []).filter(a => a.store === 'norrebro').flatMap(a => a.products.map(p => p.productId)));
-  for(const p of require('../../docs/catalogue-review-2026-09-29.json').products)if(p.store==='norrebro')addedIds.add(p.productId);
+  for(const p of [...require('../../docs/catalogue-review-2026-09-29.json').products,...require('../../docs/catalogue-payment-review-2026-09-29.json').products])if(p.store==='norrebro')addedIds.add(p.productId);
   const products = reviewed.products.filter(p => p.storeSlug === 'norrebro' && !addedIds.has(p.productId));
-  const payments = reviewed.payments.filter(p => !['Huuray', 'Splitbetaling'].includes(p.paymentType));
+  const payments = reviewed.payments.filter(p => !['Huuray', 'Splitbetaling', 'Gavekort', 'LifePeaks'].includes(p.paymentType));
   const source = provenance.sources.find(p => p.store === 'norrebro');
   assert.equal(source.sourceSha256, 'b9036f5e8ba08e1636d932a4766c85c4df84e2fc6a22c2fdd31923aed1338aa1');
   assert.equal(products.length, 69); assert.equal(payments.length, 7);

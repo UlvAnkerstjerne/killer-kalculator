@@ -261,6 +261,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859942",
+      "productLabel": "Killer Beanie",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859945",
       "productLabel": "LEGALLY required bag fee",
       "groupId": "2938903",
@@ -548,6 +555,27 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28418575",
+      "productLabel": "Killer Kap",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599371",
+      "productLabel": "Paloma (75kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599380",
+      "productLabel": "+ Paloma (+50kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28599965",
       "productLabel": "",
       "groupId": "2938909",
@@ -559,6 +587,13 @@
       "productLabel": "",
       "groupId": "2938909",
       "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599971",
+      "productLabel": "BEC Kombo",
+      "groupId": "2938897",
+      "groupLabel": "Kombos"
     },
     {
       "storeSlug": "christianshavn",
@@ -674,6 +709,20 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28714303",
+      "productLabel": "+ Cocio (+10kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714306",
+      "productLabel": "Cocio (35kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28714315",
       "productLabel": "+ BEER (+20kr)",
       "groupId": "2938894",
@@ -751,6 +800,27 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28812225",
+      "productLabel": "Killer Kap - BLUE",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28812228",
+      "productLabel": "Killer Kap - PINK",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28812231",
+      "productLabel": "Killer Kap - GREY",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "29339051",
       "productLabel": "",
       "groupId": "2938909",
@@ -790,6 +860,13 @@
       "productLabel": "+ Lover ( 10 kr )",
       "groupId": "2938888",
       "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "25906560",
+      "productLabel": "Takeawaypose",
+      "groupId": "2854166",
+      "groupLabel": "Gammel - Wolt"
     },
     {
       "storeSlug": "fisketorvet",
@@ -1325,6 +1402,20 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "28620991",
+      "productLabel": "Mango Smash (75kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28620997",
+      "productLabel": "+ Mango Smash (+50kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "28717339",
       "productLabel": "+ Blanche (+30kr)",
       "groupId": "2911652",
@@ -1399,6 +1490,13 @@
       "productLabel": "+ Lover (+10 kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "25906142",
+      "productLabel": "Takeawaypose",
+      "groupId": "2854128",
+      "groupLabel": "Gammel - Wolt"
     },
     {
       "storeSlug": "frederiksberg",
@@ -2067,6 +2165,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "18694495",
+      "productLabel": "Takeawaypose",
+      "groupId": "2420193",
+      "groupLabel": "Gammel - Wolt"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241636",
       "productLabel": "+ Dip",
       "groupId": "2911708",
@@ -2676,6 +2781,13 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "25279471",
+      "productLabel": "Takeawaypose",
+      "groupId": "2827819",
+      "groupLabel": "Gammel - Wolt"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242028",
       "productLabel": "+ Dip",
       "groupId": "2911740",
@@ -3201,10 +3313,24 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "28594153",
+      "productLabel": "Distortion kombo Lamb",
+      "groupId": "2911756",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "28594156",
       "productLabel": "Drink",
       "groupId": "2911748",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "28594159",
+      "productLabel": "Distortion kombo Falafel",
+      "groupId": "2911756",
+      "groupLabel": "Kombos"
     },
     {
       "storeSlug": "norrebro",
@@ -3278,6 +3404,20 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "29259680",
+      "productLabel": "JuJu - Kombo",
+      "groupId": "2911756",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "29259689",
+      "productLabel": "Juju - Roll",
+      "groupId": "2911768",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "29569042",
       "productLabel": "Unknown external product",
       "groupId": "3035845",
@@ -3296,6 +3436,13 @@
       "productLabel": "+ Lover (+10 kr)",
       "groupId": "2911748",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "17684143",
+      "productLabel": "Takeawaypose",
+      "groupId": "1290794",
+      "groupLabel": "Gammel - Wolt"
     },
     {
       "storeSlug": "vesterbro",
@@ -3920,6 +4067,10 @@
       "paymentCode": "mixed 3"
     },
     {
+      "paymentType": "Gavekort",
+      "paymentCode": "mixed 25"
+    },
+    {
       "paymentType": "Heaps online",
       "paymentCode": "mixed 63"
     },
@@ -3934,6 +4085,10 @@
     {
       "paymentType": "Kredit",
       "paymentCode": "mixed 1"
+    },
+    {
+      "paymentType": "LifePeaks",
+      "paymentCode": "mixed 68"
     },
     {
       "paymentType": "Online External 2",
