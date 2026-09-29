@@ -24,7 +24,7 @@ const { disposableConfig } = require('./disposable');
 const { context, start, end, initial, CANARY, raw, body, provider, options } = require('./helpers');
 const config = disposableConfig();
 const db = createDatabase(config);
-const scan = (pages = [[raw()]], extra = {}) => importHistory({ config, context, options, apply: true, request: provider(pages).request, ...extra });
+const scan = (pages = [[raw()]], extra = {}) => importHistory({ config, context, options, apply: true, zeroDayPolicy: 'legacy', request: provider(pages).request, ...extra });
 const count = async name => {
   assert.ok(['sales_line', 'sales_stage_line', 'sales_day_state', 'sales_import_scan', 'sales_import_bucket', 'sales_import_discrepancy'].includes(name));
   return (await db.query(`SELECT count(*)::int AS n FROM sales_foundation.${name}`)).rows[0].n;
