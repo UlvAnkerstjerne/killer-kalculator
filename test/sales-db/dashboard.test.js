@@ -32,3 +32,12 @@ test('later comparisons cannot evict a visible product-classification warning',(
   assert.match(elements.get('sales-data-status-summary').textContent,/Product counts incomplete/);
   assert.match(elements.get('sales-data-status-detail').textContent,/lemonade/);
 });
+
+test('coverage-only warming keeps strict day evidence without loading any facts',async()=>{
+  for(const [status,evidence,complete] of [['complete','complete-single-pass',true],['VERIFIED_CLOSED','verified-closed',true],['ZERO_OBSERVED_PENDING_REVIEW','zero-observed',false],['RETRY_REQUIRED','zero-observed',false]]){
+    const s=session([{...state,status,evidence,lineCount:0,revenueIncl:'0',revenueExcl:'0'}],[]);
+    const result=await readSnapshot(s,args,{coverageOnly:true});assert.equal(result.meta.complete,complete);assert.deepEqual(result.lines,[]);assert.equal(s.calls.length,1);assert(s.calls[0].sql.includes('sales_day_state'));
+  }
+  const oversized=session([{...state,lineCount:100001}]);assert.equal((await readSnapshot(oversized,args,{coverageOnly:true})).meta.complete,true);assert.equal(oversized.calls.length,1);
+  await assert.rejects(readSnapshot(session([{...state,lineCount:100001}]),args),{code:'DB_RANGE_TOO_LARGE'});
+});

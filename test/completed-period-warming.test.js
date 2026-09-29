@@ -234,3 +234,48 @@ test('crossing CPH midnight never reuses a pre-close snapshot as complete Yester
   assert.equal(cache.stats().refreshTimers, 0);
   cache.clear();
 });
+
+const { createWarmingSelector } = require('../lib/sales-warming-policy');
+function coverageReader(missing) {
+  return { policy: 'covered-history', read() { throw Error('fact read forbidden while warming'); },
+    async coverage({storeSlug,start,end}) {
+      const days=[];for(let d=start;d<end;d=offsetForTest(d,1))days.push({date:d,status:missing(storeSlug,d)?'missing':'complete'});
+      const complete=days.every(d=>d.status==='complete');
+      return {lines:[],meta:{complete,coverage:{complete,days},...(complete?{}:{code:'DB_COVERAGE_INCOMPLETE'})}};
+    } };
+}
+const offsetForTest=(d,n)=>new Date(Date.parse(d)+n*86400000).toISOString().slice(0,10);
+test('policy-aware completed warming fetches only whole uncovered ranges and never fact rows',async()=>{
+  const ctx=setup();ctx.selectSource=createWarmingSelector(coverageReader(s=>['b','d','f'].includes(s)),ctx.today);
+  const report=await warmCompletedPeriods(ctx);
+  assert.equal(report.outcomes.filter(o=>o.status==='database-covered').length,18);
+  assert(ctx.calls.length>0);assert(ctx.calls.every(c=>['b','d','f'].includes(c.storeId)));
+  assert(report.outcomes.filter(o=>o.source==='database').every(o=>o.bytes===0&&!o.retained));
+  ctx.salesCache.clear();ctx.summaryCache.clear();
+});
+test('coverage failures leave warm entries unavailable, omit private errors, and never call the provider',async()=>{
+  const ctx=setup(),logs=[];ctx.warn=x=>logs.push(x);
+  ctx.selectSource=createWarmingSelector({policy:'covered-history',coverage:async()=>{throw Error('private-coverage-detail');}},ctx.today);
+  const report=await warmCompletedPeriods(ctx);assert.equal(ctx.calls.length,0);
+  assert(report.outcomes.every(o=>o.status==='coverage-unavailable'&&!o.retained));assert.doesNotMatch(logs.join('\n'),/private-coverage-detail/);
+  ctx.salesCache.clear();ctx.summaryCache.clear();
+});
+test('warming rechecks coverage changes and bypasses database checks for an open range',async()=>{
+  let missing=false,calls=0;const reader=coverageReader(()=>{calls++;return missing;});
+  const choose=createWarmingSelector(reader,'2026-09-23'),closed={storeId:'a',start:'2026-09-20',end:'2026-09-21'};
+  assert.equal((await choose(closed)).source,'database');missing=true;assert.equal((await choose(closed)).source,'onlinepos');
+  const before=calls;assert.equal((await choose({...closed,end:'2026-09-24'})).source,'onlinepos');assert.equal(calls,before);
+});
+test('This Month warming is sequential and cannot evict priority ranges when capacity is full',async()=>{
+  let active=0,peak=0;
+  const ctx=setup('2026-09-23',{maxEntries:12,maxBytes:48*1024*1024,fetchRange:async args=>{peak=Math.max(peak,++active);await new Promise(r=>setImmediate(r));active--;return result(args.start,args.end);}});
+  const priority=[];
+  for(const storeId of Object.keys(stores))for(const start of ['2026-09-21','2026-09-23']){
+    const args={storeId,start,end:'2026-09-24'};ctx.salesCache.prime(args,result(start,args.end));priority.push([args,ctx.salesCache.inspect(args).result]);
+  }
+  const report=await warmCompletedPeriods({...ctx,includeLy:false,ranges:[{name:'this-month',start:'2026-09-01',end:'2026-09-24'}]});
+  assert.equal(peak,1);assert.equal(report.outcomes.length,6);assert(report.outcomes.every(o=>o.complete&&!o.retained));
+  for(const [args,value]of priority)assert.equal(ctx.salesCache.inspect(args).result,value);
+  assert(ctx.salesCache.stats().estimatedBytes<=48*1024*1024);assert.equal(ctx.summaryCache.stats().entries,0);
+  ctx.salesCache.clear();ctx.summaryCache.clear();
+});

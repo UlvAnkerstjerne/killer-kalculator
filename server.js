@@ -1004,7 +1004,9 @@ app.locals.warmCurrentSalesRanges = warmCurrentSalesRanges;
 // summaries, so this is bounded to 18 entries and at most two concurrent
 // OnlinePOS exports. Current sales warming always completes before this starts.
 async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } = {}) {
-  if (databaseSales) return { skipped: true, source: 'database' };
+  if (databaseOnly) return { skipped: true, source: 'database' };
+  concurrency = Math.min(2, Math.max(1, Math.floor(concurrency) || 2));
+  const selectSource = require('./lib/sales-warming-policy').createWarmingSelector(databaseSales, today);
   const tomorrow = cphDateNextDay(today);
   const ranges = [
     { name: 'today', start: today, end: tomorrow },
@@ -1017,15 +1019,23 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
   }));
 
   const tasks = ranges.flatMap(range => Object.entries(STORES).map(([storeId, store]) =>
-    () => revenueSummaryCache.get({ storeId, store, start: range.start, end: range.end })
+    async () => {
+      const args = { storeId, store, start: range.start, end: range.end };
+      if ((await selectSource(args)).source === 'database') return { skipped: true, source: 'database' };
+      return revenueSummaryCache.get(args);
+    }
   ));
   const results = await runBounded(tasks, concurrency);
   const warmed = results.filter(result => (
-    result.status === 'fulfilled' && result.value.result.meta.complete
+    result.status === 'fulfilled' && result.value.result?.meta.complete
   )).length;
+  const databaseCovered = results.filter(r => r.status === 'fulfilled' && r.value.skipped).length;
+  const coverageFailed = results.filter(r => r.status === 'rejected' && r.reason?.salesReadMeta).length;
   for (const result of results) {
     if (result.status === 'rejected') {
-      console.warn('[revenue-summary] startup warm failed: upstream unavailable');
+      console.warn(result.reason?.salesReadMeta
+        ? '[revenue-summary] startup warm failed: database coverage unavailable'
+        : '[revenue-summary] startup warm failed: upstream unavailable');
     }
   }
   const stats = revenueSummaryCache.stats();
@@ -1033,7 +1043,7 @@ async function warmLyRevenueSummaries({ today = cphDateStr(), concurrency = 2 } 
     `[revenue-summary] startup warm complete: ${warmed}/${tasks.length}, ` +
     `concurrency ${concurrency}, ${stats.entries} entries, ${stats.estimatedBytes} estimated bytes`
   );
-  return { warmed, attempted: tasks.length, concurrency };
+  return { warmed, attempted: tasks.length, concurrency, databaseCovered, coverageFailed };
 }
 
 async function warmStartupData() {
@@ -1044,15 +1054,29 @@ async function warmStartupData() {
   await warmLyRevenueSummaries();
   const lyFinished = performance.now();
   const completed = await warmCompletedSalesRanges();
+  const completedFinished = performance.now();
+  const month = await warmThisMonthSalesRanges();
   return { currentMs: currentFinished - started, lyMs: lyFinished - currentFinished,
-    completedMs: performance.now() - lyFinished, totalMs: performance.now() - started, completed };
+    completedMs: completedFinished - lyFinished, monthMs: performance.now() - completedFinished,
+    totalMs: performance.now() - started, completed, month };
 }
 async function warmCompletedSalesRanges({ today = cphDateStr() } = {}) {
-  if (databaseSales) return { skipped: true, source: 'database' };
+  if (databaseOnly) return { skipped: true, source: 'database' };
   return warmCompletedPeriods({ today, stores: STORES,
-    salesCache: salesRangeCache, summaryCache: revenueSummaryCache });
+    salesCache: salesRangeCache, summaryCache: revenueSummaryCache,
+    selectSource: require('./lib/sales-warming-policy').createWarmingSelector(databaseSales, today) });
+}
+async function warmThisMonthSalesRanges({ today = cphDateStr() } = {}) {
+  if (databaseOnly) return { skipped: true, source: 'database' };
+  // One store at a time, only after priority ranges. Existing non-evicting
+  // admission enforces the 48 MiB limit; no cache-size or refresh-policy change.
+  return warmCompletedPeriods({ today, stores: STORES,
+    salesCache: salesRangeCache, summaryCache: revenueSummaryCache, includeLy: false,
+    ranges: [{ name: 'this-month', start: today.slice(0, 7) + '-01', end: cphDateNextDay(today) }],
+    selectSource: require('./lib/sales-warming-policy').createWarmingSelector(databaseSales, today) });
 }
 app.locals.warmCompletedSalesRanges = warmCompletedSalesRanges;
+app.locals.warmThisMonthSalesRanges = warmThisMonthSalesRanges;
 app.locals.warmLyRevenueSummaries = warmLyRevenueSummaries;
 app.locals.warmStartupData = warmStartupData;
 
