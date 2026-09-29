@@ -1,6 +1,22 @@
 [
-  {"version":"001_foundation.sql","checksum":"463437d63400011ee46a6f630f2b402aeba17301696b849c19d29b6db3b34062"},
-  {"version":"002_backfill.sql","checksum":"dc4dfca9530d920d07599fbc0b12540024aadc09e4034bdef43ed60402b30d23"},
-  {"version":"003_payment_code_spaces.sql","checksum":"7c8d9a9a17b74d7140b00b667641982013e6d67c8bb04cfceea14db33a6e4f96"},
-  {"version":"004_empty_product_labels.sql","checksum":"b24cc49fe0aa42ef8bbc8bda19794fdc8a0c13caffb3f98777a13b2b3059c453"}
+  {
+    "version": "001_foundation.sql",
+    "checksum": "463437d63400011ee46a6f630f2b402aeba17301696b849c19d29b6db3b34062"
+  },
+  {
+    "version": "002_backfill.sql",
+    "checksum": "dc4dfca9530d920d07599fbc0b12540024aadc09e4034bdef43ed60402b30d23"
+  },
+  {
+    "version": "003_payment_code_spaces.sql",
+    "checksum": "7c8d9a9a17b74d7140b00b667641982013e6d67c8bb04cfceea14db33a6e4f96"
+  },
+  {
+    "version": "004_empty_product_labels.sql",
+    "checksum": "b24cc49fe0aa42ef8bbc8bda19794fdc8a0c13caffb3f98777a13b2b3059c453"
+  },
+  {
+    "version": "005_zero_day_review.sql",
+    "checksum": "112de1181fb6ac59a1e0fd3a8fcc9800685ccd8eef99b4663d4f4b2d09d6cabf"
+  }
 ]

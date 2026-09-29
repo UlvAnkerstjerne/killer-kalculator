@@ -31,7 +31,7 @@ const counts = async () => {
 const snapshot = async () => JSON.stringify((await db.query(`SELECT row_to_json(t)::text AS row, xmin::text AS version
   FROM sales_foundation.sales_line t ORDER BY store_id, source_key`)).rows);
 async function seed(store, start, end) {
-  return importHistory({ config, context, apply: true, now, options: { storeSlug: store, start, end, companyId: credentials.get(store).companyId }, request: async () => body([]) });
+  return importHistory({ config, context, apply: true, now, zeroDayPolicy: 'legacy', options: { storeSlug: store, start, end, companyId: credentials.get(store).companyId }, request: async () => body([]) });
 }
 before(async () => {
   assert.equal((await db.query("SELECT current_setting('server_version_num')::int AS n")).rows[0].n, 160015);
@@ -454,7 +454,7 @@ test('empty guard CLI output is fixed and omits provider fields, catalogue value
   assert.equal(/sourceKey|fingerprint|runId|orderlineid|postgres:|token|[a-f0-9]{64}/.test(output[0]), false);
 });
 
-test('manual empty publication and verification retain their previous behavior', async () => {
+test('legacy empty snapshot remains independently verifiable', async () => {
   const published = await seed('norrebro', scope.start, scope.end); assert.equal(published.status, 'published');
   const beforeState = await snapshot();
   const id = (await db.query("SELECT run_id FROM sales_foundation.sales_import_scan WHERE status = 'published'")).rows[0].run_id;

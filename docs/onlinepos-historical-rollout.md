@@ -21,22 +21,25 @@ workers own September 28 onward and must run naturally.
 
 ## Deterministic ranges and budgets
 
-Initial source units, ordered by start date then canonical store ID, are:
+The original plan used separate 2025 and 2026 units. The September 29
+continuation instead uses `planHistorical` against durable PostgreSQL coverage:
+one terminal traversal per eligible store from its earliest unresolved date to
+September 20, 2026 (exclusive), within the existing row/page/time ceilings.
+Already covered leading dates and operator-owned zero dates are skipped. Covered
+interior dates are reconciled against the same complete snapshot; their facts
+and coverage metadata remain unchanged. Known protected catalogue ranges stay
+isolated, so Christianshavn's eligible 2025 range ends before its protected 2026
+range. Never combine fragments from separate source traversals.
 
-- `[2025-01-01, 2026-01-01)` for each of the six stores;
-- `[2026-01-01, 2026-09-20)` for each of the six stores.
-
-Recompute against durable coverage before each unit. Never include an already
-published day in an automatic publication unit. Split at any existing covered
-island; a resumed controller skips complete coverage. Global importer ownership
+Global importer ownership
 allows only one source unit at a time. No historical source unit starts between
 02:30 and 04:10 UTC, preserving the first scheduled worker window; a unit has a
 20-minute abort and 20-minute-30-second process deadline.
 
 The new historical campaign ceiling, documented before any historical provider
-access, is **96 source traversals / 9,600 HTTP requests**. Allocation: 12 initial
-year/partial-year units, up to 12 explicitly reviewed catalogue retries, and up
-to 72 scoped refinements for proven empty-day splits or row-bound partitions.
+access, is **96 source traversals / 9,600 HTTP requests**. The original allocation was 12 initial units, 12 reviewed catalogue retries and
+72 refinements. The cumulative ceiling is unchanged; zero days no longer justify
+refinement traversals. Only a proven importer limit can require partitioning.
 Every traversal is additionally capped at 100 pages and 1,000,000 received rows.
 The unchanged transport limits each page to 16 MiB, starts at most 30 requests per
 minute, and times out each HTTP request. Requests are charged before sending;
@@ -53,14 +56,37 @@ before the coverage transaction commits. Existing facts are never overwritten.
 
 ## Empty days, review and resumption
 
-The nonempty worker guard now applies to **every day** of a multi-day candidate.
-One empty day stops publication of the entire candidate before any bucket commits.
-The existing durable per-day summaries identify zero and nonzero dates without
-retaining source rows. A controller can plan narrower nonempty ranges from those
-summaries, charge their new traversals and leave zero days visibly missing for
-operator review. It cannot label them complete from a zero response alone.
-Manual historical imports and independent verification keep their existing
-explicit behavior; this guard applies to bounded worker batches.
+Historical imports default to the persisted `review` zero-day policy. After a
+terminal scan passes snapshot, catalogue, identity, decimal, checksum and prior
+fact reconciliation, each monthly/day transaction publishes its nonzero days and
+records zero days as `ZERO_OBSERVED_PENDING_REVIEW`. A committed bucket includes
+its zero observations atomically. It does not add fake sales facts or confirm a
+closure. Existing pending/retry/closed decisions survive repeated observations.
+The daily scheduler keeps its existing nonempty guard.
+
+The private `scripts/sales-zero-days.js --list` command emits a consolidated safe
+store/date list. Only Ulv's explicit per-date decision permits `--decision
+VERIFIED_CLOSED` or `--decision RETRY_REQUIRED`, with `--store`, `--date`,
+`--observation-run` and `--reviewed-by ulv`. The exact observation is checked under
+the importer lock. Repeated identical decisions are no-ops; stale or conflicting
+decisions fail. A retry-required date needs a separately bounded operator retry.
+
+Pending and retry-required states remain missing for whole-range routing, with
+an explicit `zeroDayStatus` in coverage metadata. `VERIFIED_CLOSED` is covered
+with zero facts and `verified-closed` evidence, **not** independent provider
+verification. Today and incomplete/mixed ranges still use OnlinePOS wholly;
+selected database failures remain visible. Existing reader column grants suffice.
+
+`--retain-observation <run>` converts an explicitly selected old zero-guard failure
+using its terminal durable day summaries, complete range/count reconciliation,
+no catalogue reviews and no pending staging/buckets/discrepancies. It performs
+no source request, does not recreate purged rows and cannot approve a closure.
+
+Terminal `review` snapshots survive a crash after summary finalization and block
+new source work until explicit publication resume. Resume revalidates the entire
+snapshot and existing facts, skips committed buckets and uses no HTTP. Incomplete
+source scans remain non-resumable. Never split/refetch a valid range because it
+contains zeros.
 
 Safe exact encoded catalogue envelopes may be retained from failed source units.
 Only independently reviewed business-neutral product tuples may be admitted as

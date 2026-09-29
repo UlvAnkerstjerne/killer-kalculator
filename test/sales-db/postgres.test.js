@@ -52,7 +52,7 @@ after(async () => {
   assert.equal(db.health().total, 0); assert.equal(independent.health().total, 0);
 });
 
-test('empty bootstrap creates six stores and four exact checksum-ledger entries', async () => {
+test('empty bootstrap creates six stores and five exact checksum-ledger entries', async () => {
   assert.equal(await count('sales_store'), 6);
   assert.deepEqual((await db.query('SELECT version, checksum FROM sales_foundation.schema_migration ORDER BY version')).rows,
     require('./migration-checksums.json'));
@@ -60,7 +60,7 @@ test('empty bootstrap creates six stores and four exact checksum-ledger entries'
 });
 test('repeated migrations are an exact no-op', async () => {
   const before = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
-  assert.deepEqual(await migrate(db), { applied: 0, total: 4 });
+  assert.deepEqual(await migrate(db), { applied: 0, total: 5 });
   assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, before);
 });
 test('migration 003 widens only payment-code validation and preserves existing facts and staging', async () => {
@@ -133,7 +133,7 @@ test('reviewed spaced payment codes round-trip through foundation publication un
 test('concurrent independent migration sessions serialize empty bootstrap', async () => {
   await db.query('DROP SCHEMA sales_foundation CASCADE');
   const results = await Promise.all([migrate(db), migrate(independent)]);
-  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 4);
+  assert.equal(results.reduce((sum, r) => sum + r.applied, 0), 5);
   assert.equal(await count('sales_store'), 6);
 });
 test('migration runner waits on the real advisory lock and releases it at commit', async () => {
@@ -167,7 +167,7 @@ test('changed applied migration checksum fails closed', async () => {
     const name = '001_foundation.sql';
     await fs.writeFile(path.join(temp, name), await fs.readFile(path.join(migrationDir, name), 'utf8') + '\n-- changed\n');
     await assert.rejects(migrate(db, temp), { code: 'MIGRATION_MISMATCH' });
-    assert.equal(await count('schema_migration'), 4);
+    assert.equal(await count('schema_migration'), 5);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('failed migration rolls back schema and ledger and frees migration lock', async () => {
@@ -177,7 +177,7 @@ test('failed migration rolls back schema and ledger and frees migration lock', a
     await fs.writeFile(path.join(temp, '001_failure.sql'), 'CREATE TABLE sales_foundation.transient (id int); SELECT missing_synthetic_function();');
     await rejected(migrate(db, temp));
     assert.equal((await db.query("SELECT to_regnamespace('sales_foundation') IS NULL AS absent")).rows[0].absent, true);
-    assert.equal((await migrate(independent)).applied, 4);
+    assert.equal((await migrate(independent)).applied, 5);
   } finally { await fs.rm(temp, { recursive: true }); }
 });
 test('PK, FK, typed state, bounds and fact check constraints are enforced', async () => {
@@ -422,7 +422,13 @@ async function upgradeData() {
 }
 const labelCheck = row => ['sales_line', 'sales_stage_line'].includes(row.relname) && row.contype === 'c' && row.definition.includes('length(product_label)');
 
+async function migrate004(database) {
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'kk-four-migrations-'));
+  try {for(const n of (await fs.readdir(migrationDir)).filter(n=>/^(001|002|003|004)_/.test(n)))await fs.copyFile(path.join(migrationDir,n),path.join(dir,n));return await migrate(database,dir);}
+  finally {await fs.rm(dir,{recursive:true});}
+}
 test('004 fresh/upgrade schemas match; only two checks change, all rows and prior ledger entries remain byte-exact', async () => {
+  await db.query('DROP SCHEMA sales_foundation CASCADE');await migrate004(db);
   const freshSchema = await schemaSnapshot(db);
   await schema003(async () => {
     await seedUpgradeRows();
@@ -431,7 +437,7 @@ test('004 fresh/upgrade schemas match; only two checks change, all rows and prio
     const physical = async () => (await db.query(`SELECT oid, relfilenode FROM pg_class WHERE oid IN
       ('sales_foundation.sales_line'::regclass, 'sales_foundation.sales_stage_line'::regclass) ORDER BY oid`)).rows;
     const physicalBefore = await physical();
-    assert.deepEqual(await migrate(db), { applied: 1, total: 4 });
+    assert.deepEqual(await migrate004(db), { applied: 1, total: 4 });
     assert.deepEqual(await upgradeData(), before, 'values, fingerprints, physical row versions/locations unchanged');
     assert.deepEqual(await physical(), physicalBefore, 'no table recreation or rewrite');
     assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version LIMIT 3')).rows, ledger);
@@ -441,7 +447,7 @@ test('004 fresh/upgrade schemas match; only two checks change, all rows and prio
     assert.deepEqual({ ...upgraded, constraints: upgraded.constraints.filter(row => !labelCheck(row)) },
       { ...oldSchema, constraints: oldSchema.constraints.filter(row => !labelCheck(row)) });
     const newLedger = (await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
-    assert.deepEqual(await migrate(db), { applied: 0, total: 4 });
+    assert.deepEqual(await migrate004(db), { applied: 0, total: 4 });
     assert.deepEqual(await schemaSnapshot(db), freshSchema); assert.deepEqual(await upgradeData(), before);
     assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, newLedger);
   });
@@ -503,4 +509,13 @@ test('004 invalid existing whitespace data aborts atomically without cleaning or
     assert.deepEqual(await schemaSnapshot(db), before); assert.deepEqual(await upgradeData(), data);
     assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows, ledger);
   });
+});
+test('005 upgrades metadata without rewriting existing facts, day states, prior migrations',async()=>{
+ const fresh=await schemaSnapshot(db);await db.query('DROP SCHEMA sales_foundation CASCADE');await migrate004(db);await seedUpgradeRows();
+ const before=await upgradeData(),ledger=(await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version')).rows;
+ assert.deepEqual(await migrate(db),{applied:1,total:5});
+ const after=await upgradeData();for(const d of after.sales_day_state){delete d.zero_observation_run;delete d.zero_reviewed_at;delete d.zero_reviewed_by;}
+ assert.deepEqual(after,before);assert.deepEqual(await schemaSnapshot(db),fresh);
+ assert.deepEqual((await db.query('SELECT * FROM sales_foundation.schema_migration ORDER BY version LIMIT 4')).rows,ledger);
+ assert.deepEqual(await migrate(db),{applied:0,total:5});
 });
