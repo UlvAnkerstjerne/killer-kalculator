@@ -1,0 +1,1932 @@
+{
+  "version": 1,
+  "startingCommit": "4c16ff65a7c9fd68dbdf637dd6409f1d3b29d4cd",
+  "previousProducts": 425,
+  "previousProductsSha256": "436671a7345ebc6bd5ad18ca2cfd636c20ab5d9d196ab033577b8fc6849ff2c9",
+  "previousPaymentsSha256": "be7b001b86e4fdf8e7c838adba75c595e4af833b9543853c02b45e56beae03bb",
+  "reviewPolicy": "Exact product admission only; business-neutral vocabulary or already reviewed labels; no payment or metric classification.",
+  "retainedCandidates": 155,
+  "uniqueCandidates": 155,
+  "approved": 134,
+  "isolated": 21,
+  "products": [
+    {
+      "store": "vesterbro",
+      "productId": "27240608",
+      "tupleSha256": "dc87021138858bb0327f15847bbd577794d15444d3fbc9f13b81842406f3442d",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240668",
+      "tupleSha256": "a1f0df712aaee79e77ef3becba3b6d58792d058952c5bc7b97b869d54b862703",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240700",
+      "tupleSha256": "e88b7c133d281a5ad2f69ff3de4e8562685b7b63151622383b17a04e434bfc64",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240708",
+      "tupleSha256": "c47c68bcf6023c55784aa67b3f0f9d8bea162fe0227ba4b6a84a7b837a596ac5",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240716",
+      "tupleSha256": "2e83acb860cbed2d76cb95a250f687071205d755e6103e83fe5b1e9e0ffeaf01",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240720",
+      "tupleSha256": "3f6bcf708a171246f22a39637454fe04e745dfcd9d60f3b4f2cefcfce58d95b8",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240724",
+      "tupleSha256": "c1bfce90da239d1480dc77c62c11d095f4581d8058e68a1f5454c8e181718106",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240728",
+      "tupleSha256": "d405e4dc77fc5a5f53dc7445b3ef015e95bd4cf29ee2e4b6d5695cae397755de",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240736",
+      "tupleSha256": "a8d245d3f2620d6c8765a74682a5b3002cdd0c2e715967c26817a126783816d9",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240788",
+      "tupleSha256": "fb9f369525f982671b3201f620d2605acad12bf5a92199dbebc85025dea11476",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240796",
+      "tupleSha256": "69f467eb4150c0ace46ccdcb8af748e8ab89cf99c1ad90045a61c422cde5c765",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240820",
+      "tupleSha256": "33ac07aa7c724eee5a257ad5fcec338c8b77bd58674a3591b9cb8b7043bd80b0",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240832",
+      "tupleSha256": "38ae262b33a3e4a0d04b480e138eea0eaa8abde2927599b6840cbbabc5074b34",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240840",
+      "tupleSha256": "5eb3c460c92b8294518ee18ec77174bda29555e99ada0a04db3d3a1dc85ca65e",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "27240852",
+      "tupleSha256": "658a9c8ea76598a608ede3a3e2cd07df726c98d820ce0826fb0accd5bf70f475",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "vesterbro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "29134755",
+      "tupleSha256": "1d5c862ab677bc86e30ee9fe2a71b612521bd5937703eede4972e8ed922a7d51",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "29134758",
+      "tupleSha256": "b311744ce418061a2860eae03c543d3dd430cf1f69849d8c2a7e9ef7a7073dc2",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "29134761",
+      "tupleSha256": "410cf5b7c8b7adaf7da5b13f2e24be3d964409bec63457e5e72aa2561615e703",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "29134794",
+      "tupleSha256": "57ea960daea07f8593fedf789159297606d577cd1376d29e3588689ca0da013e",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "vesterbro",
+      "productId": "29134887",
+      "tupleSha256": "d5ea99c07f69e1dce584df98db46c450cbf66aef9ad6a921f2afe92a481e54ab",
+      "scopes": [
+        {
+          "store": "vesterbro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241684",
+      "tupleSha256": "54077d25b2c6fea71008008a30362f72bdad931d1cb20cf08b9f16886b5c4047",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241688",
+      "tupleSha256": "47a3132dae11eb276c13cbb5ec2c24859381f764c9e64a25e1da490d7845b9a6",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241692",
+      "tupleSha256": "8e622612674f4a448f5587313fee2eb8e23f5940d56b2a54f1ab5b81c06b2ea6",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241744",
+      "tupleSha256": "2c9155308b40178cf7d10b4fe45ba2d1b18f71a41b986eb3daffbaee5329202b",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241780",
+      "tupleSha256": "0cec4f3a7fe8b25168b6e6e1779d87cdfeade485c71052280c85396aee232a13",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241844",
+      "tupleSha256": "24b77ea7dcbd9142808499aac4b8ee3988142936d7c1bff83419e7aa835088e3",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241852",
+      "tupleSha256": "1ce25f0f5ea866d5020ffaf7cfbe2485a13e9ce8711eeaac3c55c940a1d95d78",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241860",
+      "tupleSha256": "58bdb011fe73f760c1416df4ba8814a580bb3613a61e30a077e22677b2efca18",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241864",
+      "tupleSha256": "1cc66ebf3e945ca2da8998a9718e33c3765713881bde18582658b719be1806cc",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241872",
+      "tupleSha256": "a287f244f1fa9fe7d3d92005f9e93a7e42961dbbe534e7589e7689cf702d5ae5",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241908",
+      "tupleSha256": "8208715a71a4eea3d3944c9ccdecf7a99f6e1facbf9110ea9922b1fc45b3bb85",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-09-28",
+          "end": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241912",
+      "tupleSha256": "3313988fcc61a1a111d4ac3733d32acb67e461ee702e071e0fa08c2b37e6b820",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241932",
+      "tupleSha256": "b1615877f72ef01d35716ec6c47e61a8bd3479a1412285b9f2ae85b51ad28bcf",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241968",
+      "tupleSha256": "372875a53cd3811ad703932d452be573da5db4637602659786864ff092dcc388",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241976",
+      "tupleSha256": "862975ebd93e9105b6600186d4b963a1acbb5b2b0a9efccdaa3cb94c2e3da535",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241980",
+      "tupleSha256": "77dc2ded57254d135bccd3e4ed12c372d69d20c9bea9427f89f16d445c9e51e3",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241984",
+      "tupleSha256": "5e083897a79163ea095e19ef90faa6666c8bb7f0a1d786850230eb19610c2d81",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241988",
+      "tupleSha256": "2655878aaeb3cc9a34d0f941924b7f15f9ec7d8a510c2534685c9c846589496a",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "28844043",
+      "tupleSha256": "2ae7ca83f819945771b8224eba2644cc0a028bbf1105a937f3cee67b6d83bcb5",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "28844049",
+      "tupleSha256": "28d9c71f6f3801243c64da2d20ab464479ee7c1cb9c80c3b94b525a4a8a48980",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "28844358",
+      "tupleSha256": "38d1013306228e40334020d1340967eaf7bad1934d34c6b8cb3875b3f8f82b0e",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "28844379",
+      "tupleSha256": "c4824c3b5a91673fd58db2477274b2849f1f3e305ad5f2d4a3e30490976d1f12",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859819",
+      "tupleSha256": "ff16b8d16f36965cc0053f2e0e0be5e0eccc7c4f88f0c5f3f8aecdc927b11435",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859822",
+      "tupleSha256": "54ec9337ac41b1c188490c55ab661b1b636f8afb36d99427506f17c1970a77de",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859825",
+      "tupleSha256": "a33d753a9c8f24903c661ef50a8b4c01dd757c742c9593cd239295abd0d1f3fa",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859828",
+      "tupleSha256": "17ff6dc4afdd45369555839a10f5f56c50f346ef3d925283eb4d0ba75a236ba4",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859858",
+      "tupleSha256": "54853e41e48dcca9688cc05e748fb477be3e2df3ac5212a1d86dc60f8ad12ebd",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859870",
+      "tupleSha256": "75366ba3e16363d807fef57967fbe544a781a16054be5a48f7c7eb0cb33dc26f",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859891",
+      "tupleSha256": "f302c2eee472a6b08cece1ae20d61fe2a795e350d86a4780fc32f573378154a2",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859945",
+      "tupleSha256": "863c5ab9d8f2df001895c632e0632644a8a00b90223fcad67f39e585edc8cb81",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859957",
+      "tupleSha256": "25ffc27c38391cb261ea3b62efa944039b4f8d65bb352159ac3a1edc2158a75e",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859963",
+      "tupleSha256": "7b3bce98d9187754a45851fe11e7f3f54d1ea9c2c2e4dfe8061d93801bd96043",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859972",
+      "tupleSha256": "d747cac7e1e104149688e561b266b736a93dfd530bf286e79ea4da00af01f306",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859978",
+      "tupleSha256": "2e56ee89e3315d531d81975e9323810170b0def00568f8f6f7582d600e32125e",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27859984",
+      "tupleSha256": "97721b2181061cff7387db7fa3dcfc6506c5b1b12aee698bdf6a94c7deb00722",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860014",
+      "tupleSha256": "251f77eb1e06edaec891f0e3f9d40483879c18a0f6e9ba7ef6570c2a534ba67b",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860020",
+      "tupleSha256": "8d95a9b576808b9e9ac4d8e7b3cf72a9656169cf6e75533479c6ba493442ea58",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "christianshavn",
+          "start": "2026-09-28",
+          "end": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860029",
+      "tupleSha256": "f03f0409b0072f4a561047bb74dead8b0452adc40d10715ca590f796717d14fc",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860047",
+      "tupleSha256": "8fcf80e86067e681c1e9edc19ac729a497879c81ac701d2af6c706d6c9aa3e77",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860056",
+      "tupleSha256": "7c809051a093d0d2efb9665e2a6e64462acf48d4f9357e36ffb5d3e08508b59e",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860062",
+      "tupleSha256": "72ea60d69497654b90008fe3ab95d900ca3deebce7e5b16497f2275b75aa996d",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860065",
+      "tupleSha256": "100524d2af24d1ccd8712feb654ff32b705a2685321dc43e27840b19d8c7f43c",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860068",
+      "tupleSha256": "b2995860fc1db806e943c700f5e1cfc9ede79930af3b4482968d41b5e5c0e207",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "27860074",
+      "tupleSha256": "8403b77e1a0b27f6d58d19a87720cf4c6365a7bfccde1d8d2be80d8732abfdc3",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28599965",
+      "tupleSha256": "21996a012b3ed172a775951e4fba78a74112a09186d384b91099b1f8d9339b0f",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28599968",
+      "tupleSha256": "6e5b2eb3dba349b5f56ed720d150ee842539b6f23fbac1724ffe81faeb26e714",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28599974",
+      "tupleSha256": "341f56df1e687d8491640d967d964105f08a702a96e7aafd2222708d8be1781d",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28713799",
+      "tupleSha256": "e88c35195bff0e970a25b071c4667c3e239919c10668e52fab5f84c862ce55cb",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714231",
+      "tupleSha256": "ceaeaa5077d1acebed34b224bc5384500b6082cc017b0b24f41d5b0c4922cb40",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714237",
+      "tupleSha256": "55b4193a0d9b80b69e4d8e15f802100ee13709d2b17efd36d280bc158a473064",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714300",
+      "tupleSha256": "0c80387dc2287abb612902de422efcfe602226413e607f995b798cfbea3e4fdd",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714333",
+      "tupleSha256": "a77b605e1a29256a96a767e55cf824e98be19015ed149e601fc360ab524f8cc5",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714351",
+      "tupleSha256": "4a424c504c1fb408696e187edbc1d38d0646bc616e28dd0ed07f8d0fa4c7d008",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714357",
+      "tupleSha256": "e2552911bae59ebedb79612684d4b44b136a8cf6c4b87ff9d909cdf1589b8fec",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714360",
+      "tupleSha256": "f452f7a18ef7c5562f8996b221e00edf37069c63d11f4f3f0db19d1ecf1cddc4",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28714363",
+      "tupleSha256": "12c91f63b23af796054bcb23ce6f17c6f12f32443e54dd80f959ecd9b9444b73",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28715953",
+      "tupleSha256": "149153be2b3da175975fd8c202ff0db95a554a6e97d58b02ac6e6039911d05d0",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "28715986",
+      "tupleSha256": "b6242bdcfcacfc6583eaedb810d0f71f4c1ff3c74c852a2746833d7e914af989",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "christianshavn",
+      "productId": "29339051",
+      "tupleSha256": "0d34845cf15d78f1c4c46308f8a8f5110e08193aa3b43196aed2be41136f9657",
+      "scopes": [
+        {
+          "store": "christianshavn",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241088",
+      "tupleSha256": "be92841c1ebe3bd0a363c07ad4b8e7771908b2b418ece39497772b43c9a4c096",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241096",
+      "tupleSha256": "b2add98c0c762fbf12fb03c3c3a16457ff6615d371c0ce733156f2a3935af711",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241104",
+      "tupleSha256": "a9dc6f3639224365149420cc692589c3a87b1e219867482759eedd01b2144a9f",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241108",
+      "tupleSha256": "1423a7ddbaa7c479dfbcaec95c6f356ecdf2d5446c6439025b3dc3e2fe12369c",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241112",
+      "tupleSha256": "e9b8961a2ddafd64a963a9b404b74f8d7d17630c755357842c9dccaad4e170ab",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241116",
+      "tupleSha256": "801bf1a0fa42a71121e3e074eac1585bbddeb24c6bf0fe16c7b44a887bb63d34",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241124",
+      "tupleSha256": "ba91aff33bd655b70a79c31bf431d42e9b2c23053877d629d7ae7ef67d118aa7",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241164",
+      "tupleSha256": "63c06c6c6c82bfae9cc0153ceea1d55546b21d3f1bab6d726e6df6ef3e7bc05d",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241184",
+      "tupleSha256": "4dbfac711c31d0ab267560e7e2fc9a7d7f59ae98d080d1921a84db11496bdc8a",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-09-28",
+          "end": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241208",
+      "tupleSha256": "96336b3801c91c68473aaab382b4101f0a37edd711afe1044f198f8d2ab26c8d",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27241220",
+      "tupleSha256": "afdf4c785f64c2a52c117e39ae596beae66a3f31d1746f9d250652415d5b3ece",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "28717351",
+      "tupleSha256": "ae1673682a46be2834ea2acdb5fcbc779e5cf469f896e564bece4d5dec389fa7",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241336",
+      "tupleSha256": "86783bfb4d196d83abe9691a1248fe923c47e15e72af030115b2e6c36067f700",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241360",
+      "tupleSha256": "e650a9961a256a79d8763493c1f0efeecb16e0447b90cef8d75dc20a3b5f1608",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241400",
+      "tupleSha256": "ec1745e5f8d460160dc921d38b13e5e2302e0420504515cbd7d06b7e1e74586a",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241420",
+      "tupleSha256": "82b757df8377292bebd37d7aa67a9508d28252a0e162886a5cd7b9d21e94ab4e",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241424",
+      "tupleSha256": "fff6fbc0cf101ae948c04783e6a608bc9cc19eb4711f113c21e3cab9285bd283",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241460",
+      "tupleSha256": "e0b79829340a9c6c4a485222d56fd9429acd4a1c5f8ea7eeff23242c5a998b45",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241476",
+      "tupleSha256": "be22ef6dad42d705a1a2111ebe37342994ed712895889f52402983c936df7caf",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241480",
+      "tupleSha256": "e01badcf34b25969ae9c2a109477b6b153289c61526e4469fb4335ac30b395f4",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241488",
+      "tupleSha256": "622446874d8f9fdf03fccd8f8178caea0634529789ca3c58dd3a6e4993f145fb",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241528",
+      "tupleSha256": "1b16d18246f8ae53a231c8ec284e3cfa6f936f00a0eec3a28358d733415a3d1d",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241548",
+      "tupleSha256": "a0d85a34c6799ce4dc8a2353e99427246cf3b3f37391f91298ec2c0bd4416358",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241572",
+      "tupleSha256": "a2ce741ef56583b09b4e853ee66458bc6dd6d5a5dd410a9335e3f3a6e10e519b",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241584",
+      "tupleSha256": "f269f5c159367f358fcf8d304ef6bcca7d518fe9379ff8b80ebf5e081ca0f3f8",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241592",
+      "tupleSha256": "de73adef8dba367dfa3a1ad461da205d50562d3840f6b6189e3f0291245316c3",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241596",
+      "tupleSha256": "37a1428696b08492d96c5f252e221a92f9540005c7f8da40e6586e09b26a1486",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "27241604",
+      "tupleSha256": "f75b278cd8ca37fab602bfeab6c759341a131634a8fdf5b5c81327fc134b9773",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "28714474",
+      "tupleSha256": "dc3404244d4245265bba7baf4016865112a30b1b261c064d25e498aa302bd168",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "frederiksberg",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "29134971",
+      "tupleSha256": "83c12f563f9e5f3efb99b2881f745306826db793769626c383938f18d9ac0a45",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "29134974",
+      "tupleSha256": "9b75944360f0f8d1f2b4d04e78057c86a1e6725d314cbc24c9581260b7843d6b",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "29134977",
+      "tupleSha256": "610ba4cb7c82d556435f556fc3f44b6dfb1c64379f228083aa71eb217becac09",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "frederiksberg",
+      "productId": "29134980",
+      "tupleSha256": "97f683b24b1ed9eecc5333d5945b074943bf26c53663d8308f3b1509665b323b",
+      "scopes": [
+        {
+          "store": "frederiksberg",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242128",
+      "tupleSha256": "f242c37aff8fa6d730a0ff8bb32a37f4e129db447dff31c05df7cc89f93b585c",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242172",
+      "tupleSha256": "8b00c044277e5e24f4ac8fc7d1e3a8a80fafa0b623e3d934df7248ec853c325d",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242228",
+      "tupleSha256": "cbdf057ab3e0d388ae9cf22f93b5aabd03b665a464ab0ee35e41835d1b822088",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242240",
+      "tupleSha256": "1c7e2204cef057d4c261611e95c9dd8a074956f47d7431efd2d097993dc8f9c5",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242244",
+      "tupleSha256": "52df66b183c5ae739d123236b6b1b3fe7079620fc8d555ac8c3f7c0923499b64",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242256",
+      "tupleSha256": "fbc13bd19b4f10f791defd089e0fb8d992b130c977cc9d873905b0feac4334a2",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242264",
+      "tupleSha256": "59a00ad37d95e347f354ef1d8a7d27a56024c686461a11ef34033959bab5a980",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242296",
+      "tupleSha256": "d3ec4f21678336e9d1cf2e92c2c90f7304a8d5ad3499a4ef91f3a6efd07fc04f",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242300",
+      "tupleSha256": "7f6655de725ecd3d04532999b6394a1db3c41accccc07a61d0dbc7644d29a5e3",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242324",
+      "tupleSha256": "a08f1df321a055e8e58a774116044030735fa1e99a824888779f440f9e5b5f62",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242348",
+      "tupleSha256": "f5187e275e84a63d699ebd5de8b8679daaf455252598bd05b2e628e9a009966a",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242360",
+      "tupleSha256": "1914d76e3a279a6cb7ea28e115dc39179240dbda1b9c7ffffa1f543fe0e0bf82",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242368",
+      "tupleSha256": "52440ed22f140fff1f31d61259b9dec4b17d4a33828b2ffa0fcd089d3bca4129",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242372",
+      "tupleSha256": "cdbeaa5fe8d9ba47b3deb74c780818d4585edc72a8473d82d47e88f282441408",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242380",
+      "tupleSha256": "ac2c304f7a272f859501020e718c3fa5428b6fd035b7b87ec40c4f91133c29e8",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "28259087",
+      "tupleSha256": "1b4b9e7361ac8598b27913d0f2e15984387122363e65c444648778d4c8df5c37",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "28594156",
+      "tupleSha256": "bb366ae4ba1ae9ccf23b3f6845e76293f806990978b22a5e854a15990b2a8bc2",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "28715782",
+      "tupleSha256": "35e524429e6df73fe63980ed449627787637ee6741b7b214e4db48d066b07620",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2025-01-01",
+          "end": "2026-01-01"
+        },
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "27241696",
+      "tupleSha256": "8e77f68310f4713d4d9e8c532a6dea28eb6e34baea314053580e385f80f6e18d",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "indre-by",
+      "productId": "29557363",
+      "tupleSha256": "cd7f535b7b50ce1e5b3aa8717bb232df8d6a42b935badebbd1eb7f9c97fc0f16",
+      "scopes": [
+        {
+          "store": "indre-by",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "fisketorvet",
+      "productId": "27240992",
+      "tupleSha256": "3369ef7328dbcef697cbdf47dd5ca70cf3f917e1efd7b163736e00e78a881f27",
+      "scopes": [
+        {
+          "store": "fisketorvet",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    },
+    {
+      "store": "norrebro",
+      "productId": "27242236",
+      "tupleSha256": "7dccd44775d6a64023a8a10264ca9ee3d6cc1ba193807954db395e82dfdcc56b",
+      "scopes": [
+        {
+          "store": "norrebro",
+          "start": "2026-01-01",
+          "end": "2026-09-20"
+        }
+      ]
+    }
+  ]
+}
