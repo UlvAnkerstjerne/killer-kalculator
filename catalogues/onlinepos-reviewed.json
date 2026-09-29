@@ -86,6 +86,34 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859819",
+      "productLabel": "+ Killer Fries",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859822",
+      "productLabel": "+ Lemonade",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859825",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859828",
+      "productLabel": "+ Soda",
+      "groupId": "2938888",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859834",
       "productLabel": "+ Pepsi Max (+0kr)",
       "groupId": "2938894",
@@ -135,6 +163,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859858",
+      "productLabel": "+ Blanche (+30kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859864",
       "productLabel": "Extra Hummus (10 kr)",
       "groupId": "2938888",
@@ -146,6 +181,13 @@
       "productLabel": "Extra Meat (35 kr)",
       "groupId": "2938888",
       "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859870",
+      "productLabel": "Heineken 0,0% (45kr) ",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
     },
     {
       "storeSlug": "christianshavn",
@@ -191,6 +233,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859891",
+      "productLabel": "Soft Drink (0 kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859894",
       "productLabel": "SOFT DRINK (25kr)",
       "groupId": "2938894",
@@ -212,8 +261,29 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859945",
+      "productLabel": "LEGALLY required bag fee",
+      "groupId": "2938903",
+      "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859957",
+      "productLabel": "Børnebab",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859960",
       "productLabel": "EAT NOW",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859963",
+      "productLabel": "Extra Apple",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -233,6 +303,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859972",
+      "productLabel": "Extra yogurt",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859975",
       "productLabel": "Falafel as kebab",
       "groupId": "2938906",
@@ -240,8 +317,22 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859978",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859981",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859984",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -310,8 +401,22 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27860014",
+      "productLabel": "No Celery",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27860017",
       "productLabel": "Split in Half",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860020",
+      "productLabel": "Serve on a plate",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -326,6 +431,13 @@
       "storeSlug": "christianshavn",
       "productId": "27860026",
       "productLabel": "No Cabbage",
+      "groupId": "2938906",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860029",
+      "productLabel": "No Apple",
       "groupId": "2938906",
       "groupLabel": "Messages"
     },
@@ -366,6 +478,13 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27860047",
+      "productLabel": "Dip",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27860050",
       "productLabel": "Flat Bread",
       "groupId": "2938891",
@@ -380,8 +499,43 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27860056",
+      "productLabel": "Killer Falafel",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27860059",
       "productLabel": "Killer Fries (35 kr)",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860062",
+      "productLabel": "Killer Kebab ",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860065",
+      "productLabel": "Killer Lemonade",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860068",
+      "productLabel": "Killer Pale Ale (45 kr)",
+      "groupId": "2938891",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27860074",
+      "productLabel": "Soft Drink",
       "groupId": "2938891",
       "groupLabel": "Sides "
     },
@@ -394,6 +548,27 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28599965",
+      "productLabel": "",
+      "groupId": "2938909",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599968",
+      "productLabel": "",
+      "groupId": "2938909",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599974",
+      "productLabel": "Killer Falafel Kombo",
+      "groupId": "2938897",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28614281",
       "productLabel": "Legally required bag fee",
       "groupId": "2938897",
@@ -403,6 +578,13 @@
       "storeSlug": "christianshavn",
       "productId": "28713796",
       "productLabel": "Pepsi Max (25kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28713799",
+      "productLabel": "PREMIUM DRINKS (35kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -450,6 +632,20 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28714231",
+      "productLabel": "Heineken 0,0% (55kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714237",
+      "productLabel": "+ Heineken 0,0% (+30kr) ",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28714270",
       "productLabel": "+ PREMIUM ",
       "groupId": "2938894",
@@ -466,6 +662,13 @@
       "storeSlug": "christianshavn",
       "productId": "28714291",
       "productLabel": "Booster (35kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714300",
+      "productLabel": "+ Elderflower (+10kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
     },
@@ -492,10 +695,66 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28714333",
+      "productLabel": "+ Pilsner (+20kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28714336",
       "productLabel": "Pilsner (45kr)",
       "groupId": "2938894",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714351",
+      "productLabel": "+ Blå Thor (+20kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714357",
+      "productLabel": "Blå Thor (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714360",
+      "productLabel": "+ Blanche (+20kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714363",
+      "productLabel": "Blanche (45kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28715953",
+      "productLabel": "+ Heineken 0,0% (+20kr) ",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28715986",
+      "productLabel": "Elderflower (35kr)",
+      "groupId": "2938894",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "29339051",
+      "productLabel": "",
+      "groupId": "2938909",
+      "groupLabel": "Rolls "
     },
     {
       "storeSlug": "christianshavn",
@@ -695,6 +954,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27240992",
+      "productLabel": "+ Soft Drink",
+      "groupId": "2911644",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27240996",
       "productLabel": "Extra Hummus (10 kr)",
       "groupId": "2911644",
@@ -786,8 +1052,22 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241088",
+      "productLabel": "Børnebab",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241092",
       "productLabel": "EAT NOW",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241096",
+      "productLabel": "Extra Apple",
       "groupId": "2911668",
       "groupLabel": "Messages"
     },
@@ -800,8 +1080,43 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241104",
+      "productLabel": "Extra Mayo",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241108",
+      "productLabel": "Extra yogurt",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241112",
+      "productLabel": "Falafel as kebab",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241116",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241120",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241124",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2911668",
       "groupLabel": "Messages"
     },
@@ -870,6 +1185,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241164",
+      "productLabel": "No Celery",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241168",
       "productLabel": "Split in Half",
       "groupId": "2911668",
@@ -893,6 +1215,13 @@
       "storeSlug": "fisketorvet",
       "productId": "27241180",
       "productLabel": "No Cabbage",
+      "groupId": "2911668",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241184",
+      "productLabel": "No Apple",
       "groupId": "2911668",
       "groupLabel": "Messages"
     },
@@ -933,6 +1262,13 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "27241208",
+      "productLabel": "Dip",
+      "groupId": "2911648",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "27241212",
       "productLabel": "Flat Bread",
       "groupId": "2911648",
@@ -942,6 +1278,13 @@
       "storeSlug": "fisketorvet",
       "productId": "27241216",
       "productLabel": "Hummus TO-GO (35 kr)",
+      "groupId": "2911648",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27241220",
+      "productLabel": "Killer Falafel",
       "groupId": "2911648",
       "groupLabel": "Sides "
     },
@@ -1005,6 +1348,13 @@
       "storeSlug": "fisketorvet",
       "productId": "28717348",
       "productLabel": "IPA (55kr)",
+      "groupId": "2911652",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28717351",
+      "productLabel": "+ Heineken 0,0% (+30kr)",
       "groupId": "2911652",
       "groupLabel": "Drinks "
     },
@@ -1185,6 +1535,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241336",
+      "productLabel": "Coca-Cola ",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241344",
       "productLabel": "Water, still (25kr)",
       "groupId": "2911684",
@@ -1203,6 +1560,13 @@
       "productLabel": "",
       "groupId": "2911684",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241360",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2911676",
+      "groupLabel": "Add-ons "
     },
     {
       "storeSlug": "frederiksberg",
@@ -1269,6 +1633,27 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241400",
+      "productLabel": "Soft Drink (25kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241420",
+      "productLabel": "Kombo - Falafel (2for1)",
+      "groupId": "2911692",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241424",
+      "productLabel": "Kombo - Lamb (2for1)",
+      "groupId": "2911692",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241428",
       "productLabel": "Kombo - Falafel ",
       "groupId": "2911692",
@@ -1297,6 +1682,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241460",
+      "productLabel": "Extra Apple",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241464",
       "productLabel": "Extra Hummus",
       "groupId": "2911700",
@@ -1318,8 +1710,29 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241476",
+      "productLabel": "Falafel as kebab",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241480",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241484",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241488",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
@@ -1388,6 +1801,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241528",
+      "productLabel": "No Celery",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241532",
       "productLabel": "Split in Half",
       "groupId": "2911700",
@@ -1411,6 +1831,13 @@
       "storeSlug": "frederiksberg",
       "productId": "27241544",
       "productLabel": "No Cabbage",
+      "groupId": "2911700",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241548",
+      "productLabel": "No Apple",
       "groupId": "2911700",
       "groupLabel": "Messages"
     },
@@ -1451,6 +1878,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241572",
+      "productLabel": "Dip",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241576",
       "productLabel": "Flat Bread",
       "groupId": "2911680",
@@ -1465,8 +1899,36 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "27241584",
+      "productLabel": "Killer Falafel",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "27241588",
       "productLabel": "Killer Fries (35 kr)",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241592",
+      "productLabel": "Killer Kebab ",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241596",
+      "productLabel": "Killer Lemonade",
+      "groupId": "2911680",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241604",
+      "productLabel": "Napkin",
       "groupId": "2911680",
       "groupLabel": "Sides "
     },
@@ -1514,6 +1976,13 @@
     },
     {
       "storeSlug": "frederiksberg",
+      "productId": "28714474",
+      "productLabel": "+ Heineken 0,0% (+20kr)",
+      "groupId": "2911684",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
       "productId": "28714477",
       "productLabel": "Heineken 0,0% (45kr)",
       "groupId": "2911684",
@@ -1546,6 +2015,34 @@
       "productLabel": "Faxe Kondi (25kr)",
       "groupId": "2911684",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "29134971",
+      "productLabel": "Kombo - 2 for 1",
+      "groupId": "2911692",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "29134974",
+      "productLabel": "Rolls - 2 for 1",
+      "groupId": "2911704",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "29134977",
+      "productLabel": "Killer Kebab (2for1)",
+      "groupId": "2911704",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "29134980",
+      "productLabel": "Killer Falafel (2for1)",
+      "groupId": "2911704",
+      "groupLabel": "Rolls "
     },
     {
       "storeSlug": "frederiksberg",
@@ -1654,6 +2151,34 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241684",
+      "productLabel": "+ Killer Fries",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241688",
+      "productLabel": "+ Lemonade",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241692",
+      "productLabel": "+ Pale Ale",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241696",
+      "productLabel": "+ Soda",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241704",
       "productLabel": "+ Faxe Kondi (+0kr)",
       "groupId": "2911716",
@@ -1710,6 +2235,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241744",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241748",
       "productLabel": "Extra Meat (35 kr)",
       "groupId": "2911708",
@@ -1759,6 +2291,13 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241780",
+      "productLabel": "Soft Drink (0 kr)",
+      "groupId": "2911716",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241784",
       "productLabel": "SOFT DRINK (25kr)",
       "groupId": "2911716",
@@ -1794,8 +2333,22 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241844",
+      "productLabel": "Extra Apple",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241848",
       "productLabel": "Extra Hummus",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241852",
+      "productLabel": "Extra Mayo",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1808,8 +2361,29 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241860",
+      "productLabel": "Falafel as kebab",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241864",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241868",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241872",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1871,6 +2445,20 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241908",
+      "productLabel": "No Mint",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241912",
+      "productLabel": "No Celery",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241916",
       "productLabel": "Split in Half",
       "groupId": "2911732",
@@ -1894,6 +2482,13 @@
       "storeSlug": "indre-by",
       "productId": "27241928",
       "productLabel": "No Cabbage",
+      "groupId": "2911732",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241932",
+      "productLabel": "No Apple",
       "groupId": "2911732",
       "groupLabel": "Messages"
     },
@@ -1955,8 +2550,43 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "27241968",
+      "productLabel": "Killer Falafel",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "27241972",
       "productLabel": "Killer Fries (35 kr)",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241976",
+      "productLabel": "Killer Kebab ",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241980",
+      "productLabel": "Killer Lemonade",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241984",
+      "productLabel": "Killer Pale Ale (45 kr)",
+      "groupId": "2911712",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241988",
+      "productLabel": "Napkin",
       "groupId": "2911712",
       "groupLabel": "Sides "
     },
@@ -1969,10 +2599,45 @@
     },
     {
       "storeSlug": "indre-by",
+      "productId": "28844043",
+      "productLabel": "Killer Bowl",
+      "groupId": "2911736",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "indre-by",
       "productId": "28844046",
       "productLabel": "+ Bread (25 kr)",
       "groupId": "2911708",
       "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844049",
+      "productLabel": "+ Falafels (30 kr)",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844358",
+      "productLabel": "Kombo - Bowl",
+      "groupId": "2911724",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844379",
+      "productLabel": "Extra Feta (10 kr)",
+      "groupId": "2911708",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "29557363",
+      "productLabel": "Unknown external product",
+      "groupId": "3034909",
+      "groupLabel": "Unknown external product"
     },
     {
       "storeSlug": "indre-by",
@@ -2165,6 +2830,13 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242128",
+      "productLabel": "",
+      "groupId": "2911748",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242136",
       "productLabel": "Extra Hummus (10 kr)",
       "groupId": "2911740",
@@ -2221,6 +2893,13 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242172",
+      "productLabel": "Soft Drink (0 kr)",
+      "groupId": "2911748",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242176",
       "productLabel": "SOFT DRINK (25kr)",
       "groupId": "2911748",
@@ -2242,8 +2921,36 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242228",
+      "productLabel": "Børnebab",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242232",
       "productLabel": "EAT NOW",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242236",
+      "productLabel": "Extra Apple",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242240",
+      "productLabel": "Extra Hummus",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242244",
+      "productLabel": "Extra Mayo",
       "groupId": "2911764",
       "groupLabel": "Messages"
     },
@@ -2263,8 +2970,22 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242256",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242260",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242264",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2911764",
       "groupLabel": "Messages"
     },
@@ -2319,6 +3040,20 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242296",
+      "productLabel": "No Apple",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242300",
+      "productLabel": "No Mint",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242304",
       "productLabel": "No Celery",
       "groupId": "2911764",
@@ -2349,6 +3084,13 @@
       "storeSlug": "norrebro",
       "productId": "27242320",
       "productLabel": "No Cabbage",
+      "groupId": "2911764",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242324",
+      "productLabel": "No Apple",
       "groupId": "2911764",
       "groupLabel": "Messages"
     },
@@ -2389,6 +3131,13 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242348",
+      "productLabel": "Dip",
+      "groupId": "2911744",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242352",
       "productLabel": "Flat Bread",
       "groupId": "2911744",
@@ -2403,8 +3152,36 @@
     },
     {
       "storeSlug": "norrebro",
+      "productId": "27242360",
+      "productLabel": "Killer Falafel",
+      "groupId": "2911744",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "27242364",
       "productLabel": "Killer Fries (35 kr)",
+      "groupId": "2911744",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242368",
+      "productLabel": "Killer Kebab ",
+      "groupId": "2911744",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242372",
+      "productLabel": "Killer Lemonade",
+      "groupId": "2911744",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242380",
+      "productLabel": "Napkin",
       "groupId": "2911744",
       "groupLabel": "Sides "
     },
@@ -2414,6 +3191,20 @@
       "productLabel": "Legally required bag fee",
       "groupId": "2911760",
       "groupLabel": "Merchandise"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "28259087",
+      "productLabel": "Falafel n Fries",
+      "groupId": "2911756",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "28594156",
+      "productLabel": "Drink",
+      "groupId": "2911748",
+      "groupLabel": "Drinks "
     },
     {
       "storeSlug": "norrebro",
@@ -2454,6 +3245,13 @@
       "storeSlug": "norrebro",
       "productId": "28715767",
       "productLabel": "+ Blanche (+20kr)",
+      "groupId": "2911748",
+      "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "28715782",
+      "productLabel": "+ Heineken 0,0% (+20kr)",
       "groupId": "2911748",
       "groupLabel": "Drinks "
     },
@@ -2648,6 +3446,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240608",
+      "productLabel": "Extra Hummus (10 kr)",
+      "groupId": "2911612",
+      "groupLabel": "Add-ons "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240612",
       "productLabel": "Extra Meat (35 kr)",
       "groupId": "2911612",
@@ -2718,6 +3523,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240668",
+      "productLabel": "Add-ons",
+      "groupId": "2911628",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240676",
       "productLabel": "Kombo - Falafel ",
       "groupId": "2911628",
@@ -2732,8 +3544,22 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240700",
+      "productLabel": "Børnebab",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240704",
       "productLabel": "EAT NOW",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240708",
+      "productLabel": "Extra Apple",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2746,8 +3572,43 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240716",
+      "productLabel": "Extra Mayo",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240720",
+      "productLabel": "Extra yogurt",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240724",
+      "productLabel": "Falafel as kebab",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240728",
+      "productLabel": "Falafel ball in kebab",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240732",
       "productLabel": "Hummus in flatbread",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240736",
+      "productLabel": "Kebab as Falafel",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2837,8 +3698,22 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240788",
+      "productLabel": "No Dukkah",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240792",
       "productLabel": "No Cabbage",
+      "groupId": "2911636",
+      "groupLabel": "Messages"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240796",
+      "productLabel": "No Apple",
       "groupId": "2911636",
       "groupLabel": "Messages"
     },
@@ -2879,6 +3754,13 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240820",
+      "productLabel": "Dip",
+      "groupId": "2911616",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240824",
       "productLabel": "Flat Bread",
       "groupId": "2911616",
@@ -2893,8 +3775,29 @@
     },
     {
       "storeSlug": "vesterbro",
+      "productId": "27240832",
+      "productLabel": "Killer Falafel",
+      "groupId": "2911616",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "vesterbro",
       "productId": "27240836",
       "productLabel": "Killer Fries (35 kr)",
+      "groupId": "2911616",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240840",
+      "productLabel": "Killer Kebab ",
+      "groupId": "2911616",
+      "groupLabel": "Sides "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240852",
+      "productLabel": "Napkin",
       "groupId": "2911616",
       "groupLabel": "Sides "
     },
@@ -2953,6 +3856,41 @@
       "productLabel": "Heineken 0,0% (45kr)",
       "groupId": "2911620",
       "groupLabel": "Drinks "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134755",
+      "productLabel": "Kombo - Lamb (2for1)",
+      "groupId": "2911628",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134758",
+      "productLabel": "Killer Falafel (2for1)",
+      "groupId": "2911640",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134761",
+      "productLabel": "Killer Kebab (2for1)",
+      "groupId": "2911640",
+      "groupLabel": "Rolls "
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134794",
+      "productLabel": "Kombo - 2for1",
+      "groupId": "2911628",
+      "groupLabel": "Kombos"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134887",
+      "productLabel": "Rolls - 2for1",
+      "groupId": "2911640",
+      "groupLabel": "Rolls "
     },
     {
       "storeSlug": "vesterbro",
