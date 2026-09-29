@@ -37,3 +37,16 @@ test('new-view consumers of a coalesced failed sales request retain the error no
  release({ok:false,json:async()=>({meta:{source:'database',storeId:'norrebro',start:args.start,end:args.end,complete:false,code:'DB_READ_UNAVAILABLE'}})});
  const settled=await Promise.allSettled([first,second]);assert(settled.every(r=>r.status==='rejected'));assert.match(elements.get('sales-data-status-detail').textContent,/Database read failed/);
 });
+for(const today of ['2026-03-29','2026-03-30','2026-10-25','2026-10-26'])test('hybrid boundary is a Copenhagen calendar date across DST: '+today,async()=>{
+ const start=new Date(Date.parse(today)-86400000).toISOString().slice(0,10),end=new Date(Date.parse(today)+86400000).toISOString().slice(0,10);
+ const reader={policy:'covered-history',read:async args=>({lines:[],meta:{...args,complete:true,coverage:{complete:true,days:[{date:start,status:'complete'}]}}})};
+ const selected=await selectSalesRead(reader,{storeSlug:'norrebro',start,end,today});assert.equal(selected.source,'hybrid');assert.equal(selected.result.meta.end,today);assert.deepEqual(selected.providerRange,{start:today,end});
+});
+test('hybrid signed lines preserve refunds and reject overlapping, missing or incomplete boundaries',()=>{
+ const h=require('../lib/sales-hybrid');const line={productid:'27242336',productname:'Killer Kebab',count:-1,price:-95,priceexclvat:-76,date:'2026-09-27'};
+ const selection={storeId:'norrebro',start:'2026-09-27',end:'2026-09-29',source:'hybrid',providerRange:{start:'2026-09-28',end:'2026-09-29'},result:{lines:[line],meta:{complete:true,start:'2026-09-27',end:'2026-09-28',rawLineCount:1,processedLineCount:1,coverage:{days:[{date:'2026-09-27',independentlyVerified:false}]}}}};
+ const cached={cacheStatus:'fresh',stale:false,fetchedAt:Date.now(),result:{meta:{complete:true,start:'2026-09-28',end:'2026-09-29',rawLineCount:1,processedLineCount:1,conflicts:[],invalidCount:0}}};const live=[{...line,date:'2026-09-28',price:190,priceexclvat:152,count:2}];
+ const combined=h.composeLines(selection,cached,live);assert.equal(combined.lines.reduce((s,l)=>s+l.priceexclvat,0),76);assert.equal(require('../lib/product-metrics').computeMetrics(combined.lines).rollUnits,1);assert.match(describe(combined.meta),/Stored history through 2026-09-27 \+ OnlinePOS for Today/);assert.equal(combined.meta.rawLineCount,2);
+ for(const bad of [[line],[{...live[0],date:undefined}]])assert.throws(()=>h.composeLines(selection,cached,bad),e=>e.hybridReadMeta.complete===false);
+ cached.result.meta.complete=false;assert.throws(()=>h.composeLines(selection,cached,live));assert.match(describe(h.unavailable(selection)),/No partial figures/);
+});
