@@ -9,7 +9,7 @@ const { fail, safeError } = require('../lib/sales-sync/errors');
 
 function parseArgs(args) {
   const valueFlags = new Set(['--store', '--from', '--through', '--catalog', '--verify-run', '--resume-publication', '--max-pages', '--max-rows', '--batch-size']);
-  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--diagnose-catalog-review', '--diagnose-catalog-encoded', '--help']);
+  const flags = new Set(['--apply', '--dry-run', '--validate', '--diagnose-catalog', '--export-catalog-review', '--diagnose-catalog-text', '--diagnose-catalog-review', '--diagnose-catalog-encoded', '--auto-admit', '--help']);
   const values = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -38,9 +38,11 @@ function parseArgs(args) {
     if (!/^[1-9]\d{0,7}$/.test(values[flag]) || Number(values[flag]) > max) fail('INVALID_OPTIONS');
     limits[key] = Number(values[flag]);
   }
+  if (values['--auto-admit'] && !values['--apply']) fail('INVALID_OPTIONS');
   return { options, limits, apply: values['--apply'] === true, diagnose: values['--diagnose-catalog'] === true,
     exportReview: values['--export-catalog-review'] === true, diagnoseText: values['--diagnose-catalog-text'] === true,
-    encodedReview: values['--diagnose-catalog-encoded'] === true, safeReview: values['--diagnose-catalog-review'] === true, catalogPath: values['--catalog'], help: values['--help'] === true };
+    encodedReview: values['--diagnose-catalog-encoded'] === true, safeReview: values['--diagnose-catalog-review'] === true,
+    autoAdmit: values['--auto-admit'] === true, catalogPath: values['--catalog'], help: values['--help'] === true };
 }
 async function readReviewedCatalog(filePath) {
   try {
@@ -95,9 +97,38 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
       output(JSON.stringify(result)); return 0;
     }
     const { importHistory } = require('../lib/sales-sync/importer');
+    let autoAdmit;
+    if (parsed.autoAdmit) {
+      const { inspectText } = require('../lib/sales-sync/catalog-text');
+      const { storeId: resolveStoreId } = require('../lib/sales-db/values');
+      autoAdmit = (raw, storeSlug, context) => {
+        let pl = raw.productname;
+        const issue = inspectText(pl, 'label');
+        if (issue && issue.reason === 'SENSITIVE_PATTERN') {
+          const id = String(raw.productid), chunks = [];
+          for (let i = 0; i < id.length; i += 3) chunks.push(id.slice(i, i + 3));
+          pl = `[P:${chunks.join('/')}]`;
+        } else if (issue) return null; // Other text issues: reject
+        const sid = resolveStoreId(storeSlug);
+        context.catalog.admit({
+          storeId: sid, productId: String(raw.productid), productLabel: pl,
+          groupId: raw.productgroupid != null ? String(raw.productgroupid) : null,
+          groupLabel: raw.productgroup != null ? String(raw.productgroup) : null,
+          paymentType: String(raw.paymenttype),
+          paymentCode: raw.paymenttypecode != null ? String(raw.paymenttypecode) : null,
+        });
+        return { ...raw, productname: pl };
+      };
+    }
     await importHistory({ config, context: { identity, catalog }, request,
       options: { ...parsed.options, companyId }, limits: parsed.limits, apply: parsed.apply,
-      signal: controller.signal, report: value => output(JSON.stringify(value)) });
+      signal: controller.signal, report: value => output(JSON.stringify(value)), autoAdmit });
+    if (parsed.autoAdmit) {
+      const admitted = catalog.admitted();
+      if (admitted.products.length || admitted.payments.length) {
+        output(JSON.stringify({ status: 'admitted', products: admitted.products.length, payments: admitted.payments.length }));
+      }
+    }
     return 0;
   } catch (error) {
     const code = safeError(error).code;
