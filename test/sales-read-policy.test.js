@@ -37,3 +37,60 @@ test('new-view consumers of a coalesced failed sales request retain the error no
  release({ok:false,json:async()=>({meta:{source:'database',storeId:'norrebro',start:args.start,end:args.end,complete:false,code:'DB_READ_UNAVAILABLE'}})});
  const settled=await Promise.allSettled([first,second]);assert(settled.every(r=>r.status==='rejected'));assert.match(elements.get('sales-data-status-detail').textContent,/Database read failed/);
 });
+
+// ── Hybrid routing: covered history + today ─────────────────────────────────
+const STORES=['christianshavn','fisketorvet','frederiksberg','indre-by','norrebro','vesterbro'];
+function mockReader(complete,{lines=[],code}={}){
+ return {policy:'covered-history',read:async({storeSlug,start,end})=>{
+  const days=[];for(let d=new Date(start+'T12:00:00Z');d.toISOString().slice(0,10)<end;d.setUTCDate(d.getUTCDate()+1))
+   days.push({date:d.toISOString().slice(0,10),status:complete?'complete':'missing'});
+  return {lines,meta:{complete,code:complete?null:(code||'DB_COVERAGE_INCOMPLETE'),
+   coverage:{complete,days},freshness:{status:'historical-snapshot'}}};
+ }};
+}
+test('hybrid splits This Month mid-month: DB for completed days, provider for today',async()=>{
+ const today='2026-10-15';
+ const r=await selectSalesRead(mockReader(true,{lines:[{id:1},{id:2}]}),
+  {storeSlug:'christianshavn',start:'2026-10-01',end:'2026-10-16',today});
+ assert.equal(r.source,'hybrid');
+ assert.equal(r.todayStart,today);
+ assert.equal(r.todayEnd,'2026-10-16');
+ assert.equal(r.dbResult.lines.length,2);
+ assert.match(r.routeReason,/hybrid/);
+});
+test('hybrid routes today-only range to pure OnlinePOS',async()=>{
+ const r=await selectSalesRead(mockReader(true),{storeSlug:'norrebro',start:'2026-10-15',end:'2026-10-16',today:'2026-10-15'});
+ assert.equal(r.source,'onlinepos');
+ assert.equal(r.routeReason,'includes-open-day');
+});
+test('hybrid falls back to OnlinePOS when historical days have coverage gaps',async()=>{
+ const r=await selectSalesRead(mockReader(false),{storeSlug:'norrebro',start:'2026-10-01',end:'2026-10-16',today:'2026-10-15'});
+ assert.equal(r.source,'onlinepos');
+ assert.equal(r.routeReason,'uncovered-range');
+});
+test('hybrid fails closed on DB error, never falls back to provider',async()=>{
+ const broken={policy:'covered-history',read:async()=>{throw new Error('connection refused');}};
+ await assert.rejects(selectSalesRead(broken,{storeSlug:'christianshavn',start:'2026-10-01',end:'2026-10-16',today:'2026-10-15'}),
+  e=>e.salesReadMeta?.code==='DB_READ_UNAVAILABLE');
+});
+test('hybrid works for all six stores with Copenhagen month boundary',async()=>{
+ for(const store of STORES){
+  const r=await selectSalesRead(mockReader(true,{lines:[{x:1}]}),
+   {storeSlug:store,start:'2026-10-01',end:'2026-10-16',today:'2026-10-15'});
+  assert.equal(r.source,'hybrid');
+  assert.equal(r.dbResult.lines.length,1);
+ }
+});
+test('hybrid on last day of month routes entire month to DB except today',async()=>{
+ const r=await selectSalesRead(mockReader(true,{lines:[{a:1},{b:2},{c:3}]}),
+  {storeSlug:'christianshavn',start:'2026-10-01',end:'2026-11-01',today:'2026-10-31'});
+ assert.equal(r.source,'hybrid');
+ assert.equal(r.todayStart,'2026-10-31');
+ assert.equal(r.todayEnd,'2026-11-01');
+ assert.equal(r.dbResult.lines.length,3);
+});
+test('fully closed month routes entirely to DB, not hybrid',async()=>{
+ const r=await selectSalesRead(mockReader(true,{lines:[{x:1}]}),
+  {storeSlug:'norrebro',start:'2026-09-01',end:'2026-10-01',today:'2026-10-01'});
+ assert.equal(r.source,'database');
+});

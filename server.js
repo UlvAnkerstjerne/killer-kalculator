@@ -26,6 +26,7 @@ const {
   buildRevenueSummaryResult,
   publicRevenueSummary,
   deriveRevenueSummarySubrange,
+  mergeRevenueSummaries,
 } = require('./lib/revenue-summary');
 
 // ── Fail-closed configuration check ──────────────────────────────────────────
@@ -507,6 +508,29 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
       const result = selection.result;
       return res.status(result.meta.complete ? 200 : 503).json(result);
     }
+    if (selection.source === 'hybrid') {
+      const dbLines = selection.dbResult.lines;
+      const todayCached = await salesRangeCache.get({ storeId, store, start: selection.todayStart, end: selection.todayEnd });
+      const todayLines = todayCached.result.lines.map(sanitiseSalesLine);
+      const lines = [...dbLines, ...todayLines];
+      const meta = {
+        source: 'hybrid', readPolicy: selection.readPolicy,
+        storeId, start, end,
+        routeReason: selection.routeReason,
+        databaseCoverage: selection.databaseCoverage,
+        metrics: metricCoverage(lines, storeId),
+        complete: todayCached.result.meta.complete,
+        dbDays: Math.round((Date.parse(selection.todayStart) - Date.parse(start)) / 86400000),
+        providerDays: Math.round((Date.parse(selection.todayEnd) - Date.parse(selection.todayStart)) / 86400000),
+        pages: todayCached.result.meta.pages || 0,
+        rawLineCount: dbLines.length + (todayCached.result.meta.rawLineCount || todayLines.length),
+        processedLineCount: lines.length,
+        cacheStatus: todayCached.cacheStatus,
+        stale: todayCached.stale,
+        cacheAgeMs: todayCached.fetchedAt === null ? 0 : Math.max(0, Date.now() - todayCached.fetchedAt),
+      };
+      return res.json({ lines, meta });
+    }
     const cached = await salesRangeCache.get({ storeId, store, start, end });
     const result = cached.result;
 
@@ -583,6 +607,19 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
       if (!result.meta.complete) return res.status(503).json({ summary: null, meta: result.meta });
       const source = { lines: result.lines.map(databaseInternalLine), meta: result.meta };
       return res.json({ summary: publicRevenueSummary(buildRevenueSummaryResult(source), boundary), meta: result.meta });
+    }
+    if (selection.source === 'hybrid') {
+      const dbSource = { lines: selection.dbResult.lines.map(databaseInternalLine), meta: selection.dbResult.meta };
+      const dbRevenue = buildRevenueSummaryResult(dbSource);
+      const todayCached = await revenueSummaryCache.get({ storeId, store, start: selection.todayStart, end: selection.todayEnd });
+      const todayRevenue = todayCached.result;
+      const merged = mergeRevenueSummaries(dbRevenue, todayRevenue);
+      const meta = { source: 'hybrid', readPolicy: selection.readPolicy, storeId, start, end,
+        routeReason: selection.routeReason, complete: todayCached.result.meta.complete,
+        dbDays: Math.round((Date.parse(selection.todayStart) - Date.parse(start)) / 86400000),
+        providerDays: Math.round((Date.parse(selection.todayEnd) - Date.parse(selection.todayStart)) / 86400000),
+        cacheStatus: todayCached.cacheStatus };
+      return res.json({ summary: publicRevenueSummary(merged, boundary), meta });
     }
     const cached = await revenueSummaryCache.get({ storeId, store, start, end });
     const result = cached.result;

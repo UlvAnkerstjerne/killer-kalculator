@@ -260,11 +260,11 @@ test('coverage failures leave warm entries unavailable, omit private errors, and
   assert(report.outcomes.every(o=>o.status==='coverage-unavailable'&&!o.retained));assert.doesNotMatch(logs.join('\n'),/private-coverage-detail/);
   ctx.salesCache.clear();ctx.summaryCache.clear();
 });
-test('warming rechecks coverage changes and bypasses database checks for an open range',async()=>{
+test('warming rechecks coverage changes; hybrid checks DB for history of open ranges',async()=>{
   let missing=false,calls=0;const reader=coverageReader(()=>{calls++;return missing;});
   const choose=createWarmingSelector(reader,'2026-09-23'),closed={storeId:'a',start:'2026-09-20',end:'2026-09-21'};
   assert.equal((await choose(closed)).source,'database');missing=true;assert.equal((await choose(closed)).source,'onlinepos');
-  const before=calls;assert.equal((await choose({...closed,end:'2026-09-24'})).source,'onlinepos');assert.equal(calls,before);
+  const before=calls;assert.equal((await choose({...closed,end:'2026-09-24'})).source,'onlinepos');assert.ok(calls>before,'hybrid checks DB for historical portion of open range');
 });
 test('This Month warming is sequential and cannot evict priority ranges when capacity is full',async()=>{
   let active=0,peak=0;
