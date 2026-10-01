@@ -1939,10 +1939,11 @@ async function loadSidebar() {
 // ── Product mix helpers ────────────────────────────────────────────────────────
 // computeMetrics is the canonical classifier — loaded from /js/product-metrics.js.
 // Field mapping from breakdown to the mix bar categories:
-//   rolls   = m.rollUnits                                  (rollKebab + rollFalafel)
-//   kombos  = m.komboUnits                                 (komboLamb + komboFalafel)
+//   rolls   = m.rollUnits                                  (rollKebab + rollFalafel + rollKylling)
+//   kombos  = m.komboUnits                                 (komboLamb + komboFalafel + komboKylling)
 //   kebab   = m.breakdown.komboLamb + m.breakdown.rollKebab
 //   falafel = m.breakdown.komboFalafel + m.breakdown.rollFalafel
+//   chicken = m.breakdown.komboKylling + m.breakdown.rollKylling
 function computeItemCategories(items) {
   const m = window.ProductMetrics.computeMetrics(items);
   return {
@@ -1950,6 +1951,8 @@ function computeItemCategories(items) {
     kombos:  m.komboUnits,
     kebab:   m.breakdown.komboLamb    + m.breakdown.rollKebab,
     falafel: m.breakdown.komboFalafel + m.breakdown.rollFalafel,
+    chicken: m.breakdown.komboKylling + m.breakdown.rollKylling,
+    lemUnits: m.lemUnits,
   };
 }
 
@@ -1974,8 +1977,8 @@ function renderProductMix(el, items) {
   // Bar 1: Rolls vs Kombos
   const rkTotal = c.rolls + c.kombos;
 
-  // Bar 2: Protein mix (kebab and falafel — no chicken product IDs defined)
-  const protTotal = c.kebab + c.falafel;
+  // Bar 2: Protein mix (kebab, falafel, chicken)
+  const protTotal = c.kebab + c.falafel + c.chicken;
 
   if (!rkTotal && !protTotal) {
     el.innerHTML = '<div class="empty">No categorized items in this period</div>';
@@ -1996,6 +1999,7 @@ function renderProductMix(el, items) {
     const seg = [
       { label: 'Kebab',   count: c.kebab,   color: '#b30000', pct: c.kebab   / protTotal * 100 },
       { label: 'Falafel', count: c.falafel, color: '#4ecca3', pct: c.falafel / protTotal * 100 },
+      { label: 'Chicken', count: c.chicken, color: '#ff9900', pct: c.chicken / protTotal * 100 },
     ].filter(s => s.count > 0);
     html += `<div class="mix-section-label" style="margin-top:18px">Protein Mix</div>${makeMixBar(seg)}`;
   }
@@ -2277,6 +2281,16 @@ async function renderChainView() {
           <div class="metric-sub">${kr(chCh.heaps)} ex VAT</div>
         </div>`);
 
+      const chainCat = computeItemCategories(allItems);
+      if (chainKpisEl && chainCat.lemUnits > 0) {
+        chainKpisEl.insertAdjacentHTML('beforeend', `
+          <div class="card">
+            <div class="card-title">Lemonade</div>
+            <div class="metric-val">${chainCat.lemUnits.toLocaleString('da-DK')}</div>
+            <div class="metric-sub">Units in period</div>
+          </div>`);
+      }
+
       document.getElementById('chain-top-card').innerHTML = '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(allItems));
       mixCard.innerHTML = '<div class="section-title">Product Mix</div><div id="chain-mix-body"></div>';
       renderProductMix(document.getElementById('chain-mix-body'), allItems);
@@ -2511,6 +2525,16 @@ async function renderStoreView(storeId) {
           <div class="metric-val">${stHeapsP !== null ? stHeapsP.toFixed(1) + '%' : '—'}</div>
           <div class="metric-sub">${kr(stCh.heaps)} ex VAT</div>
         </div>`);
+
+      const storeCat = computeItemCategories(items);
+      if (storeKpisEl && storeCat.lemUnits > 0) {
+        storeKpisEl.insertAdjacentHTML('beforeend', `
+          <div class="card">
+            <div class="card-title">Lemonade</div>
+            <div class="metric-val">${storeCat.lemUnits.toLocaleString('da-DK')}</div>
+            <div class="metric-sub">Units in period</div>
+          </div>`);
+      }
 
       document.getElementById('store-top-card').innerHTML =
         '<div class="section-title">Top Items</div>' + topItemsTable(buildTopItems(items));

@@ -1336,3 +1336,71 @@ describe('long-range channel classification (Last Month, This Year, custom)', ()
     assert.ok(Math.abs(ch.total - 600) < 0.001);
   });
 });
+
+// ── Protein Mix including chicken, and Lemonade parity ────────────────────────
+describe('computeItemCategories parity — chicken protein and lemonade', () => {
+  const PM = require('../lib/product-metrics');
+  function computeItemCategories(items) {
+    const m = PM.computeMetrics(items);
+    return { rolls: m.rollUnits, kombos: m.komboUnits,
+      kebab: m.breakdown.komboLamb + m.breakdown.rollKebab,
+      falafel: m.breakdown.komboFalafel + m.breakdown.rollFalafel,
+      chicken: m.breakdown.komboKylling + m.breakdown.rollKylling,
+      lemUnits: m.lemUnits };
+  }
+
+  test('Kylling combo and roll counted in chicken', () => {
+    const c = computeItemCategories([
+      { productid: PM.PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY, count: 3, price: 95 },
+      { productid: PM.PRODUCT_IDS.ROLL_KYLLING_CHRISTIANSHAVN, count: 2, price: 85 },
+    ]);
+    assert.equal(c.chicken, 5);
+    assert.equal(c.kebab, 0);
+    assert.equal(c.falafel, 0);
+  });
+
+  test('all three proteins across stores', () => {
+    const c = computeItemCategories([
+      { productid: PM.PRODUCT_IDS.KOMBO_LAMB, count: 10, price: 95 },
+      { productid: PM.PRODUCT_IDS.ROLL_FALAFEL_VESTERBRO, count: 8, price: 85 },
+      { productid: PM.PRODUCT_IDS.KOMBO_KYLLING_FISKETORVET, count: 5, price: 95 },
+      { productid: PM.PRODUCT_IDS.ROLL_KYLLING_INDRE_BY, count: 3, price: 85 },
+    ]);
+    assert.equal(c.kebab, 10);
+    assert.equal(c.falafel, 8);
+    assert.equal(c.chicken, 8);
+    assert.equal(c.kombos, 15);
+    assert.equal(c.rolls, 11);
+  });
+
+  test('lemonade all variants and stores', () => {
+    const c = computeItemCategories([
+      { productid: PM.PRODUCT_IDS.LEM_STANDALONE, count: 4, price: 35 },
+      { productid: PM.PRODUCT_IDS.LEM_UPGRADE_CHRISTIANSHAVN, count: 2, price: 10 },
+      { productid: PM.PRODUCT_IDS.LEM_ADDON_FISKETORVET, count: 6, price: 0 },
+    ]);
+    assert.equal(c.lemUnits, 12);
+  });
+
+  test('Kylling IDs present in KOMBO_IDS and ROLL_IDS', () => {
+    for (const id of [PM.PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY, PM.PRODUCT_IDS.KOMBO_KYLLING_CHRISTIANSHAVN, PM.PRODUCT_IDS.KOMBO_KYLLING_FISKETORVET])
+      assert.ok(PM.KOMBO_IDS.has(id), 'missing kombo kylling ' + id);
+    for (const id of [PM.PRODUCT_IDS.ROLL_KYLLING_INDRE_BY, PM.PRODUCT_IDS.ROLL_KYLLING_CHRISTIANSHAVN, PM.PRODUCT_IDS.ROLL_KYLLING_FISKETORVET])
+      assert.ok(PM.ROLL_IDS.has(id), 'missing roll kylling ' + id);
+  });
+
+  test('Last Month parity: all metrics including chicken and lemonade', () => {
+    const c = computeItemCategories([
+      { productid: PM.PRODUCT_IDS.KOMBO_LAMB_FREDERIKSBERG, count: 100, price: 95 },
+      { productid: PM.PRODUCT_IDS.ROLL_KEBAB, count: 80, price: 85 },
+      { productid: PM.PRODUCT_IDS.KOMBO_FALAFEL_INDRE_BY, count: 60, price: 85 },
+      { productid: PM.PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY, count: 30, price: 95 },
+      { productid: PM.PRODUCT_IDS.ROLL_KYLLING_FISKETORVET, count: 20, price: 85 },
+      { productid: PM.PRODUCT_IDS.LEM_STANDALONE_VESTERBRO, count: 50, price: 35 },
+    ]);
+    const prot = c.kebab + c.falafel + c.chicken;
+    assert.equal(prot, 290);
+    assert.ok(Math.abs(c.chicken / prot * 100 - 17.2) < 0.1);
+    assert.equal(c.lemUnits, 50);
+  });
+});
