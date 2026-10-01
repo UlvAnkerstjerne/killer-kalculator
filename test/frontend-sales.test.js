@@ -125,7 +125,12 @@ function itemBucket(dateStr, interval) {
 // Inline match of index.html WOLT_VIA_HEAPS + lineChannel + buildChannelKpis.
 // These must exactly mirror the production implementations in index.html.
 const WOLT_VIA_HEAPS = {
-  'indre-by': 'Online External 2',
+  'christianshavn': 'Online External 2',
+  'fisketorvet':    'Online External 2',
+  'frederiksberg':  'Online External 2',
+  'indre-by':       'Online External 2',
+  'norrebro':       'Online External 2',
+  'vesterbro':      'Online External 2',
 };
 
 function lineChannel(paymenttype, storeId) {
@@ -714,24 +719,12 @@ describe('lineChannel — classification rules', () => {
     }
   });
 
-  // Online External 2 — Wolt only at indre-by
-  test('Online External 2 at indre-by → wolt', () =>
-    assert.equal(lineChannel('Online External 2', 'indre-by'), 'wolt'));
-
-  test('Online External 2 at norrebro → null (not wolt)', () =>
-    assert.equal(lineChannel('Online External 2', 'norrebro'), null));
-
-  test('Online External 2 at vesterbro → null', () =>
-    assert.equal(lineChannel('Online External 2', 'vesterbro'), null));
-
-  test('Online External 2 at christianshavn → null', () =>
-    assert.equal(lineChannel('Online External 2', 'christianshavn'), null));
-
-  test('Online External 2 at fisketorvet → null', () =>
-    assert.equal(lineChannel('Online External 2', 'fisketorvet'), null));
-
-  test('Online External 2 at frederiksberg → null', () =>
-    assert.equal(lineChannel('Online External 2', 'frederiksberg'), null));
+  // Online External 2 — Wolt via Heaps at all 6 stores (migrated Sep 2026)
+  test('Online External 2 → wolt at all six stores', () => {
+    for (const id of ['christianshavn','fisketorvet','frederiksberg','indre-by','norrebro','vesterbro']) {
+      assert.equal(lineChannel('Online External 2', id), 'wolt', `Failed for storeId=${id}`);
+    }
+  });
 
   test('Online External 2 with no storeId → null', () =>
     assert.equal(lineChannel('Online External 2', undefined), null));
@@ -780,36 +773,17 @@ describe('buildChannelKpis — store-aware Wolt', () => {
     }
   });
 
-  test('Online External 2 counts as wolt at indre-by', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 200, paymenttype: 'Online External 2' }], 'indre-by');
-    assert.ok(Math.abs(ch.wolt - 200) < 0.001);
-    assert.equal(ch.heaps, 0);
-    assert.equal(ch.uberEats, 0);
+  test('Online External 2 counts as wolt at all six stores', () => {
+    for (const id of ALL_STORES) {
+      const ch = buildChannelKpis([{ priceexclvat: 200, paymenttype: 'Online External 2' }], id);
+      assert.ok(Math.abs(ch.wolt - 200) < 0.001, `Wolt failed for ${id}`);
+      assert.equal(ch.heaps, 0, `Heaps should be 0 for ${id}`);
+      assert.equal(ch.uberEats, 0, `UberEats should be 0 for ${id}`);
+    }
   });
 
-  test('Online External 2 does NOT count as wolt at norrebro', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 200, paymenttype: 'Online External 2' }], 'norrebro');
-    assert.equal(ch.wolt, 0);
-    assert.ok(Math.abs(ch.total - 200) < 0.001);
-  });
-
-  test('Online External 2 does NOT count as wolt at vesterbro', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'vesterbro');
-    assert.equal(ch.wolt, 0);
-  });
-
-  test('Online External 2 does NOT count as wolt at christianshavn', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'christianshavn');
-    assert.equal(ch.wolt, 0);
-  });
-
-  test('Online External 2 does NOT count as wolt at fisketorvet', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'fisketorvet');
-    assert.equal(ch.wolt, 0);
-  });
-
-  test('Online External 2 does NOT count as wolt at frederiksberg', () => {
-    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], 'frederiksberg');
+  test('Online External 2 without storeId does NOT count as wolt', () => {
+    const ch = buildChannelKpis([{ priceexclvat: 150, paymenttype: 'Online External 2' }], undefined);
     assert.equal(ch.wolt, 0);
   });
 
@@ -946,13 +920,13 @@ describe('chain totals — mixed stores classify correctly', () => {
     assert.ok(Math.abs(ch.total - 300) < 0.001);
   });
 
-  test('indre-by OE2 goes to wolt; norrebro OE2 goes only to total', () => {
+  test('OE2 goes to wolt at both indre-by and norrebro', () => {
     const ch = chainKpis([
       { id: 'indre-by', lines: [{ priceexclvat: 200, paymenttype: 'Online External 2' }] },
       { id: 'norrebro', lines: [{ priceexclvat: 150, paymenttype: 'Online External 2' }] },
     ]);
-    assert.ok(Math.abs(ch.wolt  - 200) < 0.001);   // only indre-by
-    assert.ok(Math.abs(ch.total - 350) < 0.001);   // both in total
+    assert.ok(Math.abs(ch.wolt  - 350) < 0.001);   // both stores
+    assert.ok(Math.abs(ch.total - 350) < 0.001);
   });
 
   test('Heaps from all stores stays in heaps, not wolt', () => {
