@@ -1,256 +1,6 @@
 {
-  "reviewedCatalogueSha256": "8a6232d8f42f52321ac128d41027283d1963495cf089f934106230e8b2b59094",
+  "reviewedCatalogueSha256": "ef983b0a8bf2ca0b663debd068645b065f4ba5eca7fb3f68dc62365f8c822c3d",
   "products": [
-    {
-      "storeSlug": "christianshavn",
-      "productId": "29553679",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "fisketorvet",
-      "productId": "29557357",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "frederiksberg",
-      "productId": "27241352",
-      "reason": "empty-label"
-    },
-    {
-      "storeSlug": "frederiksberg",
-      "productId": "29561089",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241752",
-      "reason": "empty-label"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "30528491",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "norrebro",
-      "productId": "29569042",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29561110",
-      "reason": "external-placeholder"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240608",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240668",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240700",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240708",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240716",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240720",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240724",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240728",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240736",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240788",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240796",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240820",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240832",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240840",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "27240852",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29134755",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29134758",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29134761",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29134794",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "vesterbro",
-      "productId": "29134887",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241684",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241688",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241692",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241744",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241780",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241844",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241852",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241860",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241864",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241872",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241908",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241912",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241932",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241968",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241976",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241980",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241984",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241988",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "28844043",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "28844049",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "28844358",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "28844379",
-      "reason": "unclassified-product"
-    },
     {
       "storeSlug": "christianshavn",
       "productId": "27859819",
@@ -284,6 +34,56 @@
     {
       "storeSlug": "christianshavn",
       "productId": "27859891",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859909",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859912",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859915",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859918",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859921",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859924",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859933",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859936",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859939",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859942",
       "reason": "unclassified-product"
     },
     {
@@ -363,12 +163,32 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28418575",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599371",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599380",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "28599965",
       "reason": "unclassified-product"
     },
     {
       "storeSlug": "christianshavn",
       "productId": "28599968",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28599971",
       "reason": "unclassified-product"
     },
     {
@@ -394,6 +214,16 @@
     {
       "storeSlug": "christianshavn",
       "productId": "28714300",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714303",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28714306",
       "reason": "unclassified-product"
     },
     {
@@ -433,7 +263,37 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "28812225",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28812228",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "28812231",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "29339051",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "29553679",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "25906560",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "27240992",
       "reason": "unclassified-product"
     },
     {
@@ -493,13 +353,38 @@
     },
     {
       "storeSlug": "fisketorvet",
+      "productId": "28620991",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "28620997",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "fisketorvet",
       "productId": "28717351",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "fisketorvet",
+      "productId": "29557357",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "25906142",
       "reason": "unclassified-product"
     },
     {
       "storeSlug": "frederiksberg",
       "productId": "27241336",
       "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "frederiksberg",
+      "productId": "27241352",
+      "reason": "empty-label"
     },
     {
       "storeSlug": "frederiksberg",
@@ -602,6 +487,151 @@
       "reason": "unclassified-product"
     },
     {
+      "storeSlug": "frederiksberg",
+      "productId": "29561089",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "18694495",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241684",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241688",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241692",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241696",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241744",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241752",
+      "reason": "empty-label"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241780",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241844",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241852",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241860",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241864",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241872",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241908",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241912",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241932",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241968",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241976",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241980",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241984",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "27241988",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844043",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844049",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844358",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "28844379",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "29557363",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "indre-by",
+      "productId": "30528491",
+      "reason": "external-placeholder"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "25279471",
+      "reason": "unclassified-product"
+    },
+    {
       "storeSlug": "norrebro",
       "productId": "27242128",
       "reason": "unclassified-product"
@@ -614,6 +644,11 @@
     {
       "storeSlug": "norrebro",
       "productId": "27242228",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "27242236",
       "reason": "unclassified-product"
     },
     {
@@ -683,122 +718,22 @@
     },
     {
       "storeSlug": "norrebro",
-      "productId": "28594156",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "norrebro",
-      "productId": "28715782",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "27241696",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "29557363",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "fisketorvet",
-      "productId": "27240992",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "norrebro",
-      "productId": "27242236",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "27859942",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28418575",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28599371",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28599380",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28599971",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28714303",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28714306",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28812225",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28812228",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "christianshavn",
-      "productId": "28812231",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "fisketorvet",
-      "productId": "25906560",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "fisketorvet",
-      "productId": "28620991",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "fisketorvet",
-      "productId": "28620997",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "frederiksberg",
-      "productId": "25906142",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "indre-by",
-      "productId": "18694495",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "norrebro",
-      "productId": "25279471",
-      "reason": "unclassified-product"
-    },
-    {
-      "storeSlug": "norrebro",
       "productId": "28594153",
       "reason": "unclassified-product"
     },
     {
       "storeSlug": "norrebro",
+      "productId": "28594156",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "norrebro",
       "productId": "28594159",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "norrebro",
+      "productId": "28715782",
       "reason": "unclassified-product"
     },
     {
@@ -812,9 +747,119 @@
       "reason": "unclassified-product"
     },
     {
+      "storeSlug": "norrebro",
+      "productId": "29569042",
+      "reason": "external-placeholder"
+    },
+    {
       "storeSlug": "vesterbro",
       "productId": "17684143",
       "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240608",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240668",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240700",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240708",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240716",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240720",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240724",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240728",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240736",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240788",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240796",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240820",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240832",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240840",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "27240852",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134755",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134758",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134761",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134794",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29134887",
+      "reason": "unclassified-product"
+    },
+    {
+      "storeSlug": "vesterbro",
+      "productId": "29561110",
+      "reason": "external-placeholder"
     }
   ]
 }
