@@ -41,3 +41,22 @@ test('coverage-only warming keeps strict day evidence without loading any facts'
   const oversized=session([{...state,lineCount:100001}]);assert.equal((await readSnapshot(oversized,args,{coverageOnly:true})).meta.complete,true);assert.equal(oversized.calls.length,1);
   await assert.rejects(readSnapshot(session([{...state,lineCount:100001}]),args),{code:'DB_RANGE_TOO_LARGE'});
 });
+
+test('opaque delivery products and all six stores pass catalogue validation for last-month equivalent',async()=>{
+  // Verify opaque [P:xxx/yyy] Levering products are in the catalogue and validate
+  const opaque=cat.products.find(p=>p.storeSlug==='christianshavn'&&p.productLabel.startsWith('[P:'));
+  assert(opaque,'expected opaque product in catalogue');
+  const delivery=cat.products.find(p=>p.storeSlug==='christianshavn'&&p.groupLabel==='Levering'&&!p.productLabel.startsWith('[P:'));
+  assert(delivery,'expected non-opaque delivery product in catalogue');
+  // Build a row from the opaque product and validate it through publicLine
+  const opaqueRow={...row,date:'2026-09-24',saleLocal:'2026-09-24 14:00:00',productId:opaque.productId,productLabel:opaque.productLabel,groupId:opaque.groupId,groupLabel:opaque.groupLabel};
+  const opaqueArgs={storeSlug:'christianshavn',start:'2026-09-24',end:'2026-09-25',now};
+  const result=await readSnapshot(session([{...state,date:'2026-09-24',lineCount:1}],[opaqueRow]),opaqueArgs);
+  assert.equal(result.meta.complete,true);
+  assert.equal(result.lines.length,1);
+  assert.equal(result.lines[0].productname,opaque.productLabel);
+  // Verify every store has catalogue products (no store left empty after admission)
+  for(const slug of ['christianshavn','fisketorvet','frederiksberg','indre-by','norrebro','vesterbro']){
+    assert(cat.products.some(p=>p.storeSlug===slug),'missing catalogue products for '+slug);
+  }
+});

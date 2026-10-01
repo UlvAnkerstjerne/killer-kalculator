@@ -261,6 +261,69 @@
     },
     {
       "storeSlug": "christianshavn",
+      "productId": "27859909",
+      "productLabel": "Delivery 0-500 m",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859912",
+      "productLabel": "[P:278/599/12]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859915",
+      "productLabel": "[P:278/599/15]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859918",
+      "productLabel": "[P:278/599/18]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859921",
+      "productLabel": "[P:278/599/21]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859924",
+      "productLabel": "[P:278/599/24]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859933",
+      "productLabel": "[P:278/599/33]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859936",
+      "productLabel": "Delivery Extra Fee",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
+      "productId": "27859939",
+      "productLabel": "[P:278/599/39]",
+      "groupId": "2938900",
+      "groupLabel": "Levering"
+    },
+    {
+      "storeSlug": "christianshavn",
       "productId": "27859942",
       "productLabel": "Killer Beanie",
       "groupId": "2938903",
