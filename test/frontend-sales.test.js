@@ -1263,3 +1263,76 @@ describe('lyDateRange — 364-day shift', () => {
     }
   });
 });
+
+// ── Long-range channel classification regression ──────────────────────────────
+describe('long-range channel classification (Last Month, This Year, custom)', () => {
+  const ALL = ['christianshavn','fisketorvet','frederiksberg','indre-by','norrebro','vesterbro'];
+  function chainKpis(storeLineMap) {
+    return storeLineMap.reduce((acc, { id, lines }) => {
+      const kpis = buildChannelKpis(lines, id);
+      return { total: acc.total + kpis.total, wolt: acc.wolt + kpis.wolt,
+               uberEats: acc.uberEats + kpis.uberEats, heaps: acc.heaps + kpis.heaps };
+    }, { total: 0, wolt: 0, uberEats: 0, heaps: 0 });
+  }
+  // Simulated Last Month (30-day) data: all six stores with OE2 Wolt, OE3 Uber, Heaps
+  const lastMonthStores = ALL.map(id => ({ id, lines: [
+    { priceexclvat: 1000, paymenttype: 'Betalingskort' },
+    { priceexclvat: 200,  paymenttype: 'Online External 2' },
+    { priceexclvat: 50,   paymenttype: 'Online External 3' },
+    { priceexclvat: 150,  paymenttype: 'Heaps online' },
+    { priceexclvat: 100,  paymenttype: 'Wolt' },
+  ]}));
+
+  test('Last Month all six stores: Wolt includes both OE2 and explicit Wolt without double counting', () => {
+    const ch = chainKpis(lastMonthStores);
+    assert.ok(Math.abs(ch.wolt - 1800) < 0.001, 'Wolt = 6 stores × (200 OE2 + 100 Wolt)');
+    assert.ok(Math.abs(ch.uberEats - 300) < 0.001, 'Uber = 6 × 50');
+    assert.ok(Math.abs(ch.heaps - 900) < 0.001, 'Heaps = 6 × 150');
+    assert.ok(Math.abs(ch.total - 9000) < 0.001, 'Total = 6 × 1500');
+    assert.ok(Math.abs(ch.wolt + ch.uberEats + ch.heaps + (ch.total - ch.wolt - ch.uberEats - ch.heaps) - ch.total) < 0.001, 'no double counting');
+  });
+
+  test('Last Month single store: channel percentages are consistent', () => {
+    const ch = buildChannelKpis(lastMonthStores[0].lines, 'christianshavn');
+    assert.ok(Math.abs(ch.wolt - 300) < 0.001);
+    assert.ok(Math.abs(ch.total - 1500) < 0.001);
+    const pct = ch.wolt / ch.total * 100;
+    assert.ok(Math.abs(pct - 20) < 0.001);
+  });
+
+  test('This Year: OE2 classified as Wolt across all stores', () => {
+    // 365-day simulated data
+    const yearStores = ALL.map(id => ({ id, lines: Array.from({length: 365}, () =>
+      ({ priceexclvat: 10, paymenttype: 'Online External 2' })
+    )}));
+    const ch = chainKpis(yearStores);
+    assert.ok(Math.abs(ch.wolt - 6 * 365 * 10) < 0.001);
+    assert.equal(ch.heaps, 0);
+    assert.equal(ch.uberEats, 0);
+  });
+
+  test('custom range >14 days: channel classification works on mixed payment types', () => {
+    const items = [
+      { priceexclvat: 76, paymenttype: 'Wolt' },
+      { priceexclvat: 68, paymenttype: 'Online External 2' },
+      { priceexclvat: 28, paymenttype: 'Heaps online' },
+      { priceexclvat: 50, paymenttype: 'Online External 3' },
+      { priceexclvat: 200, paymenttype: 'Betalingskort' },
+    ];
+    const ch = buildChannelKpis(items, 'norrebro');
+    assert.ok(Math.abs(ch.wolt - (76 + 68)) < 0.001, 'Wolt = explicit + OE2');
+    assert.ok(Math.abs(ch.heaps - 28) < 0.001);
+    assert.ok(Math.abs(ch.uberEats - 50) < 0.001);
+    assert.ok(Math.abs(ch.total - 422) < 0.001);
+  });
+
+  test('hybrid This Month: DB lines + provider lines merge without channel double counting', () => {
+    // Simulate: DB returns Sep 1-14 lines, provider returns Sep 15 (today)
+    const dbLines = [{ priceexclvat: 500, paymenttype: 'Online External 2' }];
+    const todayLines = [{ priceexclvat: 100, paymenttype: 'Wolt' }];
+    const merged = [...dbLines, ...todayLines];
+    const ch = buildChannelKpis(merged, 'norrebro');
+    assert.ok(Math.abs(ch.wolt - 600) < 0.001, 'OE2 + Wolt both classified as wolt');
+    assert.ok(Math.abs(ch.total - 600) < 0.001);
+  });
+});
