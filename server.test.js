@@ -87,6 +87,7 @@ let baseUrl;
 // isolationJar holds a pre-established session for tests that capture axios calls
 // and must not race with the env-var deletions in the auth-config suite.
 let isolationJar;
+let isolationCsrf;
 
 before(() => new Promise((resolve) => {
   server = app.listen(0, '127.0.0.1', async () => {
@@ -94,6 +95,7 @@ before(() => new Promise((resolve) => {
     baseUrl = `http://127.0.0.1:${port}`;
     const result = await doLogin();
     isolationJar = result.jar;
+    isolationCsrf = result.csrfToken;
     resolve();
   });
 }));
@@ -596,5 +598,60 @@ describe('No credentials in frontend or API responses', () => {
     const r = await authGet('/api/sales-range/vesterbro/2026-09-20/2026-09-21', jar);
     const found = containsAnyToken(r.body);
     assert.ok(!found, `Sales-range response contains token value: ${found}`);
+  });
+});
+
+// ── 16. CSRF token uses timing-safe comparison ────────────────────────────────
+describe('CSRF timing-safe comparison', () => {
+  test('CSRF check uses crypto.timingSafeEqual (source-level verification)', () => {
+    const fs = require('node:fs');
+    const source = fs.readFileSync(require.resolve('./server.js'), 'utf8');
+    assert.ok(source.includes('timingSafeEqual'), 'CSRF comparison must use crypto.timingSafeEqual');
+  });
+});
+
+// ── 17. scan-invoice mediaType validation ─────────────────────────────────────
+// Uses isolationJar to avoid racing with env-var deletion tests.
+describe('scan-invoice mediaType validation', () => {
+  test('rejects unsupported mediaType', async () => {
+    const r = await authPost('/api/scan-invoice', { base64: 'abc', mediaType: 'application/pdf' }, isolationJar, isolationCsrf);
+    assert.equal(r.status, 400);
+    assert.ok(r.json?.error?.includes('Unsupported media type'));
+  });
+
+  test('rejects mediaType with injection attempt', async () => {
+    const r = await authPost('/api/scan-invoice', { base64: 'abc', mediaType: 'image/jpeg; charset=utf-8' }, isolationJar, isolationCsrf);
+    assert.equal(r.status, 400);
+  });
+
+  test('accepts valid image/jpeg mediaType', async () => {
+    const r = await authPost('/api/scan-invoice', { base64: 'abc', mediaType: 'image/jpeg' }, isolationJar, isolationCsrf);
+    // Should not be 400 — may be 500/502 due to missing ANTHROPIC_API_KEY in test env
+    assert.notEqual(r.status, 400);
+  });
+});
+
+// ── 18. Error responses do not leak internal details ──────────────────────────
+describe('Error response sanitization', () => {
+  test('scan-invoice missing API key returns generic error without env var name', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const r = await authPost('/api/scan-invoice', { base64: 'abc', mediaType: 'image/png' }, isolationJar, isolationCsrf);
+    assert.ok(!r.body.includes('ANTHROPIC_API_KEY'), 'Response must not mention env var names');
+  });
+
+  test('scan-invoice error handler does not forward upstream data (source check)', () => {
+    const fs = require('node:fs');
+    const source = fs.readFileSync(require.resolve('./server.js'), 'utf8');
+    const scanSection = source.slice(source.indexOf('scan-invoice'));
+    assert.ok(!scanSection.includes('upstream: err.response'),
+      'scan-invoice error handler must not forward upstream response data');
+  });
+
+  test('planday salaries error handler does not forward upstream body (source check)', () => {
+    const fs = require('node:fs');
+    const source = fs.readFileSync(require.resolve('./server.js'), 'utf8');
+    const salariesSection = source.slice(source.indexOf("salaries fallback also failed"));
+    assert.ok(!salariesSection.includes('upstream: err.response'),
+      'Planday salaries error must not forward upstream response data');
   });
 });

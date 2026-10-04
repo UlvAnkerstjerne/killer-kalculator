@@ -97,7 +97,9 @@ function requireCsrf(req, res, next) {
   }
   const headerToken  = req.headers['x-csrf-token'];
   const sessionToken = req.session?.csrfToken;
-  if (!headerToken || !sessionToken || headerToken !== sessionToken) {
+  if (!headerToken || !sessionToken
+    || Buffer.byteLength(headerToken) !== Buffer.byteLength(sessionToken)
+    || !crypto.timingSafeEqual(Buffer.from(headerToken), Buffer.from(sessionToken))) {
     return res.status(403).json({ error: 'Invalid CSRF token' });
   }
   next();
@@ -648,12 +650,19 @@ app.get('/api/revenue-summary/:storeId/:start/:end', requireAuth, async (req, re
 });
 
 // ── Invoice image scanning via Claude API ─────────────────────────────────────
+const ALLOWED_INVOICE_MEDIA_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+]);
+
 app.post('/api/scan-invoice', requireAuth, requireCsrf, async (req, res) => {
   const { base64, mediaType } = req.body;
   if (!base64 || !mediaType) return res.status(400).json({ error: 'Missing base64 or mediaType' });
+  if (!ALLOWED_INVOICE_MEDIA_TYPES.has(mediaType)) {
+    return res.status(400).json({ error: 'Unsupported media type' });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
+  if (!apiKey) return res.status(500).json({ error: 'Invoice scanning not configured on server' });
 
   try {
     const r = await axios.post('https://api.anthropic.com/v1/messages', {
@@ -677,7 +686,7 @@ app.post('/api/scan-invoice', requireAuth, requireCsrf, async (req, res) => {
     res.json(r.data);
   } catch (err) {
     console.error('[scan-invoice] Error:', err.response?.status ?? err.message);
-    res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+    res.status(502).json({ error: 'Invoice scan failed' });
   }
 });
 
@@ -786,7 +795,7 @@ app.get('/api/planday/salaries/:from/:to', requireAuth, async (req, res) => {
     return res.json(byStore);
   } catch (err) {
     console.error('[Planday] salaries fallback also failed:', err.response?.status, err.message);
-    return res.status(err.response?.status || 500).json({ error: err.message, upstream: err.response?.data });
+    return res.status(502).json({ error: 'Salary data unavailable' });
   }
 });
 
@@ -896,7 +905,7 @@ app.post('/api/katering-recipes', requireAuth, requireCsrf, (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('[katering-recipes] write error:', e.message);
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(500).json({ ok: false, error: 'Failed to save recipes' });
   }
 });
 
@@ -1140,7 +1149,7 @@ app.post('/api/lemonade/history', requireAuth, requireCsrf, (req, res) => {
     saveLemonadeHistory(req.body);
     res.json({ ok: true });
   } catch(e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(500).json({ ok: false, error: 'Failed to save lemonade history' });
   }
 });
 
@@ -1149,7 +1158,8 @@ app.get('/api/lemonade/today', requireAuth, async (_req, res) => {
     const data = await fetchLemonadeToday();
     res.json(data);
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    console.error('[lemonade/today] Error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch lemonade data' });
   }
 });
 

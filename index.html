@@ -857,6 +857,36 @@
       .chain-mix-wrap      { order: 2; margin-bottom: 16px; margin-top: 0 !important; }
       .chain-kpis-wrap     { order: 3; margin-bottom: 16px; }
       .chain-charts-wrap   { order: 4; }
+
+      /* Breakdown table: horizontal scroll wrapper to prevent page overflow */
+      .chain-stores-wrap   { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .chain-stores-wrap table { min-width: 520px; }
+
+      /* Section titles — slightly larger for phone readability */
+      .section-title { font-size: 11px; letter-spacing: 0.5px; }
+
+      /* Metric sub-text — prevent wrapping overflow */
+      .metric-sub { font-size: 11px; flex-wrap: wrap; }
+
+      /* Badge sizing for mobile */
+      .metric-badge { font-size: 10px; padding: 2px 6px; }
+
+      /* Mix legend — stack items when narrow */
+      .mix-legend { gap: 6px 14px; }
+      .mix-legend-item { font-size: 12px; }
+
+      /* Top items table — tighter on mobile */
+      .td-rank { width: 22px; }
+
+      /* Graph controls — stack vertically on mobile */
+      .graph-controls { flex-direction: column; gap: 12px; }
+      .graph-btn-group { gap: 3px; }
+      .graph-btn { padding: 6px 8px; font-size: 11px; }
+      .graph-store-checks { gap: 6px 10px; }
+      .graph-store-check { font-size: 12px; }
+
+      /* Invoice form — prevent iOS zoom on focus */
+      .f-group input, .f-group select { font-size: 16px; }
     }
 
     /* ── Katering ─────────────────────────────────────────────────── */
@@ -1763,10 +1793,16 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
     return;
   }
 
-  // Compute global max
+  // Show only the 11:00–22:00 operating window (bins 11 through 21).
+  const HEATMAP_FIRST_HOUR = 11;
+  const HEATMAP_LAST_HOUR  = 21; // 21:00–21:59; the 22:00 bin is excluded
+
+  // Compute global max across visible hours only
   let max = 0;
   for (const arr of Object.values(hourlyMap)) {
-    for (const v of arr) if (v > max) max = v;
+    for (let h = HEATMAP_FIRST_HOUR; h <= HEATMAP_LAST_HOUR; h++) {
+      if (arr[h] > max) max = arr[h];
+    }
   }
 
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1775,7 +1811,7 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
 
   // Hour headers
   html += '<tr class="hm-header-row"><td class="hm-spacer"></td>';
-  for (let h = 0; h < 24; h++) {
+  for (let h = HEATMAP_FIRST_HOUR; h <= HEATMAP_LAST_HOUR; h++) {
     html += `<td class="hm-hour-header">${h}</td>`;
   }
   html += '</tr>';
@@ -1784,8 +1820,9 @@ function renderHeatmap(containerId, hourlyMap, from, to) {
     const arr  = hourlyMap[day];
     const dt   = new Date(day + 'T12:00:00');
     const label = `${dayNames[dt.getDay()]} ${day.slice(5)}`;
+
     html += `<tr class="hm-row"><td class="hm-label">${label}</td>`;
-    for (let h = 0; h < 24; h++) {
+    for (let h = HEATMAP_FIRST_HOUR; h <= HEATMAP_LAST_HOUR; h++) {
       const v   = arr[h] || 0;
       const col = heatColor(v, max);
       const tip = v > 0 ? `${label} ${h}:00 · ${kr(v)}` : '';
