@@ -40,9 +40,13 @@ test('historical warming skips covered ranges and primes whole missing ranges wi
   const stored=await get('/api/sales-range/norrebro/2026-09-20/2026-09-21');assert.equal(stored.meta.source,'database');assert.equal(stored.lines[0].priceexclvat,76);
   const missing=await get('/api/sales-range/christianshavn/2026-09-27/2026-09-28');assert.equal(missing.meta.source,'onlinepos');assert.equal(missing.lines.reduce((n,l)=>n+l.priceexclvat,0),20);assert.equal(provider,count,'whole provider range was warmed');
 });
-test('warming coverage errors never trigger provider fallback; This Month on first day uses OnlinePOS',async()=>{
+test('warming coverage errors never trigger provider fallback; This Month under db-error is coverage-unavailable',async()=>{
   mode='db-error';const ly=await app.locals.warmLyRevenueSummaries({today:'2026-09-28',concurrency:99});
   assert.equal(ly.concurrency,2);assert.equal(ly.coverageFailed,18);
   const completed=await app.locals.warmCompletedSalesRanges({today:'2026-09-28'});assert(completed.outcomes.every(o=>o.status==='coverage-unavailable'));assert.equal(provider,0);
-  const before=coverageReads;await app.locals.warmThisMonthSalesRanges({today});assert.equal(coverageReads,before);assert.equal(provider,6);assert.equal(reads,0);
+  const before=coverageReads;await app.locals.warmThisMonthSalesRanges({today:'2026-09-28'});assert.equal(provider,0,'hybrid this-month under db-error stays coverage-unavailable');assert.equal(reads,0);
+});
+test('This Month on first day of month uses OnlinePOS (start===today bypasses hybrid)',async()=>{
+  mode='db-error';
+  const before=coverageReads;await app.locals.warmThisMonthSalesRanges({today:'2026-10-01'});assert.equal(coverageReads,before);assert.equal(provider,6);assert.equal(reads,0);
 });

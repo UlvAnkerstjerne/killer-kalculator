@@ -171,6 +171,62 @@ test('manual catalogue exporter still accepts explicit reviewed files using only
     assert.equal(code, 0); assert.equal(requests, 1); assert.equal(result[0].status, 'catalog-review-candidates');
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+test('loadAdmitted returns empty when auto-admitted file does not exist', () => {
+  const { loadAdmitted } = require('../../lib/sales-worker/catalog');
+  const admitted = loadAdmitted();
+  // May return actual data if file exists, or empty arrays if not.
+  assert.ok(Array.isArray(admitted.products));
+  assert.ok(Array.isArray(admitted.payments));
+});
+test('persistAdmitted writes and loadAdmitted reads auto-admitted entries', () => {
+  const { loadAdmitted, persistAdmitted } = require('../../lib/sales-worker/catalog');
+  const admittedPath = path.join(root, 'catalogues/auto-admitted.json');
+  const existed = fs.existsSync(admittedPath);
+  const backup = existed ? fs.readFileSync(admittedPath) : null;
+  try {
+    // Clear any existing file.
+    try { fs.unlinkSync(admittedPath); } catch {}
+    const entries = { products: [{ storeSlug: 'norrebro', productId: 'test-persist-1',
+      productLabel: 'Test persist', groupId: 'test-group', groupLabel: 'Test group' }], payments: [] };
+    persistAdmitted(entries);
+    const loaded = loadAdmitted();
+    assert.equal(loaded.products.length, 1);
+    assert.equal(loaded.products[0].productId, 'test-persist-1');
+    // Persisting again should not duplicate.
+    persistAdmitted(entries);
+    const loaded2 = loadAdmitted();
+    assert.equal(loaded2.products.length, 1);
+    // Persisting a new entry should append.
+    const more = { products: [{ storeSlug: 'vesterbro', productId: 'test-persist-2',
+      productLabel: 'Test persist 2', groupId: 'test-group', groupLabel: 'Test group' }], payments: [] };
+    persistAdmitted(more);
+    const loaded3 = loadAdmitted();
+    assert.equal(loaded3.products.length, 2);
+  } finally {
+    if (backup) fs.writeFileSync(admittedPath, backup);
+    else try { fs.unlinkSync(admittedPath); } catch {}
+  }
+});
+test('loadCatalog merges auto-admitted entries into the catalog', () => {
+  const admittedPath = path.join(root, 'catalogues/auto-admitted.json');
+  const existed = fs.existsSync(admittedPath);
+  const backup = existed ? fs.readFileSync(admittedPath) : null;
+  try {
+    const newProduct = { storeSlug: 'norrebro', productId: 'synthetic-auto-admitted',
+      productLabel: 'Synthetic auto admitted', groupId: 'synthetic-group', groupLabel: 'Synthetic group' };
+    fs.writeFileSync(admittedPath, JSON.stringify({ products: [newProduct], payments: [] }));
+    const catalog = loadCatalog();
+    // The auto-admitted product should be recognized by the catalog.
+    const line = { storeId: storeId('norrebro'), productId: 'synthetic-auto-admitted',
+      productLabel: 'Synthetic auto admitted', groupId: 'synthetic-group', groupLabel: 'Synthetic group',
+      paymentType: current.payments[0].paymentType, paymentCode: current.payments[0].paymentCode };
+    // reviewFields should return empty (recognized product).
+    assert.deepEqual(catalog.reviewFields(line), []);
+  } finally {
+    if (backup) fs.writeFileSync(admittedPath, backup);
+    else try { fs.unlinkSync(admittedPath); } catch {}
+  }
+});
 test('loading the corrected modules and catalogue performs no provider request or database connection', () => {
   const result = spawnSync(process.execPath, ['-e', `
     const blocked=()=>{throw Error('Unexpected access');};
