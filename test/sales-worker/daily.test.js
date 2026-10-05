@@ -23,8 +23,8 @@ test('only transient durable failures retry after twenty hours and at most three
   for(const errorCode of ['ZERO_FACT_DAY_REVIEW','INVALID_PAGE'])assert.equal(decision({...day,errorCode},now),'operator-review');
   assert.equal(decision({...day,complete:true},now),'complete');
 });
-test('DB_OPERATION_FAILED and CATALOG_REVIEW are retryable after the cooldown period',()=>{
-  for(const errorCode of ['DB_OPERATION_FAILED','CATALOG_REVIEW']){
+test('DB_OPERATION_FAILED, CATALOG_REVIEW and STORE_MISMATCH are retryable after the cooldown period',()=>{
+  for(const errorCode of ['DB_OPERATION_FAILED','CATALOG_REVIEW','STORE_MISMATCH']){
     const day={attempts:1,errorCode,lastAttemptAt:'2026-09-28T03:00:00Z'};
     assert.equal(decision(day,now),'eligible','should retry '+errorCode+' after cooldown');
     assert.equal(decision({...day,lastAttemptAt:now.toISOString()},now),'retry-not-due');
