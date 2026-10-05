@@ -64,12 +64,13 @@ test('three durable transient attempts exhaust the bound without a fourth fetch'
 });
 test('quarantined date does not halt another date; private text never appears in events',async()=>{
  let calls=0;const events=[];
+ // Use a control character label that auto-admit legitimately rejects.
  const result=await daily({from:'2026-09-20',emit:e=>events.push(e),requestFor:()=>async()=>{
-  calls++;return body([calls===1?row('norrebro','2026-09-21',{productname:'synthetic unknown label'}):row('norrebro','2026-09-20')]);
+  calls++;return body([calls===1?row('norrebro','2026-09-21',{productname:'quarantine\x01label'}):row('norrebro','2026-09-20')]);
  }});
  assert.equal(result.attempted,2);assert.equal(result.published,1);assert.equal(result.status,'gaps');
  assert.equal(result.days[0].errorCode,'CATALOG_REVIEW');assert.equal(result.days[1].complete,true);
- assert.doesNotMatch(JSON.stringify({result,events}),/synthetic unknown|base64|productLabel|sha256|runId/);
+ assert.doesNotMatch(JSON.stringify({result,events}),/quarantine\x01|base64|productLabel|sha256|runId/);
 });
 test('newest missing day wins; at most two of seven dates are attempted',async()=>{
  let calls=0;const r=await daily({from:'2026-09-13',requestFor:()=>async()=>body([row('norrebro',calls++===0?'2026-09-21':'2026-09-20')])});
