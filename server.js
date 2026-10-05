@@ -1163,14 +1163,8 @@ app.get('/api/lemonade/today', requireAuth, async (_req, res) => {
   }
 });
 
-// ── Cron dispatch ─────────────────────────────────────────────────────────────
-// Cron services share the same codebase via railway.toml startCommand.
-// KK_SALES_DAILY_FROM is set only on cron services; the web service never has it.
-if (require.main === module && process.env.KK_SALES_DAILY_FROM) {
-  require('./scripts/sales-daily').main(['--apply']).then(code => { process.exitCode = code; });
-}
 // ── Start ─────────────────────────────────────────────────────────────────────
-else if (require.main === module) {
+if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log('\n  🔪  KILLER KALCULATOR');

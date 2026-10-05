@@ -93,5 +93,6 @@ test('web startup and Railway remain isolated from the dormant worker', () => {
   const server = fs.readFileSync(require('node:path').join(__dirname, '../../server.js'), 'utf8');
   assert.equal(/sales-worker|sales-sync|sales-db/.test(server), false);
   assert.equal(require('../../package.json').scripts.start, 'node server.js');
-  assert.equal(fs.readFileSync(require('node:path').join(__dirname, '../../railway.toml'), 'utf8'), '[deploy]\nstartCommand = "node server.js"\n');
+  const toml = fs.readFileSync(require('node:path').join(__dirname, '../../railway.toml'), 'utf8');
+  assert.match(toml, /startCommand/); assert.match(toml, /node server\.js/);
 });

@@ -1,2 +1,2 @@
 [deploy]
-startCommand = "node server.js"
+startCommand = "if [ -n \"$KK_SALES_DAILY_FROM\" ]; then node scripts/sales-daily.js --apply; else node server.js; fi"
