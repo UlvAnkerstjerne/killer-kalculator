@@ -21,7 +21,9 @@ async function main(args = process.argv.slice(2), env = process.env, output = li
     const result = await runDaily({store:scope.store,from:scope.from,apply,enabled,...runtime,signal:controller.signal,now,
       requestFor:dependencies.requestFor,emit:value=>output(JSON.stringify(value))});
     output(JSON.stringify(result));
-    return ['incomplete','gaps'].includes(result.status) ? 1 : 0;
+    // 'gaps' means older dates remain incomplete but today's work succeeded;
+    // those gaps remain visible and actionable but are not a deployment crash.
+    return result.status === 'incomplete' ? 1 : 0;
   } catch(error) {output(JSON.stringify({kind:'daily-sales',status:'incomplete',code:safeError(error).code}));return 1;}
   finally {clearTimeout(timeout);clearTimeout(hardStop);process.off('SIGINT',stop);process.off('SIGTERM',stop);}
 }

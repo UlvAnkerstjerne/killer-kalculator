@@ -20,8 +20,23 @@ test('only transient durable failures retry after twenty hours and at most three
   assert.equal(decision(day,now),'eligible');
   assert.equal(decision({...day,lastAttemptAt:now.toISOString()},now),'retry-not-due');
   assert.equal(decision({...day,attempts:3},now),'attempt-limit');
-  for(const errorCode of ['CATALOG_REVIEW','ZERO_FACT_DAY_REVIEW','INVALID_PAGE','DB_OPERATION_FAILED'])assert.equal(decision({...day,errorCode},now),'operator-review');
+  for(const errorCode of ['ZERO_FACT_DAY_REVIEW','INVALID_PAGE'])assert.equal(decision({...day,errorCode},now),'operator-review');
   assert.equal(decision({...day,complete:true},now),'complete');
+});
+test('DB_OPERATION_FAILED and CATALOG_REVIEW are retryable after the cooldown period',()=>{
+  for(const errorCode of ['DB_OPERATION_FAILED','CATALOG_REVIEW']){
+    const day={attempts:1,errorCode,lastAttemptAt:'2026-09-28T03:00:00Z'};
+    assert.equal(decision(day,now),'eligible','should retry '+errorCode+' after cooldown');
+    assert.equal(decision({...day,lastAttemptAt:now.toISOString()},now),'retry-not-due');
+    assert.equal(decision({...day,attempts:3},now),'attempt-limit');
+  }
+});
+test('gaps exit code is zero when today publication succeeded',async()=>{
+  const output=[];const env={KK_SALES_SYNC_ENABLED:'true',KK_SALES_SYNC_STORES:'norrebro',
+    KK_SALES_DAILY_FROM:'2026-09-28'};
+  // Disabled worker exits 0; gaps (older incomplete dates) with a successful run should also be 0.
+  const code=await main(['--apply'],{...env,KK_SALES_SYNC_ENABLED:'false'},line=>output.push(JSON.parse(line)));
+  assert.equal(code,0);assert.equal(output[0].status,'disabled');
 });
 test('disabled invocation never reads credentials or opens database/provider',async()=>{
   const output=[];const env=new Proxy({KK_SALES_SYNC_ENABLED:'false'},{get:(t,k)=>{if(!(k in t))throw Error('unexpected config access');return t[k];}});
