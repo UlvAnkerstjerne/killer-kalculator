@@ -29,6 +29,35 @@ test('graph stops on one failed store without drawing a partial or zero-filled g
  vm.createContext(context);vm.runInContext(html.slice(html.indexOf('async function loadGraphData()'),html.indexOf('function openCustomPicker()')),context);
  await context.loadGraphData();assert.match(card.innerHTML,/No partial graph is shown/);
 });
+test('large covered range stays on PostgreSQL with aggregated daily revenue',async()=>{
+  const days=Array.from({length:278},(_,i)=>{const d=new Date(Date.UTC(2026,0,1+i)).toISOString().slice(0,10);
+    return{date:d,status:'complete',lineCount:700,observedAt:new Date('2026-10-05T10:00:00Z'),revenueIncl:'50000',revenueExcl:'40000',evidence:'complete-single-pass'};});
+  const reader={policy:'covered-history',read:async({storeSlug,start,end})=>{
+    const meta={source:'database',complete:true,aggregated:true,start,end,storeId:storeSlug,rawLineCount:194600,processedLineCount:278,
+      pages:0,coverage:{complete:true,days:days.map(d=>({...d,independentlyVerified:false}))},freshness:{status:'historical-snapshot'},metrics:{potentiallyIncomplete:[]}};
+    return{lines:days.map(d=>({date:d.date,priceexclvat:40000,productid:null,productname:null,productgroupid:null,productgroup:null,count:700,price:50000,paymenttype:null,paymenttypecode:null,hour:null,secondOfDay:null})),meta};
+  }};
+  const sel=await selectSalesRead(reader,{storeSlug:'norrebro',start:'2026-01-01',end:'2026-10-05',today:'2026-10-06'});
+  assert.equal(sel.source,'database','large covered range must use database, not OnlinePOS');
+  assert.equal(sel.result.meta.aggregated,true);
+  assert.equal(sel.result.lines.length,278);
+});
+test('large covered range ending today uses hybrid: PostgreSQL aggregated + OnlinePOS for today only',async()=>{
+  let dbReadCalled=false;
+  const reader={policy:'covered-history',read:async({start,end})=>{
+    dbReadCalled=true;assert.equal(end,'2026-10-06','hybrid splits at today');
+    return{lines:[{date:'2026-01-01',priceexclvat:1000,productid:null}],meta:{source:'database',complete:true,aggregated:true,
+      start,end,coverage:{complete:true,days:[{date:'2026-01-01',status:'complete'}]},freshness:{status:'historical-snapshot'},metrics:{potentiallyIncomplete:[]}}};
+  }};
+  const sel=await selectSalesRead(reader,{storeSlug:'norrebro',start:'2026-01-01',end:'2026-10-07',today:'2026-10-06'});
+  assert.equal(sel.source,'hybrid');assert(dbReadCalled);
+  assert.equal(sel.todayStart,'2026-10-06');assert.equal(sel.todayEnd,'2026-10-07');
+});
+test('failed store is identifiable from salesReadMeta in the error',async()=>{
+  const reader={policy:'covered-history',read:async()=>{throw new Error('connection lost');}};
+  try { await selectSalesRead(reader,{storeSlug:'christianshavn',start:'2026-01-01',end:'2026-10-05',today:'2026-10-06'}); assert.fail('should throw'); }
+  catch(e) { assert.equal(e.salesReadMeta.code,'DB_READ_UNAVAILABLE'); assert.equal(e.salesReadMeta.storeId,'christianshavn'); }
+});
 test('new-view consumers of a coalesced failed sales request retain the error notice',async()=>{
  const notices=[],elements=new Map(); let release;
  const context={SalesDataStatus:require('../lib/sales-data-status'),STORES:[],sessionActive:true,sessionNonce:1,Date,SALES_CACHE_MAX_ENTRIES:120,SALES_CACHE_HISTORICAL_TTL_MS:21600000,_salesCache:new Map(),_salesInFlight:new Map(),readSalesCache:()=>null,document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},apiFetch:()=>new Promise(r=>release=r)};
