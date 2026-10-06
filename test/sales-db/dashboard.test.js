@@ -9,7 +9,7 @@ const row={date:'2026-09-24',saleLocal:'2026-09-24 14:00:00',secondOfDay:50400,t
 const cat=require('../../catalogues/onlinepos-reviewed.json');Object.assign(row,cat.products.find(p=>p.storeSlug==='norrebro'&&p.productId==='27242336'),cat.payments[0]);
 const state={date:row.date,status:'complete',evidence:'complete-single-pass',lineCount:1,observedAt:new Date('2026-09-28T10:00:00Z'),revenueIncl:'95',revenueExcl:'76'};
 const args={storeSlug:'norrebro',start:row.date,end:'2026-09-25',now};
-function session(states=[state],rows=[row]){const calls=[];return{calls,async query(sql,values){calls.push({sql,values});return{rows:sql.includes('sales_day_state')?states:rows};}};}
+function session(states=[state],rows=[row],groups){const calls=[];return{calls,async query(sql,values){calls.push({sql,values});if(sql.includes('sales_day_state'))return{rows:states};if(groups&&sql.includes('GROUP BY'))return{rows:groups};return{rows};}};}
 test('disabled switch never loads pg, opens database or reads identity config',()=>{const x=cp.spawnSync(process.execPath,['-e',"require('./lib/sales-read-source').createSalesReadSource({});if(Object.keys(require.cache).some(p=>p.includes('/pg/')||p.includes('/sales-db/')))process.exit(1)"],{cwd:require('node:path').join(__dirname,'../..')});assert.equal(x.status,0);assert.equal(createSalesReadSource({KK_SALES_READ_SOURCE:'onlinepos',KK_SALES_READ_DB_URL:'broken'}),null);assert.throws(()=>createSalesReadSource({KK_SALES_READ_SOURCE:'other'}));assert.throws(()=>createSalesReadSource({KK_SALES_READ_SOURCE:'database'}));});
 test('public numeric boundary preserves decimals and refuses precision loss',()=>{assert.equal(numeric('-12.3400'),-12.34);assert.throws(()=>numeric('9007199254740993'));assert.throws(()=>numeric('0.123456789012345678'));});
 test('complete snapshot is compatible, includes evidence and reveals no private field',async()=>{const x=await readSnapshot(session(),args);assert.equal(x.lines[0].priceexclvat,76);assert.equal(x.lines[0].secondOfDay,50400);assert.equal(x.meta.complete,true);assert.equal(x.meta.freshness.live,false);assert.equal(x.meta.coverage.days[0].independentlyVerified,false);assert.equal(x.meta.rawLineCount,1);assert.deepEqual(Object.keys(x.lines[0]).sort(),['productid','productname','productgroupid','productgroup','count','price','priceexclvat','paymenttype','paymenttypecode','date','hour','secondOfDay'].sort());});
@@ -42,7 +42,7 @@ test('coverage-only warming keeps strict day evidence without loading any facts'
   const aggregated=await readSnapshot(session([{...state,lineCount:100001}]),args);
   assert.equal(aggregated.meta.complete,true);assert.equal(aggregated.meta.aggregated,true);
   assert.equal(aggregated.lines.length,1);assert.equal(aggregated.lines[0].date,state.date);
-  assert.equal(aggregated.lines[0].priceexclvat,76);assert.equal(aggregated.lines[0].productid,null);
+  assert.equal(aggregated.lines[0].priceexclvat,76);assert.equal(aggregated.lines[0].productid,row.productId);
 });
 
 test('opaque delivery products and all six stores pass catalogue validation for last-month equivalent',async()=>{
@@ -63,24 +63,22 @@ test('opaque delivery products and all six stores pass catalogue validation for 
     assert(cat.products.some(p=>p.storeSlug===slug),'missing catalogue products for '+slug);
   }
 });
-test('ranges exceeding MAX_LINES return PostgreSQL-aggregated daily revenue without loading fact rows',async()=>{
-  // Simulate 300 days × 700 lines/day = 210,000 total (exceeds 100K)
+test('ranges exceeding MAX_LINES return PostgreSQL product-aggregated lines',async()=>{
   const largeNow=Date.parse('2026-10-28T12:00:00Z');
   const days=Array.from({length:300},(_,i)=>{const d=new Date(Date.UTC(2026,0,1+i)).toISOString().slice(0,10);
     return{date:d,status:'complete',evidence:'complete-single-pass',lineCount:700,observedAt:new Date('2026-10-28T03:00:00Z'),revenueIncl:'50000',revenueExcl:'40000'};});
-  const s=session(days,[]);
+  // Mock product-grouped rows returned by the GROUP BY query
+  const groups=days.map(d=>({date:d.date,productId:'27242336',productLabel:'Killer Kebab',groupId:'2911776',groupLabel:'Rolls ',quantity:'700',revenueIncl:'50000',revenueExcl:'40000'}));
+  const s=session(days,[],groups);
   const result=await readSnapshot(s,{storeSlug:'norrebro',start:'2026-01-01',end:'2026-10-28',now:largeNow});
   assert.equal(result.meta.complete,true);
   assert.equal(result.meta.aggregated,true);
-  assert.equal(result.lines.length,300,'one aggregated line per day');
+  assert.equal(result.lines.length,300);
   assert.equal(result.lines[0].date,'2026-01-01');
   assert.equal(result.lines[0].priceexclvat,40000);
-  assert.equal(result.lines[0].productid,null,'aggregated lines have no product detail');
+  assert.equal(result.lines[0].productid,'27242336','aggregated lines preserve product ID');
   assert.equal(result.meta.rawLineCount,210000);
-  assert.equal(result.meta.processedLineCount,300);
-  assert.equal(s.calls.length,1,'only the day_state query, no fact query');
-  assert(s.calls[0].sql.includes('sales_day_state'));
-  assert(!s.calls.some(c=>c.sql.includes('sales_line')),'must not query sales_line');
+  assert(s.calls.some(c=>c.sql.includes('GROUP BY')),'uses GROUP BY aggregation');
 });
 test('short ranges under MAX_LINES still load and validate individual facts',async()=>{
   const s=session([state],[row]);
@@ -93,24 +91,45 @@ test('short ranges under MAX_LINES still load and validate individual facts',asy
   assert(s.calls.some(c=>c.sql.includes('sales_line')),'must query sales_line for short ranges');
 });
 test('aggregated weekly revenue reconciles with individual day sums',async()=>{
-  // 3 weeks of data × 5001 lines/day = 105,021 total (exceeds 100K → aggregated)
   const weekNow=Date.parse('2026-02-01T12:00:00Z');
-  const days=[];for(let i=0;i<21;i++){const d=new Date(Date.UTC(2026,0,5+i)).toISOString().slice(0,10);
-    days.push({date:d,status:'complete',evidence:'complete-single-pass',lineCount:5001,observedAt:new Date('2026-01-30T10:00:00Z'),revenueIncl:String(10000+i*100),revenueExcl:String(8000+i*80)});}
-  const s=session(days,[]);
+  const days=[];const groups=[];
+  for(let i=0;i<21;i++){const d=new Date(Date.UTC(2026,0,5+i)).toISOString().slice(0,10);
+    const excl=String(8000+i*80),incl=String(10000+i*100);
+    days.push({date:d,status:'complete',evidence:'complete-single-pass',lineCount:5001,observedAt:new Date('2026-01-30T10:00:00Z'),revenueIncl:incl,revenueExcl:excl});
+    groups.push({date:d,productId:'27242336',productLabel:'Killer Kebab',groupId:'2911776',groupLabel:'Rolls ',quantity:String(5001),revenueIncl:incl,revenueExcl:excl});}
+  const s=session(days,[],groups);
   const result=await readSnapshot(s,{storeSlug:'norrebro',start:'2026-01-05',end:'2026-01-26',now:weekNow});
   assert.equal(result.meta.aggregated,true);
-  // Weekly bucket: sum priceexclvat for Mon-Sun groups
   const weekly={};for(const l of result.lines){
     const d=new Date(l.date+'T12:00:00Z'),wd=d.getUTCDay(),mon=new Date(d);mon.setUTCDate(d.getUTCDate()-(wd===0?6:wd-1));
     const wk=mon.toISOString().slice(0,10);weekly[wk]=(weekly[wk]||0)+l.priceexclvat;
   }
-  // Verify each week's sum matches the underlying day sums
   const expectedWeekly={};for(const d of days){
     const dt=new Date(d.date+'T12:00:00Z'),wd=dt.getUTCDay(),mon=new Date(dt);mon.setUTCDate(dt.getUTCDate()-(wd===0?6:wd-1));
     const wk=mon.toISOString().slice(0,10);expectedWeekly[wk]=(expectedWeekly[wk]||0)+Number(d.revenueExcl);
   }
   assert.deepEqual(weekly,expectedWeekly);
+});
+test('product-aggregated lines preserve product IDs for roll/mix classification',async()=>{
+  const largeNow=Date.parse('2026-02-01T12:00:00Z');
+  const days=[{date:'2026-01-05',status:'complete',evidence:'complete-single-pass',lineCount:100001,observedAt:new Date('2026-01-06T03:00:00Z'),revenueIncl:'500000',revenueExcl:'400000'}];
+  const ProductMetrics=require('../../lib/product-metrics');
+  const kebabId='27242336',komboId='27242208',falafelId='27242332';
+  const groups=[
+    {date:'2026-01-05',productId:kebabId,productLabel:'Killer Kebab',groupId:'2911776',groupLabel:'Rolls ',quantity:'50',revenueIncl:'5000',revenueExcl:'4000'},
+    {date:'2026-01-05',productId:komboId,productLabel:'Kombo - Lamb',groupId:'2911784',groupLabel:'Kombos',quantity:'30',revenueIncl:'3000',revenueExcl:'2400'},
+    {date:'2026-01-05',productId:falafelId,productLabel:'Killer Falafel',groupId:'2911776',groupLabel:'Rolls ',quantity:'20',revenueIncl:'2000',revenueExcl:'1600'},
+  ];
+  const s=session(days,[],groups);
+  const result=await readSnapshot(s,{storeSlug:'norrebro',start:'2026-01-05',end:'2026-01-06',now:largeNow});
+  assert.equal(result.meta.aggregated,true);
+  assert.equal(result.lines.length,3);
+  const m=ProductMetrics.computeMetrics(result.lines);
+  assert.equal(m.komboUnits,30,'kombo lamb count');
+  assert.equal(m.rollUnits,70,'roll kebab + falafel count');
+  assert.equal(m.breakdown.rollKebab,50);assert.equal(m.breakdown.rollFalafel,20);
+  assert.equal(m.breakdown.komboLamb,30);
+  assert(m.komboPct>0,'kombo percentage is non-zero');
 });
 test('genuine database failure returns explicit error and does not return aggregated data',async()=>{
   const failing={async query(){throw Object.assign(new Error('connection lost'),{code:'ECONNRESET'});}};
