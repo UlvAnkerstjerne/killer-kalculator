@@ -161,7 +161,6 @@ describe('frontend bounded sales caching', () => {
     assert.match(expired, /state\.cache\s*=\s*\{\}/);
     assert.match(expired, /_salesCache\.clear\(\)/);
     assert.match(expired, /_salesInFlight\.clear\(\)/);
-    assert.match(expired, /state\.lemonadeToday\s*=\s*null/);
     assert.match(expired, /state\.meat\s*=\s*\[\]/);
     assert.match(html, /if \(!res\) throw new Error\('Session unavailable'\)/);
     assert.match(html, /if \(_salesInFlight\.get\(key\) === promise\) _salesInFlight\.delete\(key\)/);

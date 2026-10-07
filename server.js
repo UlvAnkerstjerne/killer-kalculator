@@ -935,8 +935,7 @@ app.post('/api/meat', requireAuth, requireCsrf, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Lemonade tracking ─────────────────────────────────────────────────────────
-const LEMONADE_HISTORY_PATH = '/mnt/data/lemonade-history.json';
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function cphDateStr() {
   return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Copenhagen' });
@@ -964,52 +963,6 @@ function databaseInternalLine(line) {
   const timestamp = line.secondOfDay === null ? null : line.date + ' ' +
     new Date(line.secondOfDay * 1000).toISOString().slice(11,19);
   return { ...line, _cphDate: line.date, timestamp_pay: timestamp };
-}
-
-async function fetchLemonadeToday() {
-  const today    = cphDateStr();
-  const tomorrow = cphDateNextDay(today);   // exclusive end — today only
-  if (databaseOnly) return { date: today, stores: {}, total: null, complete: false, meta: {
-    source: 'database', storeId: 'all-stores', start: today, end: tomorrow, complete: false,
-    coverage: { complete: false, days: [{ date: today, status: 'open-day-unsupported' }] },
-    freshness: { live: false, status: 'incomplete' } } };
-
-  const results = await Promise.allSettled(
-    Object.entries(STORES).map(async ([id, store]) => {
-      // History snapshots must wait for a fresh result. This still shares any
-      // dashboard refresh already in flight for the identical range.
-      const { result } = await salesRangeCache.get({ storeId: id, store, start: today, end: tomorrow });
-      // Incomplete result (conflicts / invalids) must not corrupt totals.
-      if (!result.meta.complete) {
-        throw new Error(`incomplete result (invalidCount=${result.meta.invalidCount} conflicts=${(result.meta.conflicts || []).length})`);
-      }
-      // Count lemonade units using the canonical product ID engine.
-      // computeMetrics handles all three lemonade variants (addon, upgrade,
-      // standalone) by product ID — no fuzzy product-name matching.
-      const count = computeMetrics(result.lines).lemUnits;
-      return { id, count, meta: { ...providerReadMeta(await selectSalesRead(databaseSales, { storeSlug: id, start: today, end: tomorrow, today }), true), metrics: metricCoverage(result.lines.map(sanitiseSalesLine), id) } };
-    })
-  );
-
-  const stores   = {};
-  let   total    = 0;
-  let   complete = true;
-
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      stores[r.value.id] = r.value.count;
-      total += r.value.count;
-    } else {
-      console.warn('[lemonade] provider data unavailable');
-      complete = false;   // partial data — do not save to history
-    }
-  }
-
-  return { date: today, stores, total: complete ? total : null, complete, meta: { source: 'onlinepos', storeId: 'all-stores', start: today, end: tomorrow, complete,
-    readPolicy: databaseSales?.policy || 'provider-only', routeReason: 'includes-open-day',
-    coverage: { kind: 'provider-range', complete, start: today, end: tomorrow },
-    stores: results.filter(r=>r.status === 'fulfilled').map(r=>r.value.meta),
-    metrics: { potentiallyIncomplete: [...new Set(results.flatMap(r=>r.status === 'fulfilled' ? r.value.meta.metrics.potentiallyIncomplete : []))] } } };
 }
 
 // Warm This Week without delaying server readiness. Every complete weekly
@@ -1126,43 +1079,6 @@ app.locals.warmThisMonthSalesRanges = warmThisMonthSalesRanges;
 app.locals.warmLyRevenueSummaries = warmLyRevenueSummaries;
 app.locals.warmStartupData = warmStartupData;
 
-function loadLemonadeHistory() {
-  try {
-    if (fs.existsSync(LEMONADE_HISTORY_PATH))
-      return JSON.parse(fs.readFileSync(LEMONADE_HISTORY_PATH, 'utf8'));
-  } catch(e) { console.error('[lemonade] read error:', e.message); }
-  return [];
-}
-
-function saveLemonadeHistory(history) {
-  const dir = path.dirname(LEMONADE_HISTORY_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(LEMONADE_HISTORY_PATH, JSON.stringify(history, null, 2), 'utf8');
-}
-
-app.get('/api/lemonade/history', requireAuth, (_req, res) => {
-  res.json(loadLemonadeHistory());
-});
-
-app.post('/api/lemonade/history', requireAuth, requireCsrf, (req, res) => {
-  try {
-    saveLemonadeHistory(req.body);
-    res.json({ ok: true });
-  } catch(e) {
-    res.status(500).json({ ok: false, error: 'Failed to save lemonade history' });
-  }
-});
-
-app.get('/api/lemonade/today', requireAuth, async (_req, res) => {
-  try {
-    const data = await fetchLemonadeToday();
-    res.json(data);
-  } catch(e) {
-    console.error('[lemonade/today] Error:', e.message);
-    res.status(500).json({ error: 'Failed to fetch lemonade data' });
-  }
-});
-
 // ── Start ─────────────────────────────────────────────────────────────────────
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
@@ -1172,34 +1088,6 @@ if (require.main === module) {
     console.log('  http://0.0.0.0:' + PORT + '\n');
     void warmStartupData().catch(() => console.warn('[startup-warm] failed; requests can retry'));
   });
-
-  // Scheduled lemonade save at 22:00 Copenhagen time.
-  // Only runs in the live process — not during tests.
-  let lemonadeSavedDate = null;
-  setInterval(() => {
-    const cph  = new Date().toLocaleString('sv', { timeZone: 'Europe/Copenhagen' });
-    const hour = parseInt(cph.slice(11, 13), 10);
-    const date = cph.slice(0, 10);
-    if (hour < 22) return;
-    if (lemonadeSavedDate === date) return;
-    lemonadeSavedDate = date;
-    (async () => {
-      try {
-        const data = await fetchLemonadeToday();
-        if (!data.complete) {
-          console.warn('[lemonade] skipping history save: incomplete data for', data.date);
-          return;
-        }
-        const history = loadLemonadeHistory();
-        const idx     = history.findIndex(e => e.date === data.date);
-        if (idx >= 0) history[idx] = data; else history.push(data);
-        saveLemonadeHistory(history);
-        console.log('[lemonade] saved daily count:', data);
-      } catch(e) {
-        console.error('[lemonade] scheduled save error:', e.message);
-      }
-    })();
-  }, 60000);
 }
 
 module.exports = app;
