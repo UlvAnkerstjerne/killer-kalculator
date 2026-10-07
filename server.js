@@ -503,12 +503,19 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
     });
   }
 
+  const { status, body } = await readSalesRange(storeId, store, start, end);
+  return res.status(status).json(body);
+});
+
+// Shared hybrid read routing for /api/sales-range and the internal store summary.
+// Returns { status, body } exactly as the sales-range route serialises it.
+async function readSalesRange(storeId, store, start, end) {
   let selection;
   try {
     selection = await selectSalesRead(databaseSales, { storeSlug: storeId, start, end, today: cphDateStr() });
     if (selection.source === 'database') {
       const result = selection.result;
-      return res.status(result.meta.complete ? 200 : 503).json(result);
+      return { status: result.meta.complete ? 200 : 503, body: result };
     }
     if (selection.source === 'hybrid') {
       const dbLines = selection.dbResult.lines;
@@ -531,7 +538,7 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
         stale: todayCached.stale,
         cacheAgeMs: todayCached.fetchedAt === null ? 0 : Math.max(0, Date.now() - todayCached.fetchedAt),
       };
-      return res.json({ lines, meta });
+      return { status: 200, body: { lines, meta } };
     }
     const cached = await salesRangeCache.get({ storeId, store, start, end });
     const result = cached.result;
@@ -559,15 +566,16 @@ app.get('/api/sales-range/:storeId/:start/:end', requireAuth, async (req, res) =
       cacheAgeMs:         cached.fetchedAt === null ? 0 : Math.max(0, Date.now() - cached.fetchedAt),
     };
 
-    return res.json({ lines, meta });
+    return { status: 200, body: { lines, meta } };
   } catch (err) {
     // Log the message only — never the store token, firmaid or upstream body
     if (!err.salesReadMeta && selection?.source === 'database') err.salesReadMeta = { source: 'database', storeId, start, end, complete: false, code: 'DB_READ_UNAVAILABLE', routeReason: 'database-error' };
-    if (err.salesReadMeta) return res.status(503).json({ error: 'Stored sales unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', lines: [], meta: err.salesReadMeta });
+    if (err.salesReadMeta) return { status: 503, body: { error: 'Stored sales unavailable; no provider fallback', code: 'DB_READ_UNAVAILABLE', lines: [], meta: err.salesReadMeta } };
     console.error('[sales-range] upstream unavailable');
-    return res.status(502).json({ error: 'Upstream data fetch failed', ...(selection ? { meta: { ...providerReadMeta(selection, false), code: 'PROVIDER_READ_UNAVAILABLE' } } : {}) });
+    return { status: 502, body: { error: 'Upstream data fetch failed', ...(selection ? { meta: { ...providerReadMeta(selection, false), code: 'PROVIDER_READ_UNAVAILABLE' } } : {}) } };
   }
-});
+}
+
 
 /**
  * Compact revenue-only range for LY comparisons and budgets.
@@ -769,12 +777,22 @@ async function fetchPayrollByStore(from, to, token) {
 // :from and :to are YYYY-MM-DD strings
 app.get('/api/planday/salaries/:from/:to', requireAuth, async (req, res) => {
   const { from, to } = req.params;
+  try {
+    return res.json(await fetchSalariesByStore(from, to));
+  } catch {
+    return res.status(502).json({ error: 'Salary data unavailable' });
+  }
+});
+
+// Shared by the dashboard route above and the internal store summary.
+// Throws when both the payroll path and the shift-hours fallback fail.
+async function fetchSalariesByStore(from, to) {
   const token = await getPlandayToken();
   // Primary: payroll endpoint cross-referenced with shifts for department mapping
   try {
     const { byStore } = await fetchPayrollByStore(from, to, token);
     console.log('[Planday] salaries (payroll) result:', byStore);
-    return res.json(byStore);
+    return byStore;
   } catch (err) {
     console.warn('[Planday] payroll endpoint failed (' + err.response?.status + '), falling back to shift hours');
   }
@@ -792,11 +810,67 @@ app.get('/api/planday/salaries/:from/:to', requireAuth, async (req, res) => {
       byStore[storeId] = (byStore[storeId] || 0) + Math.round(hours * HOURLY_RATE);
     }
     console.log('[Planday] salaries fallback: ' + shifts.length + ' shifts, ' + skipped + ' skipped');
-    return res.json(byStore);
+    return byStore;
   } catch (err) {
     console.error('[Planday] salaries fallback also failed:', err.response?.status, err.message);
-    return res.status(502).json({ error: 'Salary data unavailable' });
+    throw new Error('Salary data unavailable');
   }
+}
+
+// ── Internal server-to-server store summary (Killer Kockpit) ────────────────
+//
+// GET /api/internal/store-summary/:storeId/:start/:end
+//   :start inclusive, :end exclusive CPH dates — the same contract as
+//   /api/sales-range. Sales are read through readSalesRange, so database /
+//   provider / hybrid routing is decided here exactly as for the dashboard.
+//   Returns normalized KPIs only: no sales lines, product names, payment,
+//   order, employee, provider or Planday data.
+//
+// Auth: `Authorization: Bearer $KOCKPIT_READ_TOKEN`. Never the browser session.
+// Unconfigured token → 503 (endpoint disabled), so deploy order is safe.
+const { createInternalTokenGuard } = require('./lib/internal-auth');
+const { buildStoreSummaryMetrics, publicSource } = require('./lib/store-summary');
+const requireInternalToken = createInternalTokenGuard(() => process.env.KOCKPIT_READ_TOKEN);
+const STORE_SUMMARY_MAX_DAYS = 31;
+
+// One Planday call covers all six stores for a period, so a Kockpit render
+// for any store shares it. Short TTL; failures are never cached.
+const SALARY_SUMMARY_TTL_MS = 5 * 60 * 1000;
+const salarySummaryCache = new Map();
+function cachedSalariesByStore(from, to) {
+  const key = from + ':' + to;
+  const hit = salarySummaryCache.get(key);
+  if (hit && Date.now() - hit.at < SALARY_SUMMARY_TTL_MS) return hit.promise;
+  const promise = fetchSalariesByStore(from, to);
+  salarySummaryCache.set(key, { at: Date.now(), promise });
+  promise.catch(() => { if (salarySummaryCache.get(key)?.promise === promise) salarySummaryCache.delete(key); });
+  return promise;
+}
+app.locals.salarySummaryCache = salarySummaryCache;
+
+app.get('/api/internal/store-summary/:storeId/:start/:end', requireInternalToken, async (req, res) => {
+  const { storeId, start, end } = req.params;
+  // Exact canonical slug only — no Danish-character normalization here.
+  if (!Object.hasOwn(STORES, storeId)) return res.status(404).json({ error: 'Unknown store' });
+  if (!isValidISODate(start) || !isValidISODate(end) || end <= start) {
+    return res.status(400).json({ error: 'Invalid date range' });
+  }
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000);
+  if (days > STORE_SUMMARY_MAX_DAYS || end > cphDateNextDay(cphDateStr())) {
+    return res.status(400).json({ error: 'Invalid date range' });
+  }
+
+  // Planday `to` is inclusive; the dashboard passes the last day of the period.
+  const [sales, salaries] = await Promise.all([
+    readSalesRange(storeId, STORES[storeId], start, end),
+    cachedSalariesByStore(start, cphDateOffset(end, -1)).catch(() => null),
+  ]);
+  const meta = sales.body.meta || {};
+  const complete = sales.status === 200 && meta.complete === true && Array.isArray(sales.body.lines);
+  const base = { storeId, start, end, complete, source: publicSource(meta.source) };
+  if (!complete) return res.status(503).json({ ...base, metrics: null });
+  const salaryCost = salaries && Object.hasOwn(salaries, storeId) ? salaries[storeId] : null;
+  return res.json({ ...base, metrics: buildStoreSummaryMetrics(sales.body.lines, salaryCost) });
 });
 
 // ── Katering recipes ──────────────────────────────────────────────────────────
