@@ -127,7 +127,7 @@ test('fully closed month routes entirely to DB, not hybrid',async()=>{
 // ── Combined and trend graph helpers ─────────────────────────────────────────
 // Extract the pure functions from index.html and test them directly.
 const helperSrc = html.slice(html.indexOf('// ── Graph helpers'), html.indexOf('// ── Graph bucketing helpers'));
-const helperCtx = { window: { ProductMetrics: require('../lib/product-metrics') }, computeItemCategories: null };
+const helperCtx = { window: { ProductMetrics: require('../lib/product-metrics') }, computeItemCategories: null, Intl, kr: n => n == null ? '—' : new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK',maximumFractionDigits:0}).format(n) };
 vm.createContext(helperCtx);
 vm.runInContext('function computeItemCategories(items){const m=window.ProductMetrics.computeMetrics(items);return{rolls:m.rollUnits,kombos:m.komboUnits,kebab:m.breakdown.komboLamb+m.breakdown.rollKebab,falafel:m.breakdown.komboFalafel+m.breakdown.rollFalafel,chicken:m.breakdown.komboKylling+m.breakdown.rollKylling,lemUnits:m.lemUnits};}', helperCtx);
 vm.runInContext(helperSrc, helperCtx);
@@ -156,46 +156,60 @@ test('combined rolls % uses total numerators/denominators, not store averages',(
   const pct = helperCtx.componentValue(combined, 'rolls');
   assert(Math.abs(pct - 11/120*100) < 0.01, 'combined rolls % = 9.17%, not 25.5%');
 });
-test('rolling trend uses correct window and combines ratio numerators',()=>{
-  const comps = [
-    { num: 10, den: 100, hasData: true },
-    { num: 20, den: 100, hasData: true },
-    { num: 30, den: 100, hasData: true },
-    { num: 40, den: 100, hasData: true },
-  ];
-  const trend = helperCtx.rollingTrend(comps, 4, 'rolls');
-  assert.equal(trend[0], null); assert.equal(trend[1], null); assert.equal(trend[2], null);
-  // Window 4: (10+20+30+40)/(100+100+100+100) = 100/400 = 25%
-  assert.equal(trend[3], 25);
+test('linear regression returns correct slope and fitted endpoints',()=>{
+  // y = 100, 200, 300, 400 → slope = 100, intercept = 100
+  const reg = helperCtx.linearRegression([100, 200, 300, 400]);
+  assert.equal(reg.validCount, 4);
+  assert(Math.abs(reg.fittedStart - 100) < 0.01);
+  assert(Math.abs(reg.fittedEnd - 400) < 0.01);
+  assert(Math.abs(reg.data[0] - 100) < 0.01);
+  assert(Math.abs(reg.data[3] - 400) < 0.01);
 });
-test('rolling trend for revenue averages bucket totals',()=>{
-  const comps = [
-    { value: 1000, hasData: true },
-    { value: 2000, hasData: true },
-    { value: 3000, hasData: true },
-  ];
-  const trend = helperCtx.rollingTrend(comps, 3, 'revenue');
-  assert.equal(trend[0], null); assert.equal(trend[1], null);
-  assert.equal(trend[2], 2000); // (1000+2000+3000)/3
+test('revenue trend reports fitted relative percentage change',()=>{
+  // Fitted start 100, end 125 → +25%
+  const change = helperCtx.formatTrendChange(100, 125, 'revenue');
+  assert.equal(change, '+25%');
+  // Negative: start 200, end 150 → -25%
+  assert.equal(helperCtx.formatTrendChange(200, 150, 'revenue'), '-25%');
 });
-test('produktmix trend combines kebab+falafel counts before calculating share',()=>{
-  const comps = [
-    { kebab: 80, falafel: 20, hasData: true },
-    { kebab: 60, falafel: 40, hasData: true },
-    { kebab: 70, falafel: 30, hasData: true },
-  ];
-  const lambTrend = helperCtx.rollingTrend(comps, 3, 'produktmix', 'kebab');
-  // Combined: (80+60+70) / (80+60+70 + 20+40+30) = 210/300 = 70%
-  assert.equal(lambTrend[2], 70);
+test('lemonade trend reports fitted relative percentage change',()=>{
+  assert.equal(helperCtx.formatTrendChange(50, 60, 'lemonade'), '+20%');
 });
-test('missing bucket in trend window produces null, not zero',()=>{
-  const comps = [
-    { value: 100, hasData: true },
-    { value: 0, hasData: false }, // missing
-    { value: 300, hasData: true },
-  ];
-  const trend = helperCtx.rollingTrend(comps, 3, 'revenue');
-  assert.equal(trend[2], null, 'missing data prevents trend calculation');
+test('ratio metrics report percentage-point change',()=>{
+  // Rolls %: start 55.0, end 58.2 → +3.2 pp
+  assert.equal(helperCtx.formatTrendChange(55.0, 58.2, 'rolls'), '+3.2 pp');
+  assert.equal(helperCtx.formatTrendChange(40.0, 38.3, 'food-cost'), '-1.7 pp');
+  assert.equal(helperCtx.formatTrendChange(10.0, 10.9, 'salary'), '+0.9 pp');
+});
+test('null buckets are ignored in regression, not treated as zero',()=>{
+  const reg = helperCtx.linearRegression([100, null, null, 400]);
+  assert.equal(reg.validCount, 2);
+  assert(Math.abs(reg.fittedStart - 100) < 0.01);
+  assert(Math.abs(reg.fittedEnd - 400) < 0.01);
+  // Interior nulls filled by fitted line
+  assert(reg.data[1] != null); assert(reg.data[2] != null);
+});
+test('fewer than two valid buckets produces no trend',()=>{
+  const reg = helperCtx.linearRegression([42]);
+  assert.equal(reg.validCount, 1);
+  assert.equal(reg.fittedStart, null);
+  assert.equal(reg.data[0], null);
+});
+test('zero fitted starting value is handled safely',()=>{
+  // Revenue: fitted start ~0, show absolute change
+  const change = helperCtx.formatTrendChange(0, 500, 'revenue');
+  assert(change != null && !change.includes('Infinity'));
+  assert(change != null && !change.includes('NaN'));
+});
+test('produktmix produces one trend per displayed series',()=>{
+  // Two series: lamb rises, falafel falls
+  const lambData = [60, 65, 70, 75];
+  const falafelData = [40, 35, 30, 25];
+  const regL = helperCtx.linearRegression(lambData);
+  const regF = helperCtx.linearRegression(falafelData);
+  const changeL = helperCtx.formatTrendChange(regL.fittedStart, regL.fittedEnd, 'produktmix');
+  const changeF = helperCtx.formatTrendChange(regF.fittedStart, regF.fittedEnd, 'produktmix');
+  assert.match(changeL, /^\+/); assert.match(changeF, /^-/);
 });
 test('lemonade combined sums units across stores',()=>{
   const PM = require('../lib/product-metrics');

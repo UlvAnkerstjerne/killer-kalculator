@@ -3419,21 +3419,19 @@ function renderGraphsView() {
         </div>
 
         <div class="graph-ctrl-group" style="flex-basis:100%">
-          <div class="graph-ctrl-label">
-            <span>Stores</span>
-            <span style="display:flex;gap:12px;align-items:center">
-              <label class="graph-store-check" style="font-weight:600">
-                <input type="checkbox" ${state.graphCombined ? 'checked' : ''}
-                  onchange="state.graphCombined=this.checked;loadGraphData()">
-                <span class="graph-dot" style="background:#e8e8e8"></span>
-                All stores combined
-              </label>
-              <button class="graph-toggle-all" onclick="toggleAllGraphStores()">
-                ${allSel ? 'Deselect all' : 'Select all'}
-              </button>
-            </span>
+          <div class="graph-ctrl-label">Stores</div>
+          <label class="graph-store-check" style="font-weight:600;margin-bottom:6px">
+            <input type="checkbox" ${state.graphCombined ? 'checked' : ''}
+              onchange="state.graphCombined=this.checked;loadGraphData()">
+            <span class="graph-dot" style="background:#e8e8e8"></span>
+            All stores combined
+          </label>
+          <div class="graph-store-checks" style="${state.graphCombined ? 'opacity:0.4;pointer-events:none' : ''}">
+            ${storeChecks}
           </div>
-          <div class="graph-store-checks" style="${state.graphCombined ? 'opacity:0.4;pointer-events:none' : ''}">${storeChecks}</div>
+          <button class="graph-toggle-all" style="margin-top:4px;${state.graphCombined ? 'opacity:0.4;pointer-events:none' : ''}" onclick="toggleAllGraphStores()">
+            ${allSel ? 'Deselect all' : 'Select all'}
+          </button>
         </div>
 
       </div>
@@ -3442,6 +3440,7 @@ function renderGraphsView() {
     <div class="card" id="graph-chart-card" style="min-height:220px">
       <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
     </div>
+    <div id="graph-trend-summary" style="padding:0 4px;font-size:13px;color:#aaa;margin-top:4px"></div>
   `;
 
   loadGraphData();
@@ -3506,28 +3505,37 @@ function componentValue(comp, metric, category) {
   return comp.num / comp.den * 100;
 }
 
-// Rolling trend: combine raw components over a window, then compute value
-function rollingTrend(components, windowSize, metric, category) {
-  return components.map((_, i) => {
-    if (i < windowSize - 1) return null;
-    const window = components.slice(i - windowSize + 1, i + 1);
-    if (window.some(c => !c || !c.hasData)) return null;
-    if (metric === 'revenue' || metric === 'lemonade') {
-      return window.reduce((s, c) => s + c.value, 0) / windowSize;
+// OLS linear regression across all valid buckets. Returns { data, fittedStart, fittedEnd, validCount }.
+// data[i] is the fitted y at bucket i (null outside [first valid, last valid]).
+function linearRegression(values) {
+  const pts = [];
+  for (let i = 0; i < values.length; i++) if (values[i] != null) pts.push({ x: i, y: values[i] });
+  if (pts.length < 2) return { data: values.map(() => null), fittedStart: null, fittedEnd: null, validCount: pts.length };
+  const n = pts.length;
+  const sx = pts.reduce((s, p) => s + p.x, 0), sy = pts.reduce((s, p) => s + p.y, 0);
+  const mx = sx / n, my = sy / n;
+  let num = 0, den = 0;
+  for (const p of pts) { num += (p.x - mx) * (p.y - my); den += (p.x - mx) * (p.x - mx); }
+  const b = den !== 0 ? num / den : 0, a = my - b * mx;
+  const first = pts[0].x, last = pts[pts.length - 1].x;
+  const data = values.map((_, i) => i >= first && i <= last ? a + b * i : null);
+  return { data, fittedStart: a + b * first, fittedEnd: a + b * last, validCount: n };
+}
+
+// Format the trend change for display
+function formatTrendChange(fittedStart, fittedEnd, metric) {
+  if (fittedStart == null || fittedEnd == null) return null;
+  if (metric === 'revenue' || metric === 'lemonade') {
+    if (Math.abs(fittedStart) < 0.01) {
+      const diff = fittedEnd - fittedStart;
+      return (diff >= 0 ? '+' : '') + (metric === 'lemonade' ? Math.round(diff) + ' stk' : kr(Math.round(diff)));
     }
-    if (metric === 'produktmix') {
-      const tk = window.reduce((s, c) => s + c.kebab, 0);
-      const tf = window.reduce((s, c) => s + c.falafel, 0);
-      const tot = tk + tf;
-      if (tot <= 0) return null;
-      return (category === 'kebab' ? tk : tf) / tot * 100;
-    }
-    // ratio metrics
-    const num = window.reduce((s, c) => s + c.num, 0);
-    const den = window.reduce((s, c) => s + c.den, 0);
-    if (den <= 0) return null;
-    return num / den * 100;
-  });
+    const pct = (fittedEnd - fittedStart) / Math.abs(fittedStart) * 100;
+    return (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+  }
+  // Percentage-point metrics
+  const diff = fittedEnd - fittedStart;
+  return (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' pp';
 }
 
 // ── Graph bucketing helpers ─────────────────────────────────────────────────────
@@ -3672,7 +3680,7 @@ async function loadGraphData() {
 
   // ── Pre-compute per-store bucket items and cost maps ────────────────────────
   const isLine = state.graphType === 'line';
-  const trendWindow = state.graphInterval === 'monthly' ? 3 : 4;
+  const trendSummaries = [];
   const storeBucketItems = {}; // storeId → { bucketKey: [items] }
   const storeCostMaps = {};    // storeId → { bucketKey: cost }
   for (const storeId of selectedStores) {
@@ -3723,43 +3731,49 @@ async function loadGraphData() {
 
   function mkDataset(label, color, data, isTrend) {
     return {
-      label: isTrend ? label + (trendWindow === 3 ? ' (3M trend)' : ' (4W trend)') : label,
+      label: isTrend ? label + ' (overall trend)' : label,
       data,
-      borderColor: color,
-      backgroundColor: isLine ? color + (isTrend ? '10' : '28') : color + (isTrend ? '66' : 'bb'),
-      borderWidth: isLine ? (isTrend ? 3 : (state.graphTrend ? 1.5 : 2)) : 0,
+      type: isTrend ? 'line' : state.graphType,
+      borderColor: isTrend ? color : (state.graphTrend ? color + '66' : color),
+      backgroundColor: isLine ? color + (isTrend ? '00' : '28') : color + 'bb',
+      borderWidth: isTrend ? 3 : (isLine ? (state.graphTrend ? 1.5 : 2) : 0),
       borderRadius: isLine ? 0 : 4,
-      borderDash: isTrend ? [] : [],
-      tension: 0.35,
+      tension: isTrend ? 0 : 0.35,
       pointRadius: isTrend ? 0 : smallPt,
-      pointHoverRadius: isTrend ? 4 : 5,
+      pointHoverRadius: isTrend ? 0 : 5,
       fill: false,
       spanGaps: true,
       order: isTrend ? 0 : 1,
-      ...(state.graphTrend && !isTrend ? { borderColor: color + '66' } : {}),
     };
   }
 
+  function addTrend(label, color, data) {
+    const reg = linearRegression(data);
+    if (reg.validCount >= 2) {
+      datasets.push(mkDataset(label, color, reg.data, true));
+      trendSummaries.push({ label, change: formatTrendChange(reg.fittedStart, reg.fittedEnd, state.graphMetric) });
+    }
+  }
+
   if (state.graphMetric === 'produktmix') {
-    // Produktmix always pools items across selected scope
     const comps = state.graphCombined ? [combinedComponents()] : selectedStores.map(sid => storeComponents(sid));
-    // Pool all components
     const pooled = bucketKeys.map((_, bi) => {
       let kebab = 0, falafel = 0, has = false;
       for (const c of comps) { if (c[bi]?.hasData) { kebab += c[bi].kebab; falafel += c[bi].falafel; has = true; } }
       return { kebab, falafel, hasData: has };
     });
     for (const [cat, color] of [['kebab', '#b30000'], ['falafel', '#4ecca3']]) {
+      const catLabel = cat === 'kebab' ? 'Lamb' : 'Falafel';
       const data = pooled.map(c => componentValue(c, 'produktmix', cat));
-      datasets.push(mkDataset(cat === 'kebab' ? 'Lamb' : 'Falafel', color, data, false));
-      if (state.graphTrend) datasets.push(mkDataset(cat === 'kebab' ? 'Lamb' : 'Falafel', color, rollingTrend(pooled, trendWindow, 'produktmix', cat), true));
+      datasets.push(mkDataset(catLabel, color, data, false));
+      if (state.graphTrend) addTrend(catLabel, color, data);
     }
   } else if (state.graphCombined) {
     const comps = combinedComponents();
     const data = comps.map(c => componentValue(c, state.graphMetric));
     const color = '#e8e8e8';
     datasets.push(mkDataset('All stores', color, data, false));
-    if (state.graphTrend) datasets.push(mkDataset('All stores', color, rollingTrend(comps, trendWindow, state.graphMetric), true));
+    if (state.graphTrend) addTrend('All stores', color, data);
   } else {
     for (const storeId of selectedStores) {
       const store = STORES.find(s => s.id === storeId);
@@ -3767,11 +3781,17 @@ async function loadGraphData() {
       const comps = storeComponents(storeId);
       const data = comps.map(c => componentValue(c, state.graphMetric));
       datasets.push(mkDataset(store.name, color, data, false));
-      if (state.graphTrend) datasets.push(mkDataset(store.name, color, rollingTrend(comps, trendWindow, state.graphMetric), true));
+      if (state.graphTrend) addTrend(store.name, color, data);
     }
   }
 
   card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';
+
+  // Trend summary
+  const summaryEl = document.getElementById('graph-trend-summary');
+  if (summaryEl) summaryEl.innerHTML = trendSummaries.length
+    ? trendSummaries.map(t => `<span style="margin-right:16px"><b>${t.label}:</b> ${t.change || '—'}</span>`).join('')
+    : '';
 
   makeChart('graph-canvas', {
     type: state.graphType,
