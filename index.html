@@ -3398,7 +3398,7 @@ function renderGraphsView() {
         <div class="graph-ctrl-group">
           <div class="graph-ctrl-label">Metric</div>
           <div class="graph-btn-group">
-            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %'],['produktmix','Produktmix %'],['lemonade','Lemonade']],'graphMetric','renderGraphsView()')}
+            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['kombo','Kombo %'],['chicken','Chicken %'],['produktmix','Produktmix %'],['lemonade','Lemonade']],'graphMetric','renderGraphsView()')}
           </div>
         </div>
 
@@ -3478,15 +3478,21 @@ function bucketComponents(items, revMap, bucketKey, metric, costMap, salMap) {
     const sal = salMap?.[bucketKey] || 0, rev = revMap?.[bucketKey] || 0;
     return { num: sal, den: rev, hasData: rev > 0 && sal > 0 };
   }
-  if (metric === 'rolls') {
+  if (metric === 'kombo') {
     if (!items || !items.length) return { num: 0, den: 0, hasData: false };
     const c = computeItemCategories(items);
-    return { num: c.rolls, den: c.rolls + c.kombos, hasData: (c.rolls + c.kombos) > 0 };
+    return { num: c.kombos, den: c.kombos + c.rolls, hasData: (c.kombos + c.rolls) > 0 };
+  }
+  if (metric === 'chicken') {
+    if (!items || !items.length) return { num: 0, den: 0, hasData: false };
+    const c = computeItemCategories(items);
+    const den = c.kebab + c.falafel + c.chicken;
+    return { num: c.chicken, den, hasData: den > 0 };
   }
   if (metric === 'produktmix') {
-    if (!items || !items.length) return { kebab: 0, falafel: 0, hasData: false };
+    if (!items || !items.length) return { kebab: 0, falafel: 0, chicken: 0, hasData: false };
     const c = computeItemCategories(items);
-    return { kebab: c.kebab, falafel: c.falafel, hasData: (c.kebab + c.falafel) > 0 };
+    return { kebab: c.kebab, falafel: c.falafel, chicken: c.chicken, hasData: (c.kebab + c.falafel + c.chicken) > 0 };
   }
   return { value: 0, hasData: false };
 }
@@ -3496,11 +3502,11 @@ function componentValue(comp, metric, category) {
   if (!comp || !comp.hasData) return null;
   if (metric === 'revenue' || metric === 'lemonade') return comp.value || null;
   if (metric === 'produktmix') {
-    const tot = comp.kebab + comp.falafel;
+    const tot = comp.kebab + comp.falafel + comp.chicken;
     if (tot <= 0) return null;
-    return (category === 'kebab' ? comp.kebab : comp.falafel) / tot * 100;
+    return (category === 'kebab' ? comp.kebab : category === 'falafel' ? comp.falafel : comp.chicken) / tot * 100;
   }
-  // ratio metrics (food-cost, salary, rolls)
+  // ratio metrics (food-cost, salary, kombo, chicken)
   if (comp.den <= 0) return null;
   return comp.num / comp.den * 100;
 }
@@ -3637,7 +3643,7 @@ async function loadGraphData() {
   const toTs   = Math.floor(new Date(state.graphTo   + 'T23:59:59').getTime() / 1000);
   const bucketKeys    = generateBuckets(state.graphFrom, state.graphTo, state.graphInterval);
   const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
-  const isPercent     = ['food-cost', 'salary', 'rolls', 'produktmix'].includes(state.graphMetric);
+  const isPercent     = ['food-cost', 'salary', 'kombo', 'chicken', 'produktmix'].includes(state.graphMetric);
   const isUnits       = state.graphMetric === 'lemonade';
 
   // ── Revenue: one apiSalesRange call per store; group priceexclvat by bucket ──
@@ -3758,12 +3764,12 @@ async function loadGraphData() {
   if (state.graphMetric === 'produktmix') {
     const comps = state.graphCombined ? [combinedComponents()] : selectedStores.map(sid => storeComponents(sid));
     const pooled = bucketKeys.map((_, bi) => {
-      let kebab = 0, falafel = 0, has = false;
-      for (const c of comps) { if (c[bi]?.hasData) { kebab += c[bi].kebab; falafel += c[bi].falafel; has = true; } }
-      return { kebab, falafel, hasData: has };
+      let kebab = 0, falafel = 0, chicken = 0, has = false;
+      for (const c of comps) { if (c[bi]?.hasData) { kebab += c[bi].kebab; falafel += c[bi].falafel; chicken += c[bi].chicken; has = true; } }
+      return { kebab, falafel, chicken, hasData: has };
     });
-    for (const [cat, color] of [['kebab', '#b30000'], ['falafel', '#4ecca3']]) {
-      const catLabel = cat === 'kebab' ? 'Lamb' : 'Falafel';
+    for (const [cat, color] of [['kebab', '#b30000'], ['falafel', '#4ecca3'], ['chicken', '#f0a020']]) {
+      const catLabel = cat === 'kebab' ? 'Lamb' : cat === 'falafel' ? 'Falafel' : 'Chicken';
       const data = pooled.map(c => componentValue(c, 'produktmix', cat));
       datasets.push(mkDataset(catLabel, color, data, false));
       if (state.graphTrend) addTrend(catLabel, color, data);
