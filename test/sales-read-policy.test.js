@@ -140,21 +140,24 @@ test('combined revenue sums across stores, not averages',()=>{
   const c2 = helperCtx.bucketComponents(null, { 'w1': 1500 }, 'w1', 'revenue');
   assert.equal(c1.value + c2.value, 2500);
 });
-test('combined rolls % uses total numerators/denominators, not store averages',()=>{
-  // Store A: 60 rolls, 40 kombos → 60%. Store B: 80 rolls, 20 kombos → 80%.
-  // Simple avg would be 70%. Correct combined: 140/(140+60) = 70% (coincidence here).
-  // Use different numbers: A: 10 rolls, 90 kombos (10%). B: 90 rolls, 10 kombos (90%).
-  // Average of store %: 50%. Correct combined: 100/(100+100) = 50% (still coincidence).
-  // Try: A: 10 rolls, 10 kombos (50%). B: 1 roll, 99 kombos (1%).
-  // Average: 25.5%. Correct: 11/120 = 9.17%.
-  const itemsA = [{productid:'27242336',count:10,price:100},{productid:'27242208',count:10,price:100}];
-  const itemsB = [{productid:'27242336',count:1,price:10},{productid:'27242208',count:99,price:990}];
-  const cA = helperCtx.bucketComponents(itemsA, {}, 'w1', 'rolls');
-  const cB = helperCtx.bucketComponents(itemsB, {}, 'w1', 'rolls');
-  // Combined: num=10+1=11, den=(10+10)+(1+99)=120
+test('combined kombo % uses total numerators/denominators, not store averages',()=>{
+  // Store A: 10 kombos, 10 rolls → kombo 50%. Store B: 99 kombos, 1 roll → kombo 99%.
+  // Average: 74.5%. Correct: 109/120 = 90.83%.
+  const itemsA = [{productid:'27242208',count:10,price:100},{productid:'27242336',count:10,price:100}];
+  const itemsB = [{productid:'27242208',count:99,price:990},{productid:'27242336',count:1,price:10}];
+  const cA = helperCtx.bucketComponents(itemsA, {}, 'w1', 'kombo');
+  const cB = helperCtx.bucketComponents(itemsB, {}, 'w1', 'kombo');
   const combined = { num: cA.num + cB.num, den: cA.den + cB.den, hasData: true };
-  const pct = helperCtx.componentValue(combined, 'rolls');
-  assert(Math.abs(pct - 11/120*100) < 0.01, 'combined rolls % = 9.17%, not 25.5%');
+  const pct = helperCtx.componentValue(combined, 'kombo');
+  assert(Math.abs(pct - 109/120*100) < 0.01, 'combined kombo % = 90.83%, not 74.5%');
+});
+test('kombo % is the complement of the old rolls % for identical data',()=>{
+  const items = [{productid:'27242208',count:30,price:300},{productid:'27242336',count:70,price:700}];
+  const c = helperCtx.bucketComponents(items, {}, 'w1', 'kombo');
+  const komboPct = helperCtx.componentValue(c, 'kombo');
+  // Kombo: 30/(30+70) = 30%. Former Rolls: 70/(70+30) = 70%. Sum = 100%.
+  assert(Math.abs(komboPct - 30) < 0.01);
+  assert(Math.abs(komboPct + 70 - 100) < 0.01, 'kombo + former rolls = 100%');
 });
 test('linear regression returns correct slope and fitted endpoints',()=>{
   // y = 100, 200, 300, 400 → slope = 100, intercept = 100
@@ -176,10 +179,10 @@ test('lemonade trend reports fitted relative percentage change',()=>{
   assert.equal(helperCtx.formatTrendChange(50, 60, 'lemonade'), '+20%');
 });
 test('ratio metrics report percentage-point change',()=>{
-  // Rolls %: start 55.0, end 58.2 → +3.2 pp
-  assert.equal(helperCtx.formatTrendChange(55.0, 58.2, 'rolls'), '+3.2 pp');
+  assert.equal(helperCtx.formatTrendChange(55.0, 58.2, 'kombo'), '+3.2 pp');
   assert.equal(helperCtx.formatTrendChange(40.0, 38.3, 'food-cost'), '-1.7 pp');
   assert.equal(helperCtx.formatTrendChange(10.0, 10.9, 'salary'), '+0.9 pp');
+  assert.equal(helperCtx.formatTrendChange(5.0, 8.5, 'chicken'), '+3.5 pp');
 });
 test('null buckets are ignored in regression, not treated as zero',()=>{
   const reg = helperCtx.linearRegression([100, null, null, 400]);
@@ -210,6 +213,58 @@ test('produktmix produces one trend per displayed series',()=>{
   const changeL = helperCtx.formatTrendChange(regL.fittedStart, regL.fittedEnd, 'produktmix');
   const changeF = helperCtx.formatTrendChange(regF.fittedStart, regF.fittedEnd, 'produktmix');
   assert.match(changeL, /^\+/); assert.match(changeF, /^-/);
+});
+test('chicken % includes both komboKylling and rollKylling',()=>{
+  const PM = require('../lib/product-metrics');
+  const items = [
+    {productid:PM.PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY,count:5,price:500},
+    {productid:PM.PRODUCT_IDS.ROLL_KYLLING_INDRE_BY,count:3,price:300},
+    {productid:PM.PRODUCT_IDS.ROLL_KEBAB_INDRE_BY,count:12,price:1200},
+    {productid:PM.PRODUCT_IDS.ROLL_FALAFEL_INDRE_BY,count:10,price:1000},
+  ];
+  const c = helperCtx.bucketComponents(items, {}, 'w1', 'chicken');
+  // chicken = 5+3=8, den = (12+5)kebab + (10+3)falafel-is-wrong... Let me recalculate:
+  // kebab = komboLamb(0)+rollKebab(12) = 12
+  // falafel = komboFalafel(0)+rollFalafel(10) = 10
+  // chicken = komboKylling(5)+rollKylling(3) = 8
+  // den = 12+10+8 = 30
+  assert.equal(c.num, 8);
+  assert.equal(c.den, 30);
+  const pct = helperCtx.componentValue(c, 'chicken');
+  assert(Math.abs(pct - 8/30*100) < 0.01);
+});
+test('valid zero-chicken bucket returns 0%, not null',()=>{
+  const items = [{productid:'27242336',count:10,price:100},{productid:'27242332',count:5,price:50}]; // kebab + falafel only
+  const c = helperCtx.bucketComponents(items, {}, 'w1', 'chicken');
+  assert.equal(c.num, 0);
+  assert(c.den > 0);
+  assert.equal(c.hasData, true);
+  assert.equal(helperCtx.componentValue(c, 'chicken'), 0);
+});
+test('zero-protein bucket returns null',()=>{
+  const c = helperCtx.bucketComponents([], {}, 'w1', 'chicken');
+  assert.equal(c.hasData, false);
+  assert.equal(helperCtx.componentValue(c, 'chicken'), null);
+});
+test('produktmix displays kebab, falafel and chicken totalling 100%',()=>{
+  const PM = require('../lib/product-metrics');
+  const items = [
+    {productid:PM.PRODUCT_IDS.ROLL_KEBAB,count:50,price:5000},
+    {productid:PM.PRODUCT_IDS.ROLL_FALAFEL,count:30,price:3000},
+    {productid:PM.PRODUCT_IDS.KOMBO_KYLLING_INDRE_BY,count:20,price:2000},
+  ];
+  const c = helperCtx.bucketComponents(items, {}, 'w1', 'produktmix');
+  const kebab = helperCtx.componentValue(c, 'produktmix', 'kebab');
+  const falafel = helperCtx.componentValue(c, 'produktmix', 'falafel');
+  const chicken = helperCtx.componentValue(c, 'produktmix', 'chicken');
+  assert(Math.abs(kebab + falafel + chicken - 100) < 0.01, 'three shares sum to 100%');
+  assert(Math.abs(kebab - 50) < 0.01);
+  assert(Math.abs(falafel - 30) < 0.01);
+  assert(Math.abs(chicken - 20) < 0.01);
+});
+test('no graph-facing rolls label remains',()=>{
+  assert(!html.includes("'rolls'"), 'no rolls metric identifier in graph code');
+  assert(!html.includes("Rolls %"), 'no Rolls % button label');
 });
 test('lemonade combined sums units across stores',()=>{
   const PM = require('../lib/product-metrics');
