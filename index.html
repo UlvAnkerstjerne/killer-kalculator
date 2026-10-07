@@ -3396,7 +3396,7 @@ function renderGraphsView() {
         <div class="graph-ctrl-group">
           <div class="graph-ctrl-label">Metric</div>
           <div class="graph-btn-group">
-            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %'],['produktmix','Produktmix %']],'graphMetric','renderGraphsView()')}
+            ${btnGroup([['revenue','Revenue'],['food-cost','Food Cost %'],['salary','Salary %'],['rolls','Rolls %'],['produktmix','Produktmix %'],['lemonade','Lemonade']],'graphMetric','renderGraphsView()')}
           </div>
         </div>
 
@@ -3541,6 +3541,7 @@ async function loadGraphData() {
   const bucketKeys    = generateBuckets(state.graphFrom, state.graphTo, state.graphInterval);
   const labels        = bucketKeys.map(k => formatBucketLabel(k, state.graphInterval));
   const isPercent     = ['food-cost', 'salary', 'rolls', 'produktmix'].includes(state.graphMetric);
+  const isUnits       = state.graphMetric === 'lemonade';
 
   // ── Revenue: one apiSalesRange call per store; group priceexclvat by bucket ──
   // Six stores → six requests total, regardless of bucket count.
@@ -3670,6 +3671,20 @@ async function loadGraphData() {
           const tot = c.rolls + c.kombos;
           return tot > 0 ? c.rolls / tot * 100 : null;
         });
+
+      } else if (state.graphMetric === 'lemonade') {
+        const bucketMap = {};
+        for (const item of (allItems[storeId] || [])) {
+          const key = itemBucket(item.date, state.graphInterval);
+          if (!key) continue;
+          (bucketMap[key] = bucketMap[key] || []).push(item);
+        }
+        data = bucketKeys.map(k => {
+          const its = bucketMap[k];
+          if (!its || !its.length) return null;
+          const c = computeItemCategories(its);
+          return c.lemUnits || null;
+        });
       }
 
       return {
@@ -3704,7 +3719,7 @@ async function loadGraphData() {
             label: ctx => {
               const v = ctx.raw;
               if (v == null) return ` ${ctx.dataset.label}: —`;
-              return isPercent ? ` ${ctx.dataset.label}: ${v.toFixed(1)}%` : ` ${ctx.dataset.label}: ${kr(v)}`;
+              return isPercent ? ` ${ctx.dataset.label}: ${v.toFixed(1)}%` : isUnits ? ` ${ctx.dataset.label}: ${v} stk` : ` ${ctx.dataset.label}: ${kr(v)}`;
             }
           }
         }
@@ -3713,8 +3728,8 @@ async function loadGraphData() {
         x: { grid: { color: '#2c2c2c' }, ticks: { color: '#787878', maxRotation: 45, maxTicksLimit: 24 } },
         y: {
           grid: { color: '#2c2c2c' },
-          beginAtZero: isPercent,
-          ticks: { color: '#787878', callback: v => isPercent ? v.toFixed(0) + '%' : kr(v) }
+          beginAtZero: isPercent || isUnits,
+          ticks: { color: '#787878', callback: v => isPercent ? v.toFixed(0) + '%' : isUnits ? v : kr(v) }
         }
       }
     }

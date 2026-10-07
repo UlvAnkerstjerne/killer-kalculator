@@ -131,6 +131,59 @@ test('product-aggregated lines preserve product IDs for roll/mix classification'
   assert.equal(m.breakdown.komboLamb,30);
   assert(m.komboPct>0,'kombo percentage is non-zero');
 });
+test('product-aggregated lemonade includes addon, upgrade and standalone categories',async()=>{
+  const largeNow=Date.parse('2026-02-01T12:00:00Z');
+  const ProductMetrics=require('../../lib/product-metrics');
+  const P=ProductMetrics.PRODUCT_IDS;
+  // One day with lemonade addon (free, price=0), upgrade (paid) and standalone (paid)
+  const days=[{date:'2026-01-05',status:'complete',evidence:'complete-single-pass',lineCount:100001,observedAt:new Date('2026-01-06T03:00:00Z'),revenueIncl:'500000',revenueExcl:'400000'}];
+  const groups=[
+    // Lemonade addon — zero price (included in kombo); lemonade uses all counts regardless of price
+    {date:'2026-01-05',productId:P.LEM_ADDON,productLabel:'+ Lemonade',groupId:'1',groupLabel:'Drinks ',quantity:'12',revenueIncl:'0',revenueExcl:'0'},
+    // Lemonade upgrade — paid
+    {date:'2026-01-05',productId:P.LEM_UPGRADE,productLabel:'+ Killer Lemonade (+10 kr)',groupId:'1',groupLabel:'Drinks ',quantity:'5',revenueIncl:'50',revenueExcl:'40'},
+    // Standalone lemonade — paid
+    {date:'2026-01-05',productId:P.LEM_STANDALONE,productLabel:'Killer Lemonade (35 kr)',groupId:'1',groupLabel:'Drinks ',quantity:'8',revenueIncl:'280',revenueExcl:'224'},
+  ];
+  const s=session(days,[],groups);
+  const result=await readSnapshot(s,{storeSlug:'norrebro',start:'2026-01-05',end:'2026-01-06',now:largeNow});
+  assert.equal(result.meta.aggregated,true);
+  const m=ProductMetrics.computeMetrics(result.lines);
+  assert.equal(m.lemUnits,25,'total lemonade = 12 addon + 5 upgrade + 8 standalone');
+  assert.equal(m.breakdown.lemAddon,12);assert.equal(m.breakdown.lemUpgrade,5);assert.equal(m.breakdown.lemStandalone,8);
+  // Zero-price addon is counted (lemonade has no price filter)
+  assert.equal(result.lines.find(l=>l.productid===P.LEM_ADDON).price,0,'zero-price addon preserved');
+});
+test('weekly and monthly lemonade buckets from aggregated data match day sums',async()=>{
+  const largeNow=Date.parse('2026-02-08T12:00:00Z');
+  const ProductMetrics=require('../../lib/product-metrics');
+  const P=ProductMetrics.PRODUCT_IDS;
+  const days=[],groups=[];
+  for(let i=0;i<14;i++){const d=new Date(Date.UTC(2026,0,5+i)).toISOString().slice(0,10);
+    days.push({date:d,status:'complete',evidence:'complete-single-pass',lineCount:7200,observedAt:new Date('2026-02-01T03:00:00Z'),revenueIncl:'50000',revenueExcl:'40000'});
+    groups.push({date:d,productId:P.LEM_UPGRADE,productLabel:'+ Killer Lemonade',groupId:'1',groupLabel:'Drinks ',quantity:String(3+i),revenueIncl:String((3+i)*10),revenueExcl:String((3+i)*8)});
+    groups.push({date:d,productId:P.LEM_STANDALONE,productLabel:'Killer Lemonade',groupId:'1',groupLabel:'Drinks ',quantity:String(2+i),revenueIncl:String((2+i)*35),revenueExcl:String((2+i)*28)});
+  }
+  const s=session(days,[],groups);
+  const result=await readSnapshot(s,{storeSlug:'norrebro',start:'2026-01-05',end:'2026-01-19',now:largeNow});
+  assert.equal(result.meta.aggregated,true);
+  // Weekly buckets
+  const weekly={};for(const l of result.lines){
+    if(!ProductMetrics.LEM_IDS.has(String(l.productid)))continue;
+    const d=new Date(l.date+'T12:00:00Z'),wd=d.getUTCDay(),mon=new Date(d);mon.setUTCDate(d.getUTCDate()-(wd===0?6:wd-1));
+    weekly[mon.toISOString().slice(0,10)]=(weekly[mon.toISOString().slice(0,10)]||0)+l.count;
+  }
+  // Expected: week of Jan 5 (Mon-Sun) = days 0-6, week of Jan 12 = days 7-13
+  const w1=Array.from({length:7},(_,i)=>(3+i)+(2+i)).reduce((a,b)=>a+b,0);
+  const w2=Array.from({length:7},(_,i)=>(10+i)+(9+i)).reduce((a,b)=>a+b,0);
+  assert.equal(weekly['2026-01-05'],w1);assert.equal(weekly['2026-01-12'],w2);
+  // Monthly bucket
+  const monthly={};for(const l of result.lines){
+    if(!ProductMetrics.LEM_IDS.has(String(l.productid)))continue;
+    monthly[l.date.slice(0,7)]=(monthly[l.date.slice(0,7)]||0)+l.count;
+  }
+  assert.equal(monthly['2026-01'],w1+w2);
+});
 test('genuine database failure returns explicit error and does not return aggregated data',async()=>{
   const failing={async query(){throw Object.assign(new Error('connection lost'),{code:'ECONNRESET'});}};
   await assert.rejects(readSnapshot(failing,args),/connection lost/);
