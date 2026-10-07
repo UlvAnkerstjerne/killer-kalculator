@@ -3343,6 +3343,8 @@ function initGraphState() {
     state.graphStores = new Set(STORES.map(s => s.id));
     state.graphMetric = 'revenue';
     state.graphType   = 'line';
+    state.graphCombined = false;
+    state.graphTrend  = false;
   }
   // Remove daily if it was previously stored
   if (!state.graphInterval || state.graphInterval === 'daily') state.graphInterval = 'weekly';
@@ -3407,14 +3409,31 @@ function renderGraphsView() {
           </div>
         </div>
 
+        <div class="graph-ctrl-group">
+          <div class="graph-ctrl-label">Trend</div>
+          <label class="graph-store-check">
+            <input type="checkbox" ${state.graphTrend ? 'checked' : ''}
+              onchange="state.graphTrend=this.checked;loadGraphData()">
+            Show trend
+          </label>
+        </div>
+
         <div class="graph-ctrl-group" style="flex-basis:100%">
           <div class="graph-ctrl-label">
             <span>Stores</span>
-            <button class="graph-toggle-all" onclick="toggleAllGraphStores()">
-              ${allSel ? 'Deselect all' : 'Select all'}
-            </button>
+            <span style="display:flex;gap:12px;align-items:center">
+              <label class="graph-store-check" style="font-weight:600">
+                <input type="checkbox" ${state.graphCombined ? 'checked' : ''}
+                  onchange="state.graphCombined=this.checked;loadGraphData()">
+                <span class="graph-dot" style="background:#e8e8e8"></span>
+                All stores combined
+              </label>
+              <button class="graph-toggle-all" onclick="toggleAllGraphStores()">
+                ${allSel ? 'Deselect all' : 'Select all'}
+              </button>
+            </span>
           </div>
-          <div class="graph-store-checks">${storeChecks}</div>
+          <div class="graph-store-checks" style="${state.graphCombined ? 'opacity:0.4;pointer-events:none' : ''}">${storeChecks}</div>
         </div>
 
       </div>
@@ -3439,6 +3458,76 @@ function toggleAllGraphStores() {
     ? new Set()
     : new Set(STORES.map(s => s.id));
   renderGraphsView();
+}
+
+// ── Graph helpers ────────────────────────────────────────────────────────────────
+
+// Compute raw metric components for a set of items in one bucket.
+// Returns numerators/denominators so combined and trend can aggregate correctly.
+function bucketComponents(items, revMap, bucketKey, metric, costMap, salMap) {
+  if (metric === 'revenue') return { value: revMap?.[bucketKey] || 0, hasData: (revMap?.[bucketKey] || 0) > 0 };
+  if (metric === 'lemonade') {
+    if (!items || !items.length) return { value: 0, hasData: false };
+    const c = computeItemCategories(items);
+    return { value: c.lemUnits, hasData: c.lemUnits > 0 };
+  }
+  if (metric === 'food-cost') {
+    const cost = costMap?.[bucketKey] || 0, rev = revMap?.[bucketKey] || 0;
+    return { num: cost, den: rev, hasData: rev > 0 && cost > 0 };
+  }
+  if (metric === 'salary') {
+    const sal = salMap?.[bucketKey] || 0, rev = revMap?.[bucketKey] || 0;
+    return { num: sal, den: rev, hasData: rev > 0 && sal > 0 };
+  }
+  if (metric === 'rolls') {
+    if (!items || !items.length) return { num: 0, den: 0, hasData: false };
+    const c = computeItemCategories(items);
+    return { num: c.rolls, den: c.rolls + c.kombos, hasData: (c.rolls + c.kombos) > 0 };
+  }
+  if (metric === 'produktmix') {
+    if (!items || !items.length) return { kebab: 0, falafel: 0, hasData: false };
+    const c = computeItemCategories(items);
+    return { kebab: c.kebab, falafel: c.falafel, hasData: (c.kebab + c.falafel) > 0 };
+  }
+  return { value: 0, hasData: false };
+}
+
+// Convert raw components to a display value
+function componentValue(comp, metric, category) {
+  if (!comp || !comp.hasData) return null;
+  if (metric === 'revenue' || metric === 'lemonade') return comp.value || null;
+  if (metric === 'produktmix') {
+    const tot = comp.kebab + comp.falafel;
+    if (tot <= 0) return null;
+    return (category === 'kebab' ? comp.kebab : comp.falafel) / tot * 100;
+  }
+  // ratio metrics (food-cost, salary, rolls)
+  if (comp.den <= 0) return null;
+  return comp.num / comp.den * 100;
+}
+
+// Rolling trend: combine raw components over a window, then compute value
+function rollingTrend(components, windowSize, metric, category) {
+  return components.map((_, i) => {
+    if (i < windowSize - 1) return null;
+    const window = components.slice(i - windowSize + 1, i + 1);
+    if (window.some(c => !c || !c.hasData)) return null;
+    if (metric === 'revenue' || metric === 'lemonade') {
+      return window.reduce((s, c) => s + c.value, 0) / windowSize;
+    }
+    if (metric === 'produktmix') {
+      const tk = window.reduce((s, c) => s + c.kebab, 0);
+      const tf = window.reduce((s, c) => s + c.falafel, 0);
+      const tot = tk + tf;
+      if (tot <= 0) return null;
+      return (category === 'kebab' ? tk : tf) / tot * 100;
+    }
+    // ratio metrics
+    const num = window.reduce((s, c) => s + c.num, 0);
+    const den = window.reduce((s, c) => s + c.den, 0);
+    if (den <= 0) return null;
+    return num / den * 100;
+  });
 }
 
 // ── Graph bucketing helpers ─────────────────────────────────────────────────────
@@ -3530,8 +3619,8 @@ async function loadGraphData() {
   card.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Loading…</div>';
 
   resetSalesDataNotices();
-  const selectedStores = [...state.graphStores];
-  if (!selectedStores.length) {
+  const selectedStores = state.graphCombined ? STORES.map(s => s.id) : [...state.graphStores];
+  if (!selectedStores.length && !state.graphCombined) {
     card.innerHTML = '<div class="empty">Select at least one store.</div>';
     return;
   }
@@ -3581,126 +3670,105 @@ async function loadGraphData() {
 
   if (state.view !== 'graphs') return; // navigated away while fetching
 
-  // ── Build Chart.js datasets ─────────────────────────────────────────────────
+  // ── Pre-compute per-store bucket items and cost maps ────────────────────────
   const isLine = state.graphType === 'line';
-  let datasets;
-
-  if (state.graphMetric === 'produktmix') {
-    const bucketMap = {};
-    for (const storeId of selectedStores) {
-      for (const item of (allItems[storeId] || [])) {
-        const key = itemBucket(item.date, state.graphInterval);
-        if (!key) continue;
-        (bucketMap[key] = bucketMap[key] || []).push(item);
-      }
+  const trendWindow = state.graphInterval === 'monthly' ? 3 : 4;
+  const storeBucketItems = {}; // storeId → { bucketKey: [items] }
+  const storeCostMaps = {};    // storeId → { bucketKey: cost }
+  for (const storeId of selectedStores) {
+    const bm = {};
+    for (const item of (allItems[storeId] || [])) {
+      const key = itemBucket(item.date, state.graphInterval);
+      if (key) (bm[key] = bm[key] || []).push(item);
     }
-    const mkDs = (label, color, getter) => ({
-      label,
-      data: bucketKeys.map(k => {
-        const its = bucketMap[k];
-        if (!its || !its.length) return null;
-        const c = computeItemCategories(its);
-        const tot = c.kebab + c.falafel;
-        return tot > 0 ? getter(c) / tot * 100 : null;
-      }),
+    storeBucketItems[storeId] = bm;
+    if (state.graphMetric === 'food-cost') {
+      const cm = {};
+      for (const inv of (state.invoices || [])) {
+        if (inv.storeId !== storeId) continue;
+        let bk;
+        if (state.graphInterval === 'monthly') bk = inv.month;
+        else { const d = new Date(inv.month + '-01T12:00:00'); const wd = d.getDay(); d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1)); bk = d.toISOString().slice(0, 10); }
+        cm[bk] = (cm[bk] || 0) + inv.amount;
+      }
+      storeCostMaps[storeId] = cm;
+    }
+  }
+
+  // ── Compute raw components per bucket ──────────────────────────────────────
+  // For combined mode: merge items from all stores into one set per bucket.
+  // For individual mode: one set per store per bucket.
+  function storeComponents(storeId) {
+    return bucketKeys.map(k => {
+      const items = storeBucketItems[storeId]?.[k] || [];
+      const salMap = { [k]: (bucketSalaries[k] || {})[storeId] || 0 };
+      return bucketComponents(items.length ? items : null, revByStore[storeId], k, state.graphMetric, storeCostMaps[storeId], salMap);
+    });
+  }
+
+  function combinedComponents() {
+    return bucketKeys.map((k, bi) => {
+      const allBucketItems = selectedStores.flatMap(sid => storeBucketItems[sid]?.[k] || []);
+      const combinedRev = selectedStores.reduce((s, sid) => s + (revByStore[sid]?.[k] || 0), 0);
+      const combinedCost = selectedStores.reduce((s, sid) => s + (storeCostMaps[sid]?.[k] || 0), 0);
+      const combinedSal = selectedStores.reduce((s, sid) => s + ((bucketSalaries[k] || {})[sid] || 0), 0);
+      const revMap = { [k]: combinedRev }, costMap = { [k]: combinedCost }, salMap = { [k]: combinedSal };
+      return bucketComponents(allBucketItems.length ? allBucketItems : null, revMap, k, state.graphMetric, costMap, salMap);
+    });
+  }
+
+  // ── Build Chart.js datasets ─────────────────────────────────────────────────
+  let datasets = [];
+  const smallPt = bucketKeys.length > 45 ? 0 : 3;
+
+  function mkDataset(label, color, data, isTrend) {
+    return {
+      label: isTrend ? label + (trendWindow === 3 ? ' (3M trend)' : ' (4W trend)') : label,
+      data,
       borderColor: color,
-      backgroundColor: isLine ? color + '28' : color + 'bb',
-      borderWidth: isLine ? 2 : 0,
+      backgroundColor: isLine ? color + (isTrend ? '10' : '28') : color + (isTrend ? '66' : 'bb'),
+      borderWidth: isLine ? (isTrend ? 3 : (state.graphTrend ? 1.5 : 2)) : 0,
       borderRadius: isLine ? 0 : 4,
+      borderDash: isTrend ? [] : [],
       tension: 0.35,
-      pointRadius: bucketKeys.length > 45 ? 0 : 3,
-      pointHoverRadius: 5,
+      pointRadius: isTrend ? 0 : smallPt,
+      pointHoverRadius: isTrend ? 4 : 5,
       fill: false,
       spanGaps: true,
+      order: isTrend ? 0 : 1,
+      ...(state.graphTrend && !isTrend ? { borderColor: color + '66' } : {}),
+    };
+  }
+
+  if (state.graphMetric === 'produktmix') {
+    // Produktmix always pools items across selected scope
+    const comps = state.graphCombined ? [combinedComponents()] : selectedStores.map(sid => storeComponents(sid));
+    // Pool all components
+    const pooled = bucketKeys.map((_, bi) => {
+      let kebab = 0, falafel = 0, has = false;
+      for (const c of comps) { if (c[bi]?.hasData) { kebab += c[bi].kebab; falafel += c[bi].falafel; has = true; } }
+      return { kebab, falafel, hasData: has };
     });
-    datasets = [
-      mkDs('Lamb',    '#b30000', c => c.kebab),
-      mkDs('Falafel', '#4ecca3', c => c.falafel),
-    ];
+    for (const [cat, color] of [['kebab', '#b30000'], ['falafel', '#4ecca3']]) {
+      const data = pooled.map(c => componentValue(c, 'produktmix', cat));
+      datasets.push(mkDataset(cat === 'kebab' ? 'Lamb' : 'Falafel', color, data, false));
+      if (state.graphTrend) datasets.push(mkDataset(cat === 'kebab' ? 'Lamb' : 'Falafel', color, rollingTrend(pooled, trendWindow, 'produktmix', cat), true));
+    }
+  } else if (state.graphCombined) {
+    const comps = combinedComponents();
+    const data = comps.map(c => componentValue(c, state.graphMetric));
+    const color = '#e8e8e8';
+    datasets.push(mkDataset('All stores', color, data, false));
+    if (state.graphTrend) datasets.push(mkDataset('All stores', color, rollingTrend(comps, trendWindow, state.graphMetric), true));
   } else {
-    datasets = selectedStores.map(storeId => {
-      const store  = STORES.find(s => s.id === storeId);
-      const color  = GRAPH_STORE_COLORS[storeId] || '#888';
-      const revMap = revByStore[storeId]; // bucketKey → revenue
-
-      let data;
-
-      if (state.graphMetric === 'revenue') {
-        data = bucketKeys.map(k => revMap[k] || null);
-
-      } else if (state.graphMetric === 'food-cost') {
-        // Invoices have month-level granularity; map each invoice to the nearest bucket key
-        const costMap = {};
-        for (const inv of state.invoices) {
-          if (inv.storeId !== storeId) continue;
-          let bk;
-          if (state.graphInterval === 'monthly') {
-            bk = inv.month;
-          } else {
-            // weekly: Monday of the first day of this invoice's month
-            const d = new Date(inv.month + '-01T12:00:00');
-            const wd = d.getDay();
-            d.setDate(d.getDate() - (wd === 0 ? 6 : wd - 1));
-            bk = d.toISOString().slice(0, 10);
-          }
-          costMap[bk] = (costMap[bk] || 0) + inv.amount;
-        }
-        data = bucketKeys.map(k => {
-          const cost = costMap[k] || 0, rev = revMap[k] || 0;
-          return rev > 0 && cost > 0 ? cost / rev * 100 : null;
-        });
-
-      } else if (state.graphMetric === 'salary') {
-        data = bucketKeys.map(k => {
-          const sal = (bucketSalaries[k] || {})[storeId] || 0;
-          const rev = revMap[k] || 0;
-          return rev > 0 && sal > 0 ? sal / rev * 100 : null;
-        });
-
-      } else if (state.graphMetric === 'rolls') {
-        const bucketMap = {};
-        for (const item of (allItems[storeId] || [])) {
-          const key = itemBucket(item.date, state.graphInterval);
-          if (!key) continue;
-          (bucketMap[key] = bucketMap[key] || []).push(item);
-        }
-        data = bucketKeys.map(k => {
-          const its = bucketMap[k];
-          if (!its || !its.length) return null;
-          const c = computeItemCategories(its);
-          const tot = c.rolls + c.kombos;
-          return tot > 0 ? c.rolls / tot * 100 : null;
-        });
-
-      } else if (state.graphMetric === 'lemonade') {
-        const bucketMap = {};
-        for (const item of (allItems[storeId] || [])) {
-          const key = itemBucket(item.date, state.graphInterval);
-          if (!key) continue;
-          (bucketMap[key] = bucketMap[key] || []).push(item);
-        }
-        data = bucketKeys.map(k => {
-          const its = bucketMap[k];
-          if (!its || !its.length) return null;
-          const c = computeItemCategories(its);
-          return c.lemUnits || null;
-        });
-      }
-
-      return {
-        label: store.name,
-        data,
-        borderColor: color,
-        backgroundColor: isLine ? color + '28' : color + 'bb',
-        borderWidth: isLine ? 2 : 0,
-        borderRadius: isLine ? 0 : 4,
-        tension: 0.35,
-        pointRadius: bucketKeys.length > 45 ? 0 : 3,
-        pointHoverRadius: 5,
-        fill: false,
-        spanGaps: true,
-      };
-    });
+    for (const storeId of selectedStores) {
+      const store = STORES.find(s => s.id === storeId);
+      const color = GRAPH_STORE_COLORS[storeId] || '#888';
+      const comps = storeComponents(storeId);
+      const data = comps.map(c => componentValue(c, state.graphMetric));
+      datasets.push(mkDataset(store.name, color, data, false));
+      if (state.graphTrend) datasets.push(mkDataset(store.name, color, rollingTrend(comps, trendWindow, state.graphMetric), true));
+    }
   }
 
   card.innerHTML = '<div class="chart-wrap" style="height:420px"><canvas id="graph-canvas"></canvas></div>';

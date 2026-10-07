@@ -123,3 +123,85 @@ test('fully closed month routes entirely to DB, not hybrid',async()=>{
   {storeSlug:'norrebro',start:'2026-09-01',end:'2026-10-01',today:'2026-10-01'});
  assert.equal(r.source,'database');
 });
+
+// ── Combined and trend graph helpers ─────────────────────────────────────────
+// Extract the pure functions from index.html and test them directly.
+const helperSrc = html.slice(html.indexOf('// ── Graph helpers'), html.indexOf('// ── Graph bucketing helpers'));
+const helperCtx = { window: { ProductMetrics: require('../lib/product-metrics') }, computeItemCategories: null };
+vm.createContext(helperCtx);
+vm.runInContext('function computeItemCategories(items){const m=window.ProductMetrics.computeMetrics(items);return{rolls:m.rollUnits,kombos:m.komboUnits,kebab:m.breakdown.komboLamb+m.breakdown.rollKebab,falafel:m.breakdown.komboFalafel+m.breakdown.rollFalafel,chicken:m.breakdown.komboKylling+m.breakdown.rollKylling,lemUnits:m.lemUnits};}', helperCtx);
+vm.runInContext(helperSrc, helperCtx);
+
+test('combined revenue sums across stores, not averages',()=>{
+  const c = helperCtx.bucketComponents(null, { 'w1': 1000 }, 'w1', 'revenue');
+  assert.equal(c.value, 1000);
+  // Combined: two stores with 1000 each = 2000
+  const c1 = helperCtx.bucketComponents(null, { 'w1': 1000 }, 'w1', 'revenue');
+  const c2 = helperCtx.bucketComponents(null, { 'w1': 1500 }, 'w1', 'revenue');
+  assert.equal(c1.value + c2.value, 2500);
+});
+test('combined rolls % uses total numerators/denominators, not store averages',()=>{
+  // Store A: 60 rolls, 40 kombos → 60%. Store B: 80 rolls, 20 kombos → 80%.
+  // Simple avg would be 70%. Correct combined: 140/(140+60) = 70% (coincidence here).
+  // Use different numbers: A: 10 rolls, 90 kombos (10%). B: 90 rolls, 10 kombos (90%).
+  // Average of store %: 50%. Correct combined: 100/(100+100) = 50% (still coincidence).
+  // Try: A: 10 rolls, 10 kombos (50%). B: 1 roll, 99 kombos (1%).
+  // Average: 25.5%. Correct: 11/120 = 9.17%.
+  const itemsA = [{productid:'27242336',count:10,price:100},{productid:'27242208',count:10,price:100}];
+  const itemsB = [{productid:'27242336',count:1,price:10},{productid:'27242208',count:99,price:990}];
+  const cA = helperCtx.bucketComponents(itemsA, {}, 'w1', 'rolls');
+  const cB = helperCtx.bucketComponents(itemsB, {}, 'w1', 'rolls');
+  // Combined: num=10+1=11, den=(10+10)+(1+99)=120
+  const combined = { num: cA.num + cB.num, den: cA.den + cB.den, hasData: true };
+  const pct = helperCtx.componentValue(combined, 'rolls');
+  assert(Math.abs(pct - 11/120*100) < 0.01, 'combined rolls % = 9.17%, not 25.5%');
+});
+test('rolling trend uses correct window and combines ratio numerators',()=>{
+  const comps = [
+    { num: 10, den: 100, hasData: true },
+    { num: 20, den: 100, hasData: true },
+    { num: 30, den: 100, hasData: true },
+    { num: 40, den: 100, hasData: true },
+  ];
+  const trend = helperCtx.rollingTrend(comps, 4, 'rolls');
+  assert.equal(trend[0], null); assert.equal(trend[1], null); assert.equal(trend[2], null);
+  // Window 4: (10+20+30+40)/(100+100+100+100) = 100/400 = 25%
+  assert.equal(trend[3], 25);
+});
+test('rolling trend for revenue averages bucket totals',()=>{
+  const comps = [
+    { value: 1000, hasData: true },
+    { value: 2000, hasData: true },
+    { value: 3000, hasData: true },
+  ];
+  const trend = helperCtx.rollingTrend(comps, 3, 'revenue');
+  assert.equal(trend[0], null); assert.equal(trend[1], null);
+  assert.equal(trend[2], 2000); // (1000+2000+3000)/3
+});
+test('produktmix trend combines kebab+falafel counts before calculating share',()=>{
+  const comps = [
+    { kebab: 80, falafel: 20, hasData: true },
+    { kebab: 60, falafel: 40, hasData: true },
+    { kebab: 70, falafel: 30, hasData: true },
+  ];
+  const lambTrend = helperCtx.rollingTrend(comps, 3, 'produktmix', 'kebab');
+  // Combined: (80+60+70) / (80+60+70 + 20+40+30) = 210/300 = 70%
+  assert.equal(lambTrend[2], 70);
+});
+test('missing bucket in trend window produces null, not zero',()=>{
+  const comps = [
+    { value: 100, hasData: true },
+    { value: 0, hasData: false }, // missing
+    { value: 300, hasData: true },
+  ];
+  const trend = helperCtx.rollingTrend(comps, 3, 'revenue');
+  assert.equal(trend[2], null, 'missing data prevents trend calculation');
+});
+test('lemonade combined sums units across stores',()=>{
+  const PM = require('../lib/product-metrics');
+  const items1 = [{productid: PM.PRODUCT_IDS.LEM_ADDON, count: 10, price: 0}];
+  const items2 = [{productid: PM.PRODUCT_IDS.LEM_UPGRADE, count: 5, price: 50}];
+  const c1 = helperCtx.bucketComponents(items1, {}, 'w1', 'lemonade');
+  const c2 = helperCtx.bucketComponents(items2, {}, 'w1', 'lemonade');
+  assert.equal(c1.value + c2.value, 15);
+});
