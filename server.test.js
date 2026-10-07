@@ -193,7 +193,6 @@ describe('Source and data path blocking', () => {
   const blockedPaths = [
     '/server.js', '/package.json', '/package-lock.json',
     '/.gitignore', '/.env', '/.mcp.json',
-    '/data/lemonade-history.json',
     '/%2e%2e%2fserver.js', '/..%2Fserver.js', '/%2e%2e/server.js',
   ];
 
@@ -261,8 +260,6 @@ describe('Unauthenticated access to business routes is denied', () => {
     '/api/planday/salaries/2026-01-01/2026-01-07',
     '/api/katering-recipes',
     '/api/meat',
-    '/api/lemonade/today',
-    '/api/lemonade/history',
   ];
 
   for (const p of protectedGets) {
@@ -275,7 +272,6 @@ describe('Unauthenticated access to business routes is denied', () => {
   const protectedPosts = [
     ['/api/meat',             []],
     ['/api/katering-recipes', {}],
-    ['/api/lemonade/history', []],
     ['/api/scan-invoice',     { base64: 'abc', mediaType: 'image/jpeg' }],
     ['/api/auth/logout',      {}],
   ];

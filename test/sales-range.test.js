@@ -921,10 +921,10 @@ describe('sales-range — existing endpoints unaffected', () => {
     assert.equal(r.status, 404);
   });
 
-  test('GET /api/lemonade/today still requires authentication', async () => {
+  test('GET /api/lemonade/today returns 404 (route removed)', async () => {
     resetMock();
     const r = await request({ path: '/api/lemonade/today' });
-    assert.equal(r.status, 401);
+    assert.equal(r.status, 404);
   });
 
   test('GET /api/health still returns 200 without auth', async () => {

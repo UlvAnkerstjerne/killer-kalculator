@@ -1066,10 +1066,6 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
           Killer Catering
         </button>
-        <button class="nav-btn" data-view="lemonade" onclick="setView('lemonade')">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 2h8l1 6H7L8 2z"/><path d="M7 8c0 8 10 8 10 0"/><line x1="12" y1="8" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
-          Lemonade
-        </button>
       </div>
 
       <div class="sidebar-section-label">Stores</div>
@@ -1122,13 +1118,11 @@ const state = {
   kateringRecipes: null,
   kateringTab: 'beregner',
   editingInvoiceId: null,
-  lemonadeToday: null,
   invoiceSupFrom: null,
   invoiceSupTo: null,
 };
 
 const charts = {};
-let lemonadeRefreshInterval = null;
 
 // ── Persistence ────────────────────────────────────────────────────────────────
 function loadInvoices() {
@@ -2044,20 +2038,6 @@ function renderProductMix(el, items) {
   el.innerHTML = html;
 }
 
-// ── Lemonade today cache helper ────────────────────────────────────────────────
-async function getLemonadeToday() {
-  if (state.lemonadeToday) return state.lemonadeToday;
-  try {
-    const r = await apiFetch('/api/lemonade/today');
-    if (!r) return null;
-    state.lemonadeToday = await r.json();
-  } catch (e) {
-    state.lemonadeToday = null;
-  }
-  return state.lemonadeToday;
-}
-
-const PERIODS_WITH_TODAY = ['today', 'this-week', 'this-month', 'this-year'];
 
 // ── Chain view ─────────────────────────────────────────────────────────────────
 // Preserved across render attempts so a failed re-render can restore the last
@@ -2258,21 +2238,6 @@ async function renderChainView() {
 
   // Snapshot so a later failed re-render can restore current progress.
   _chainLastRender = main.innerHTML;
-
-  // Lemonade card (always fire-and-forget; guarded by gen check)
-  if (PERIODS_WITH_TODAY.includes(state.period)) {
-    getLemonadeToday().then(d => {
-      if (_chainRenderGen !== gen) return;
-      const el = document.getElementById('chain-kpis');
-      if (!el || !d) return;
-      el.insertAdjacentHTML('beforeend', `
-        <div class="card">
-          <div class="card-title">Lemonade today</div>
-          <div class="metric-val">${d.total != null ? d.total : '—'}</div>
-          <div class="metric-sub">Chain total today</div>
-        </div>`);
-    });
-  }
 
   // ── Phase 1b: per-store lines (Wolt%, top items, product mix) ────────────────
   const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
@@ -2508,22 +2473,6 @@ async function renderStoreView(storeId) {
       <div class="metric-sub">Loading wage data…</div>
     </div>
   `;
-
-  // Lemonade card (always fire-and-forget; guarded by gen check)
-  if (PERIODS_WITH_TODAY.includes(state.period)) {
-    getLemonadeToday().then(d => {
-      if (_storeRenderGen !== gen) return;
-      const el = document.getElementById('store-kpis');
-      if (!el || !d) return;
-      const cnt = (d.stores && d.stores[storeId] != null) ? d.stores[storeId] : '—';
-      el.insertAdjacentHTML('beforeend', `
-        <div class="card">
-          <div class="card-title">Lemonade today</div>
-          <div class="metric-val">${cnt}</div>
-          <div class="metric-sub">Sold today</div>
-        </div>`);
-    });
-  }
 
   // ── Phase 1b: detailed sales lines (channels, top items, mix, heatmap) ───────
   const { start: salesStart, end: salesEnd } = getCphDateRange(state.period);
@@ -4233,150 +4182,7 @@ async function renderKateringView() {
   else renderKateringBeregnerTab();
 }
 
-// ── Lemonade tracking view ─────────────────────────────────────────────────────
-async function renderLemonadeView() {
-  const main = document.getElementById('main');
-
-  main.innerHTML = `
-    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
-      <div class="page-title" style="font-family:var(--brand);font-size:22px;color:var(--red)">Killer Lemonade</div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:12px">Live Today</div>
-      <div id="lemonade-today-wrap">
-        <div class="spinner-wrap"><div class="spinner"></div> Loading…</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="section-title" style="margin-bottom:12px">History</div>
-      <div id="lemonade-history-wrap">
-        <div class="spinner-wrap"><div class="spinner"></div> Loading history…</div>
-      </div>
-    </div>`;
-
-  async function loadToday() {
-    const wrap = document.getElementById('lemonade-today-wrap');
-    if (!wrap) return;
-    try {
-      const r = await apiFetch('/api/lemonade/today');
-      if (!r) return;
-      const d = await r.json();
-      recordSalesDataStatus(d.meta);
-      let html = '<div class="kpi-grid">';
-      for (const s of STORES) {
-        const cnt = (d.stores && d.stores[s.id] != null) ? d.stores[s.id] : '—';
-        html += `<div class="kpi-card"><div class="kpi-label">${s.name}</div><div class="kpi-value">${cnt}</div></div>`;
-      }
-      html += `<div class="kpi-card" style="border-color:var(--red)"><div class="kpi-label">Total</div><div class="kpi-value" style="color:var(--red)">${d.total != null ? d.total : '—'}</div></div>`;
-      html += '</div>';
-      wrap.innerHTML = html;
-    } catch (e) {
-      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Failed to load data: ${e.message}</div>`;
-    }
-  }
-
-  async function loadHistory() {
-    const wrap = document.getElementById('lemonade-history-wrap');
-    if (!wrap) return;
-    try {
-      const r = await apiFetch('/api/lemonade/history');
-      if (!r) return;
-      const history = await r.json();
-
-      if (!history.length) {
-        wrap.innerHTML = '<div style="color:var(--muted)">No history yet.</div>';
-        return;
-      }
-
-      const storeIds = STORES.map(s => s.id);
-      const storeNames = STORES.map(s => s.name);
-
-      let tableHtml = `<div style="overflow-x:auto;margin-bottom:24px"><table class="inv-table" style="width:100%">
-        <thead><tr>
-          <th>Date</th>
-          ${storeNames.map(n => `<th style="text-align:right">${n}</th>`).join('')}
-          <th style="text-align:right">Total</th>
-        </tr></thead>
-        <tbody>`;
-
-      const labels = [];
-      const totals = [];
-      const storeSeries = {};
-      for (const sid of storeIds) storeSeries[sid] = [];
-
-      for (const row of history) {
-        labels.push(row.date);
-        totals.push(row.total || 0);
-        for (const sid of storeIds) storeSeries[sid].push(row.stores ? (row.stores[sid] || 0) : 0);
-        tableHtml += `<tr>
-          <td>${row.date}</td>
-          ${storeIds.map(sid => `<td style="text-align:right">${row.stores ? (row.stores[sid] ?? '—') : '—'}</td>`).join('')}
-          <td style="text-align:right;font-weight:600">${row.total != null ? row.total : '—'}</td>
-        </tr>`;
-      }
-      tableHtml += '</tbody></table></div>';
-
-      const colors = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
-      const datasets = storeIds.map((sid, i) => ({
-        label: storeNames[i],
-        data: storeSeries[sid],
-        borderColor: colors[i % colors.length],
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 3,
-      }));
-      datasets.push({
-        label: 'Total',
-        data: totals,
-        borderColor: '#FFD700',
-        backgroundColor: '#FFD70028',
-        borderWidth: 3,
-        tension: 0.3,
-        pointRadius: 4,
-        borderDash: [5,3],
-      });
-
-      wrap.innerHTML = tableHtml + `<div class="chart-wrap" style="height:280px"><canvas id="lemonade-chart"></canvas></div>`;
-
-      makeChart('lemonade-chart', {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#f0f0f0', font: { size: 11 } } } },
-          scales: {
-            x: { ticks: { color: '#787878', font: { size: 10 } }, grid: { color: '#2c2c2c' } },
-            y: { ticks: { color: '#787878', font: { size: 10 } }, grid: { color: '#2c2c2c' }, beginAtZero: true }
-          }
-        }
-      });
-    } catch (e) {
-      if (wrap) wrap.innerHTML = `<div style="color:var(--muted)">Failed to load history: ${e.message}</div>`;
-    }
-  }
-
-  await Promise.all([loadToday(), loadHistory()]);
-
-  if (lemonadeRefreshInterval) clearInterval(lemonadeRefreshInterval);
-  lemonadeRefreshInterval = setInterval(() => {
-    if (state.view === 'lemonade') {
-      loadToday();
-    } else {
-      clearInterval(lemonadeRefreshInterval);
-      lemonadeRefreshInterval = null;
-    }
-  }, 5 * 60 * 1000);
-}
-
 function renderMain() {
-  if (lemonadeRefreshInterval && state.view !== 'lemonade') {
-    clearInterval(lemonadeRefreshInterval);
-    lemonadeRefreshInterval = null;
-  }
   updateNav();
   if (state.view === 'chain') {
     renderChainView();
@@ -4390,8 +4196,6 @@ function renderMain() {
     renderGraphsView();
   } else if (state.view === 'katering') {
     renderKateringView();
-  } else if (state.view === 'lemonade') {
-    renderLemonadeView();
   }
 }
 
@@ -4430,12 +4234,7 @@ function onSessionExpired(message) {
   _salesInFlight.clear(); // Abandon all in-flight requests
   _revenueSummaryCache.clear();
   _revenueSummaryInFlight.clear();
-  state.lemonadeToday = null;
   state.meat = [];
-  if (lemonadeRefreshInterval) {
-    clearInterval(lemonadeRefreshInterval);
-    lemonadeRefreshInterval = null;
-  }
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('username').value = '';
