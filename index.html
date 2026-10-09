@@ -1058,6 +1058,10 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
           Graphs
         </button>
+        <button class="nav-btn" data-view="records" onclick="setView('records')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M8 13l-2 9 6-3 6 3-2-9"/></svg>
+          Records
+        </button>
         <button class="nav-btn" data-view="meat" onclick="setView('meat')">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
           Meat Tracking
@@ -1120,6 +1124,8 @@ const state = {
   editingInvoiceId: null,
   invoiceSupFrom: null,
   invoiceSupTo: null,
+  recordsQuestion: '',
+  recordsResponse: null,
 };
 
 const charts = {};
@@ -4182,6 +4188,84 @@ async function renderKateringView() {
   else renderKateringBeregnerTab();
 }
 
+const RECORD_PROMPTS = [
+  'Best day ever in Frederiksberg',
+  'Best Monday across the chain',
+  'Top 5 Fridays across the chain',
+  'Top 10 days in Nørrebro',
+];
+
+function recordsKr(value) {
+  return new Intl.NumberFormat('da-DK', { maximumFractionDigits: 0 }).format(value) + ' kr';
+}
+
+function recordsDate(date) {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Copenhagen' })
+    .format(new Date(date + 'T12:00:00Z'));
+}
+
+function renderRecordsResults(response) {
+  if (!response) return '';
+  if (response.error) return `<div style="margin-top:18px;padding:16px;border:1px solid #7b2d2d;background:#281717;color:#ff8d8d;border-radius:8px">${escHtml(response.error)}</div>`;
+  if (!response.results.length) return '<div style="margin-top:18px;color:var(--muted)">No completed sales days matched that question.</div>';
+  const scope = response.query.scope === 'chain' ? 'All six stores' : response.query.store.name;
+  const rows = response.results.map((result, index) => `
+    <div style="padding:18px 0;${index ? 'border-top:1px solid #2c2c2c' : ''}">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div><span style="color:var(--muted);font-size:12px;margin-right:10px">#${index + 1}</span><b>${recordsDate(result.date)}</b></div>
+        <div style="font-size:22px;font-weight:800;color:#fff">${recordsKr(result.revenueExVat)}</div>
+      </div>
+      ${response.query.scope === 'chain' ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:13px">
+        ${result.stores.map(store => `<div style="background:#191919;border:1px solid #2c2c2c;border-radius:6px;padding:9px 11px"><div style="font-size:11px;color:var(--muted)">${escHtml(store.name)}</div><b>${recordsKr(store.revenueExVat)}</b></div>`).join('')}
+      </div>` : ''}
+    </div>`).join('');
+  return `<div style="margin-top:20px;border:1px solid #2c2c2c;border-radius:9px;padding:4px 18px 8px;background:#131313">
+    <div style="padding:14px 0 7px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">${scope} · Revenue ex VAT · Completed days only</div>${rows}</div>`;
+}
+
+function renderRecordsView() {
+  const main = document.getElementById('main');
+  main.innerHTML = `<div class="view-header"><div><h2>Records</h2><div style="color:var(--muted);margin-top:5px">Ask the Kalculator about your best revenue days.</div></div></div>
+    <div style="max-width:850px">
+      <form onsubmit="askRecords(event)" style="display:flex;gap:9px;align-items:stretch">
+        <input id="records-question" maxlength="200" value="${escHtml(state.recordsQuestion).replace(/"/g, '&quot;')}" placeholder="e.g. Best Monday across the chain" style="flex:1;min-width:0;background:#151515;color:#fff;border:1px solid #3b3b3b;border-radius:7px;padding:13px 14px;font-size:15px">
+        <button id="records-submit" type="submit" style="background:#b30000;color:#fff;border:0;border-radius:7px;padding:0 20px;font-weight:700;cursor:pointer">Ask</button>
+      </form>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px">
+        ${RECORD_PROMPTS.map(prompt => `<button onclick="useRecordsPrompt('${prompt.replace(/'/g, "\\'")}')" style="background:#1a1a1a;color:#aaa;border:1px solid #343434;border-radius:999px;padding:7px 11px;cursor:pointer;font-size:12px">${prompt}</button>`).join('')}
+      </div>
+      <div id="records-output">${renderRecordsResults(state.recordsResponse)}</div>
+      <div style="margin-top:18px;color:#666;font-size:12px;line-height:1.55">“Across the chain” means the same calendar date summed across all six stores. Today and incomplete days are excluded. “Best” means revenue excluding VAT.</div>
+    </div>`;
+}
+
+function useRecordsPrompt(prompt) {
+  state.recordsQuestion = prompt;
+  renderRecordsView();
+  document.getElementById('records-question').focus();
+}
+
+async function askRecords(event) {
+  event.preventDefault();
+  const input = document.getElementById('records-question');
+  const button = document.getElementById('records-submit');
+  const question = input.value.trim();
+  if (!question) return;
+  state.recordsQuestion = question;
+  button.disabled = true;
+  button.textContent = 'Checking…';
+  document.getElementById('records-output').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Checking completed days…</div>';
+  try {
+    const res = await apiFetch('/api/records/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
+    if (!res) return;
+    const data = await res.json();
+    state.recordsResponse = res.ok ? data : { error: data.error || 'Could not answer that question.' };
+  } catch {
+    state.recordsResponse = { error: 'Records are temporarily unavailable.' };
+  }
+  if (state.view === 'records') renderRecordsView();
+}
+
 function renderMain() {
   updateNav();
   if (state.view === 'chain') {
@@ -4194,6 +4278,8 @@ function renderMain() {
     renderMeatView();
   } else if (state.view === 'graphs') {
     renderGraphsView();
+  } else if (state.view === 'records') {
+    renderRecordsView();
   } else if (state.view === 'katering') {
     renderKateringView();
   }
