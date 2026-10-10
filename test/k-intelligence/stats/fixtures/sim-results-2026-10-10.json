@@ -1,0 +1,269 @@
+{
+ "config": {
+  "alpha": 0.05,
+  "fprLimit": 0.07,
+  "tieMargin": 0.02,
+  "nullReps": 2000,
+  "powerReps": 1000,
+  "bootstrapReps": 199,
+  "minSegment": 8,
+  "sizes": [
+   52,
+   90
+  ],
+  "shiftStart": 0.4,
+  "seedBase": 20261010
+ },
+ "results": {
+  "null n=52 AR1 phi=0": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.057,
+    "B": 0.052,
+    "C1": 0.034,
+    "C2": 0.075
+   }
+  },
+  "null n=52 AR1 phi=0.3": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.0585,
+    "B": 0.0525,
+    "C1": 0.0225,
+    "C2": 0.09
+   }
+  },
+  "null n=52 AR1 phi=0.6": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.069,
+    "B": 0.049,
+    "C1": 0.0235,
+    "C2": 0.1285
+   }
+  },
+  "null n=52 AR2(.5,.2) t4": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.1565,
+    "B": 0.1135,
+    "C1": 0.085,
+    "C2": 0.2835
+   }
+  },
+  "null n=90 AR1 phi=0": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.0465,
+    "B": 0.0455,
+    "C1": 0.0355,
+    "C2": 0.059
+   }
+  },
+  "null n=90 AR1 phi=0.3": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.0445,
+    "B": 0.041,
+    "C1": 0.0305,
+    "C2": 0.0685
+   }
+  },
+  "null n=90 AR1 phi=0.6": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.07,
+    "B": 0.06,
+    "C1": 0.0365,
+    "C2": 0.1185
+   }
+  },
+  "null n=90 AR2(.5,.2) t4": {
+   "kind": "null",
+   "reps": 2000,
+   "rates": {
+    "A": 0.1305,
+    "B": 0.111,
+    "C1": 0.117,
+    "C2": 0.2555
+   }
+  },
+  "trend n=52 0.5SD": {
+   "kind": "trend",
+   "reps": 1000,
+   "rates": {
+    "A": 0.118,
+    "B": 0.096,
+    "C1": 0.061,
+    "C2": 0.15
+   }
+  },
+  "trend n=52 1SD": {
+   "kind": "trend",
+   "reps": 1000,
+   "rates": {
+    "A": 0.3,
+    "B": 0.248,
+    "C1": 0.149,
+    "C2": 0.351
+   }
+  },
+  "shift n=52 0.5SD": {
+   "kind": "shift",
+   "reps": 1000,
+   "rates": {
+    "A": 0.159,
+    "B": 0.127,
+    "C1": 0.084,
+    "C2": 0.217
+   }
+  },
+  "shift n=52 1SD": {
+   "kind": "shift",
+   "reps": 1000,
+   "rates": {
+    "A": 0.437,
+    "B": 0.315,
+    "C1": 0.266,
+    "C2": 0.571
+   }
+  },
+  "trend n=90 0.5SD": {
+   "kind": "trend",
+   "reps": 1000,
+   "rates": {
+    "A": 0.167,
+    "B": 0.16,
+    "C1": 0.103,
+    "C2": 0.179
+   }
+  },
+  "trend n=90 1SD": {
+   "kind": "trend",
+   "reps": 1000,
+   "rates": {
+    "A": 0.461,
+    "B": 0.411,
+    "C1": 0.275,
+    "C2": 0.452
+   }
+  },
+  "shift n=90 0.5SD": {
+   "kind": "shift",
+   "reps": 1000,
+   "rates": {
+    "A": 0.263,
+    "B": 0.226,
+    "C1": 0.16,
+    "C2": 0.291
+   }
+  },
+  "shift n=90 1SD": {
+   "kind": "shift",
+   "reps": 1000,
+   "rates": {
+    "A": 0.699,
+    "B": 0.61,
+    "C1": 0.58,
+    "C2": 0.775
+   }
+  }
+ },
+ "selection": {
+  "trend": {
+   "winner": null,
+   "reason": "no candidate passed the FPR limit in every null cell",
+   "verdicts": {
+    "A": {
+     "maxFpr": 0.1565,
+     "violations": [
+      {
+       "cell": "null n=52 AR2(.5,.2) t4",
+       "rate": 0.1565
+      },
+      {
+       "cell": "null n=90 AR2(.5,.2) t4",
+       "rate": 0.1305
+      }
+     ],
+     "passes": false,
+     "meanPower": 0.2615
+    },
+    "B": {
+     "maxFpr": 0.1135,
+     "violations": [
+      {
+       "cell": "null n=52 AR2(.5,.2) t4",
+       "rate": 0.1135
+      },
+      {
+       "cell": "null n=90 AR2(.5,.2) t4",
+       "rate": 0.111
+      }
+     ],
+     "passes": false,
+     "meanPower": 0.22875
+    }
+   }
+  },
+  "changePoint": {
+   "winner": null,
+   "reason": "no candidate passed the FPR limit in every null cell",
+   "verdicts": {
+    "C1": {
+     "maxFpr": 0.117,
+     "violations": [
+      {
+       "cell": "null n=52 AR2(.5,.2) t4",
+       "rate": 0.085
+      },
+      {
+       "cell": "null n=90 AR2(.5,.2) t4",
+       "rate": 0.117
+      }
+     ],
+     "passes": false,
+     "meanPower": 0.27249999999999996
+    },
+    "C2": {
+     "maxFpr": 0.2835,
+     "violations": [
+      {
+       "cell": "null n=52 AR1 phi=0",
+       "rate": 0.075
+      },
+      {
+       "cell": "null n=52 AR1 phi=0.3",
+       "rate": 0.09
+      },
+      {
+       "cell": "null n=52 AR1 phi=0.6",
+       "rate": 0.1285
+      },
+      {
+       "cell": "null n=52 AR2(.5,.2) t4",
+       "rate": 0.2835
+      },
+      {
+       "cell": "null n=90 AR1 phi=0.6",
+       "rate": 0.1185
+      },
+      {
+       "cell": "null n=90 AR2(.5,.2) t4",
+       "rate": 0.2555
+      }
+     ],
+     "passes": false,
+     "meanPower": 0.4635
+    }
+   }
+  }
+ }
+}
