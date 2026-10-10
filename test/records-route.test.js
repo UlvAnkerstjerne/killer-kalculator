@@ -15,8 +15,9 @@ require.cache[require.resolve('../lib/sales-read-source')] = { exports: { create
   async records(query, today) {
     if (databaseError) throw databaseError;
     received = { query, today };
-    return [{ date: '2026-09-21', weekdayIso: 1, revenueExVat: 600,
-      stores: [{ slug: 'norrebro', name: 'Nørrebro', revenueExVat: 100 }] }];
+    return { results: [{ date: '2026-09-21', weekdayIso: 1, revenueExVat: 600,
+      stores: [{ slug: 'norrebro', name: 'Nørrebro', revenueExVat: 100 }] }],
+      coverage: { eligiblePeriods: 1, cutoffExclusive: today, excludedPeriods: 2 } };
   },
 }) } };
 
@@ -48,8 +49,23 @@ test('records endpoint returns structured database results', async () => {
   assert.equal(body.meta.source, 'database');
   assert.equal(body.meta.todayExcluded, true);
   assert.equal(body.results[0].revenueExVat, 600);
+  assert.equal(body.meta.coverage.excludedPeriods, 2);
   assert.equal(received.query.weekday.iso, 1);
   assert.match(received.today, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('records endpoint passes period and lunch scope through with coverage metadata', async () => {
+  for (const [question, period, daypart] of [
+    ['Best week in Vesterbro', 'week', 'full-day'], ['Top 10 months in Nørrebro', 'month', 'full-day'],
+    ['Best Friday lunch across the chain', 'day', 'lunch'],
+  ]) {
+    const response = await fetch(url + '/api/records/query', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie, 'X-CSRF-Token': csrf }, body: JSON.stringify({ question }) });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(received.query.period, period); assert.equal(received.query.daypart, daypart);
+    assert.equal(body.meta.coverage.eligiblePeriods, 1);
+  }
 });
 
 test('records endpoint rejects unsupported questions before database access', async () => {

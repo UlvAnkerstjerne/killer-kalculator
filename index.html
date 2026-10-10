@@ -4193,6 +4193,13 @@ const RECORD_PROMPTS = [
   'Best Monday across the chain',
   'Top 5 Fridays across the chain',
   'Top 10 days in Nørrebro',
+  'Best week ever across the chain',
+  'Best month ever across the chain',
+  'Best lunch ever in Frederiksberg',
+  'Best Friday lunch across the chain',
+  'Top 5 weeks across the chain',
+  'Top 10 months in Nørrebro',
+  'Best week in Vesterbro',
 ];
 
 function recordsKr(value) {
@@ -4204,15 +4211,52 @@ function recordsDate(date) {
     .format(new Date(date + 'T12:00:00Z'));
 }
 
+function recordsPeriodLabel(result, query) {
+  if (query.period === 'month') return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Europe/Copenhagen' })
+    .format(new Date(result.periodStart + 'T12:00:00Z'));
+  if (query.period === 'week') return recordsDate(result.periodStart) + ' – ' + recordsDate(result.periodEnd);
+  return recordsDate(result.date) + (query.daypart === 'lunch' ? ' · Lunch' : '');
+}
+
+function renderRecordsCoverage(response) {
+  const coverage = response.meta?.coverage;
+  if (!coverage) return '';
+  const unit = response.query.period || 'day';
+  const labels = {
+    missingCoverage: 'missing store-day coverage', unverifiedCoverage: 'unverified or pending store-day coverage',
+    invalidObservation: 'invalid coverage observation time', timestampUncertainty: 'uncertain transaction timestamps',
+    factsMismatch: 'transaction totals do not match verified day totals', noSales: 'no recorded sales for this store-day',
+  };
+  const reasons = Object.entries(coverage.exclusions).map(([code, counts]) =>
+    `${counts.periods} ${unit}${counts.periods === 1 ? '' : 's'} with ${labels[code] || code}`).join('; ');
+  const names = Object.fromEntries(coverage.stores.map(s => [s.slug, s.name]));
+  return `<div style="margin-top:16px;padding:15px 18px;border:1px solid #343434;border-radius:8px;color:var(--muted);font-size:12px;line-height:1.65">
+    <b style="color:#ddd">Historical coverage</b>
+    <div>${coverage.historyFrom ? `Stored history: ${recordsDate(coverage.historyFrom)} – ${recordsDate(coverage.historyThrough)}.` : 'No stored historical coverage is available for this scope.'}</div>
+    <div>${coverage.eligiblePeriods} eligible ${unit}${coverage.eligiblePeriods === 1 ? '' : 's'} out of ${coverage.consideredPeriods} completed calendar ${unit}${coverage.consideredPeriods === 1 ? '' : 's'} checked${response.query.weekday ? ` (${escHtml(response.query.weekday.name)} only)` : ''}.
+      ${coverage.eligibleFrom ? `Eligible span: ${recordsDate(coverage.eligibleFrom)} – ${recordsDate(coverage.eligibleThrough)}; gaps are excluded.` : ''}</div>
+    <div>The current unfinished ${unit} and future dates are excluded. Only periods ending before ${recordsDate(coverage.cutoffExclusive)} can rank.</div>
+    ${coverage.excludedPeriods ? `<div style="color:#d6b879;margin-top:6px">${coverage.excludedPeriods} ${unit}${coverage.excludedPeriods === 1 ? '' : 's'} excluded: ${escHtml(reasons)}. Reasons can overlap.</div>` : ''}
+    ${coverage.timing ? `<div style="margin-top:6px">Lunch includes recorded sales before 16:00 Copenhagen time; transactions at 16:00 or later are excluded. Only unambiguous payment timestamps qualify. A date with any missing, fallback or DST-ambiguous transaction time is excluded (${coverage.timing.uncertainLines} uncertain lines across covered dates checked).</div>` : ''}
+    <div style="margin-top:6px">Records rank the available verified history, not dates before that history. Missing days are never treated as zero; verified closed days contribute zero to complete periods.</div>
+    <details style="margin-top:8px"><summary style="cursor:pointer">Coverage by store and excluded periods</summary>
+      ${coverage.stores.map(s => `<div style="margin-top:5px"><b>${escHtml(s.name)}</b>: ${s.historyFrom ? `${recordsDate(s.historyFrom)} – ${recordsDate(s.historyThrough)}` : 'no stored history'}; ${s.eligibleDays} eligible days for this ranking.</div>`).join('')}
+      ${coverage.excludedExamples.map(p => `<div style="margin-top:8px">${recordsDate(p.periodStart)}${p.periodEnd !== p.periodStart ? ` – ${recordsDate(p.periodEnd)}` : ''}: ${p.reasons.map(r => `${escHtml(labels[r.code] || r.code)} — ${escHtml(r.stores.map(slug => names[slug] || slug).join(', '))} (${r.storeDays} store-days)`).join('; ')}.</div>`).join('')}
+      ${coverage.excludedExamplesOmitted ? `<div style="margin-top:6px">${coverage.excludedExamplesOmitted} more excluded periods; all are included in the counts above.</div>` : ''}
+    </details>
+  </div>`;
+}
+
 function renderRecordsResults(response) {
   if (!response) return '';
   if (response.error) return `<div style="margin-top:18px;padding:16px;border:1px solid #7b2d2d;background:#281717;color:#ff8d8d;border-radius:8px">${escHtml(response.error)}</div>`;
-  if (!response.results.length) return '<div style="margin-top:18px;color:var(--muted)">No completed sales days matched that question.</div>';
+  const coverage = renderRecordsCoverage(response);
+  if (!response.results.length) return '<div style="margin-top:18px;color:var(--muted)">No eligible complete periods matched that question.</div>' + coverage;
   const scope = response.query.scope === 'chain' ? 'All six stores' : response.query.store.name;
   const rows = response.results.map((result, index) => `
     <div style="padding:18px 0;${index ? 'border-top:1px solid #2c2c2c' : ''}">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div><span style="color:var(--muted);font-size:12px;margin-right:10px">#${index + 1}</span><b>${recordsDate(result.date)}</b></div>
+        <div><span style="color:var(--muted);font-size:12px;margin-right:10px">#${index + 1}</span><b>${recordsPeriodLabel(result, response.query)}</b></div>
         <div style="font-size:22px;font-weight:800;color:#fff">${recordsKr(result.revenueExVat)}</div>
       </div>
       ${response.query.scope === 'chain' ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:13px">
@@ -4220,12 +4264,12 @@ function renderRecordsResults(response) {
       </div>` : ''}
     </div>`).join('');
   return `<div style="margin-top:20px;border:1px solid #2c2c2c;border-radius:9px;padding:4px 18px 8px;background:#131313">
-    <div style="padding:14px 0 7px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">${scope} · Revenue ex VAT · Completed days only</div>${rows}</div>`;
+    <div style="padding:14px 0 7px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">${escHtml(scope)} · Revenue ex VAT · Complete ${response.query.period || 'day'}s${response.query.daypart === 'lunch' ? ' · Lunch before 16:00' : ''}</div>${rows}</div>${coverage}`;
 }
 
 function renderRecordsView() {
   const main = document.getElementById('main');
-  main.innerHTML = `<div class="view-header"><div><h2>Records</h2><div style="color:var(--muted);margin-top:5px">Ask the Kalculator about your best revenue days.</div></div></div>
+  main.innerHTML = `<div class="view-header"><div><h2>Records</h2><div style="color:var(--muted);margin-top:5px">Ask the Kalculator about your best revenue days, weeks, months and lunches.</div></div></div>
     <div style="max-width:850px">
       <form onsubmit="askRecords(event)" style="display:flex;gap:9px;align-items:stretch">
         <input id="records-question" maxlength="200" value="${escHtml(state.recordsQuestion).replace(/"/g, '&quot;')}" placeholder="e.g. Best Monday across the chain" style="flex:1;min-width:0;background:#151515;color:#fff;border:1px solid #3b3b3b;border-radius:7px;padding:13px 14px;font-size:15px">
@@ -4235,7 +4279,7 @@ function renderRecordsView() {
         ${RECORD_PROMPTS.map(prompt => `<button onclick="useRecordsPrompt('${prompt.replace(/'/g, "\\'")}')" style="background:#1a1a1a;color:#aaa;border:1px solid #343434;border-radius:999px;padding:7px 11px;cursor:pointer;font-size:12px">${prompt}</button>`).join('')}
       </div>
       <div id="records-output">${renderRecordsResults(state.recordsResponse)}</div>
-      <div style="margin-top:18px;color:#666;font-size:12px;line-height:1.55">“Across the chain” means the same calendar date summed across all six stores. Today and incomplete days are excluded. “Best” means revenue excluding VAT.</div>
+      <div style="margin-top:18px;color:#666;font-size:12px;line-height:1.55">“Across the chain” means the same calendar period across all six stores, with every day covered. Weeks run Monday–Sunday; months follow the Copenhagen calendar. Lunch ranks individual dates before 16:00. Unfinished periods and incomplete coverage are excluded. “Best” means revenue excluding VAT.</div>
     </div>`;
 }
 
@@ -4254,7 +4298,7 @@ async function askRecords(event) {
   state.recordsQuestion = question;
   button.disabled = true;
   button.textContent = 'Checking…';
-  document.getElementById('records-output').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Checking completed days…</div>';
+  document.getElementById('records-output').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Checking completed periods…</div>';
   try {
     const res = await apiFetch('/api/records/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
     if (!res) return;
