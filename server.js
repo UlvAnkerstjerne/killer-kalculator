@@ -484,9 +484,9 @@ app.post('/api/records/query', requireAuth, requireCsrf, async (req, res) => {
   if (!parsed.ok) return res.status(400).json({ error: parsed.message, code: parsed.code });
   if (!databaseSales?.records) return res.status(503).json({ error: 'Records are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE' });
   try {
-    const results = await databaseSales.records(parsed.query, cphDateStr());
+    const { results, coverage } = await databaseSales.records(parsed.query, cphDateStr());
     return res.json({ question: req.body.question.trim(), query: parsed.query, results,
-      meta: { source: 'database', completedDaysOnly: true, todayExcluded: true, revenueBasis: 'ex-vat' } });
+      meta: { source: 'database', completedDaysOnly: true, todayExcluded: true, revenueBasis: 'ex-vat', coverage } });
   } catch {
     return res.status(503).json({ error: 'Records are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE' });
   }

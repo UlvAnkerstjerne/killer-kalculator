@@ -22,7 +22,7 @@ const readonly = {
 };
 const reader = createDashboardReader(readonly);
 const today = '2026-09-28';
-const ask = question => reader.records(parseRecordsQuestion(question).query, today);
+const ask = async question => (await reader.records(parseRecordsQuestion(question).query, today)).results;
 const emptyDigest = createHash('sha256').update('').digest();
 const fridayDates = ['2026-07-24', '2026-07-31', '2026-08-07', '2026-08-14',
   '2026-08-21', '2026-08-28', '2026-09-04', '2026-09-11'];
