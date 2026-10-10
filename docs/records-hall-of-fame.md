@@ -88,7 +88,7 @@ leaderboard's limit. Invalid link values normalize to a safe scope/category.
 
 ## Validation
 
-- Full local regression/privacy-canary suite: 1,381 tests passed, none failed or
+- Full local regression/privacy-canary suite: 1,382 tests passed, none failed or
   skipped. Tests include batching limits, cache TTL/Copenhagen midnight, concurrent
   requests, session/scope races, failure/retry, HTML escaping, navigation and links.
 - PostgreSQL 16.14: 21 dashboard/Records integration tests passed. All twelve

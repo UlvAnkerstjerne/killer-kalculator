@@ -3897,7 +3897,9 @@ function setView(view) {
   const leavingRecords = state.view === 'records';
   if (leavingRecords) {
     recordsViewGeneration++;
-    history.replaceState(null, '', location.pathname + location.search);
+    // Keep the leaderboard URL in history when a user leaves via navigation.
+    // A back/forward hashchange already moved the URL and must not add an entry.
+    if (RecordsLeaderboards.parseHash(location.hash)) history.pushState(null, '', location.pathname + location.search);
   }
   resetSalesDataNotices();
   state.view = view;

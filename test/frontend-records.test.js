@@ -21,7 +21,7 @@ function batch(store, group) {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function createUi(fetchBatch = async (store, group) => batch(store, group)) {
-  const elements = new Map(), calls = [], events = {};
+  const elements = new Map(), calls = [], events = {}, historyEntries = [];
   const element = id => {
     if (!elements.has(id)) elements.set(id, { innerHTML: '', textContent: '', focused: false, scrolled: false,
       focus() { this.focused = true; }, scrollIntoView() { this.scrolled = true; } });
@@ -35,15 +35,16 @@ function createUi(fetchBatch = async (store, group) => batch(store, group)) {
     } },
     location: { hash: '', pathname: '/', search: '' }, window: { addEventListener: (event, handler) => { events[event] = handler; } },
     escHtml: s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
-    unixToCphDate: () => '2026-10-10', closeSidebar() {}, resetSalesDataNotices() {},
+    unixToCphDate: () => '2026-10-10', closeSidebar() {}, resetSalesDataNotices() {}, updateNav() {}, loadSidebar() {},
     apiFetch: async url => { const p = new URL(url, 'http://localhost').searchParams; calls.push(url);
       return { ok: true, json: () => fetchBatch(p.get('store'), p.get('group')) }; },
   });
   vm.runInContext(source, ui);
-  ui.renderMain = () => ui.renderRecordsView();
+  ui.history = { pushState: (_state, _title, url) => { historyEntries.push(url); ui.location.hash = ''; } };
+  ui.renderMain = () => state.view === 'records' ? ui.renderRecordsView() : (element('main').innerHTML = 'Dashboard');
   ui.renderSidebarSkeleton = () => ui.renderRecordsStoreSelector();
-  ui.setView = view => { state.view = view; };
-  return { ui, state, element, calls, events };
+  vm.runInContext(html.slice(html.indexOf('function setView('), html.indexOf('function setPeriod(')), ui);
+  return { ui, state, element, calls, events, historyEntries };
 }
 
 test('Hall of Fame automatically populates twelve top-five boards using only two batch requests', async () => {
@@ -126,6 +127,16 @@ test('logout and refresh invalidate in-flight responses before they reach the UI
   release(batch('all', 'standard')); await settle();
   assert(!element('records-days').innerHTML.includes('class="records-entry'));
   assert.match(html, /recordsClient\.clear\(\);[\s\n]+recordsViewGeneration\+\+/);
+});
+
+test('leaving Records preserves its link for Back, without adding history during back/forward events', async () => {
+  const { ui, state, events, historyEntries } = createUi();
+  const link = '#records?store=frederiksberg&board=lunches';
+  ui.location.hash = link; events.hashchange(); await settle(); await settle();
+  ui.setView('chain'); assert.equal(state.view, 'chain'); assert.deepEqual(historyEntries, ['/']);
+  ui.location.hash = link; events.hashchange(); await settle(); await settle();
+  assert.equal(state.view, 'records'); assert.equal(state.recordsStore, 'frederiksberg'); assert.equal(state.recordsBoard, 'lunches');
+  ui.location.hash = ''; events.hashchange(); assert.equal(state.view, 'chain'); assert.deepEqual(historyEntries, ['/']);
 });
 
 test('untrusted store names are escaped in per-store breakdowns and coverage', () => {
