@@ -1047,8 +1047,6 @@
      APP
 ══════════════════════════════════════════════════════════════════════════ -->
 <div id="app" class="hidden">
-  <details id="sales-data-status" role="status" aria-live="polite" hidden style="position:fixed;bottom:12px;right:12px;z-index:40;max-width:min(620px,calc(100vw - 24px));padding:12px 16px;border:1px solid #ad843b;border-radius:8px;background:#242019;color:#f4ddb0;font-size:12px"><summary id="sales-data-status-summary" style="cursor:pointer">Stored data status</summary><div id="sales-data-status-detail" style="max-height:28vh;overflow:auto;white-space:pre-line;margin-top:10px"></div></details>
-
   <!-- Header -->
   <div id="header">
     <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
@@ -1601,29 +1599,15 @@ let salesNoticeGeneration = 0;
 function resetSalesDataNotices() {
   salesNoticeGeneration++;
   salesDataNotices.clear();
-  const el = document.getElementById('sales-data-status');
-  if (el) { el.hidden = true; el.open = false; }
-  const detail = document.getElementById('sales-data-status-detail');
-  if (detail) detail.textContent = '';
 }
 function recordSalesDataStatus(meta) {
   if (typeof SalesDataStatus === 'undefined' || !['database','onlinepos'].includes(meta?.source)) return;
   const key = meta.storeId + ':' + meta.start + ':' + meta.end;
   const storeName = STORES.find(s => s.id === meta.storeId)?.name || 'All stores';
   salesDataNotices.set(key, { meta, text: storeName + ' · ' + SalesDataStatus.rangeLabel(meta) + ': ' + SalesDataStatus.describe(meta) });
-  // Keep every notice for this view: comparisons must not evict warnings.
+  // Retain source and quality metadata for this view without a floating banner.
+  // Comparisons must not evict earlier quality warnings.
   // Navigation/session changes clear the map.
-  const el = document.getElementById('sales-data-status');
-  if (el) {
-    const notices = [...salesDataNotices.values()];
-    const incomplete = notices.some(n => !n.meta.complete);
-    const unresolved = notices.some(n => n.meta.metrics?.potentiallyIncomplete?.length);
-    const sources = [...new Set(notices.map(n=>n.meta.source === 'database' ? 'Stored snapshots' : 'OnlinePOS'))].join(' + ');
-    document.getElementById('sales-data-status-summary').textContent =
-      (incomplete ? 'Sales data unavailable · ' : unresolved ? 'Product counts incomplete · ' : '') + sources + ' · Source & coverage';
-    document.getElementById('sales-data-status-detail').textContent = notices.map(n=>n.text).join('\n\n');
-    el.hidden = false;
-  }
 }
 
 async function apiSalesRange(storeId, start, endExcl) {
@@ -1652,7 +1636,7 @@ async function apiSalesRange(storeId, start, endExcl) {
       const data = await res.json();
       promise.meta = data.meta;
       if (sessionActive && sessionNonce === requestNonce && typeof recordSalesDataStatus === 'function' && requestNoticeGeneration === salesNoticeGeneration) recordSalesDataStatus(data.meta);
-      if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable; see data status.' : data.error || 'API error');
+      if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable. Please try again.' : data.error || 'API error');
       if (!data.meta || !data.meta.complete) {
         console.warn(`[apiSalesRange] incomplete data for ${storeId} ${start}→${endExcl}`, data.meta);
         throw new Error('Incomplete sales data from server');
@@ -1724,7 +1708,7 @@ async function apiRevenueSummary(storeId, start, endExcl, boundary = null) {
       const data = await res.json();
       promise.meta = data.meta;
       if (sessionActive && sessionNonce === requestNonce && typeof recordSalesDataStatus === 'function' && requestNoticeGeneration === salesNoticeGeneration) recordSalesDataStatus(data.meta);
-      if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable; see data status.' : data.error || 'API error');
+      if (!res.ok) throw new Error(data.meta?.source === 'database' ? 'Stored sales unavailable. Please try again.' : data.error || 'API error');
       if (!data.meta?.complete || !data.summary || !Array.isArray(data.summary.dailyRevenue)) {
         throw new Error('Incomplete revenue summary from server');
       }
@@ -3689,7 +3673,7 @@ async function loadGraphData() {
   }));
 
   if (salesFailed) {
-    card.innerHTML = '<div class="empty">Sales data unavailable for one or more stores. No partial graph is shown. See Source &amp; coverage, then retry.</div>';
+    card.innerHTML = '<div class="empty">Sales data unavailable for one or more stores. No partial graph is shown. Please try again.</div>';
     return;
   }
 
