@@ -894,7 +894,8 @@
     .records-hall { max-width: 1440px; padding-bottom: 28px; }
     .records-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
     .records-eyebrow { color: #bd9999; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 5px; }
-    .records-heading h2 { font-size: 30px; letter-spacing: -.7px; }
+    .records-heading h2 { display: flex; align-items: center; gap: 10px; font-size: 30px; letter-spacing: -.7px; }
+    .records-heading h2 svg { flex-shrink: 0; color: #d6b879; }
     .records-subtitle, .records-status { color: #aaa; font-size: 12px; margin-top: 6px; }
     .records-scope { display: block; font-weight: 600; color: var(--text); margin-top: 9px; }
     .records-jumps { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 22px; }
@@ -1120,7 +1121,7 @@
         </button>
         <button class="nav-btn" data-view="records" onclick="setView('records')">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M8 13l-2 9 6-3 6 3-2-9"/></svg>
-          Records
+          Hall of Fame
         </button>
         <button class="nav-btn" data-view="meat" onclick="setView('meat')">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
@@ -4428,7 +4429,7 @@ function renderRecordsView() {
   const scope = state.recordsStore === 'all' ? 'All Stores Combined' : STORES.find(s => s.id === state.recordsStore).name;
   const section = board => `<section class="records-board" id="records-${board.id}" tabindex="-1" aria-labelledby="records-title-${board.id}">${renderRecordBoard(board)}</section>`;
   document.getElementById('main').innerHTML = `<div class="records-hall">
-    <header class="records-heading"><div><div class="records-eyebrow">Records · Top 5</div><h2>Hall of Fame</h2>
+    <header class="records-heading"><div><div class="records-eyebrow">Records · Top 5</div><h2><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 3h8v6a4 4 0 0 1-8 0V3Z"/><path d="M8 5H4v2a4 4 0 0 0 4 4M16 5h4v2a4 4 0 0 1-4 4M12 13v5M8 21v-3h8v3M6 21h12"/></svg>Hall of Fame</h2>
       <p class="records-subtitle">The best of your verified history. Revenue excluding VAT.</p><span class="records-scope">${escHtml(scope)}</span>
       <button class="records-refresh records-mobile-scope" onclick="toggleSidebar()">Choose store</button></div>
       <button class="records-refresh" onclick="refreshRecords()">Refresh</button></header>
