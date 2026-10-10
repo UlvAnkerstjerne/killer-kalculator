@@ -12,6 +12,11 @@ let received = null;
 let databaseError = null;
 require.cache[require.resolve('../lib/sales-read-source')] = { exports: { createSalesReadSource: () => ({
   policy: 'covered-history',
+  async leaderboards(scope, group, today) {
+    if (databaseError) throw databaseError;
+    received = { scope, group, today };
+    return { scope, group, boards: [], meta: { revenueBasis: 'ex-vat', today } };
+  },
   async records(query, today) {
     if (databaseError) throw databaseError;
     received = { query, today };
@@ -38,6 +43,32 @@ test('records endpoint requires a session and CSRF token', async () => {
   const options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: 'Best Monday across the chain' }) };
   assert.equal((await fetch(url + '/api/records/query', options)).status, 401);
   assert.equal((await fetch(url + '/api/records/query', { ...options, headers: { ...options.headers, Cookie: cookie } })).status, 403);
+});
+
+test('leaderboard batches require authentication, validate scope/group and prevent shared caching', async () => {
+  assert.equal((await fetch(url + '/api/records/leaderboards')).status, 401);
+  for (const [store, group] of [['all', 'standard'], ['norrebro', 'lunch']]) {
+    const response = await fetch(url + `/api/records/leaderboards?store=${store}&group=${group}`, { headers: { Cookie: cookie } });
+    assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    const body = await response.json(); assert.equal(body.group, group); assert.equal(body.meta.revenueBasis, 'ex-vat');
+    assert.equal(received.scope.scope, store === 'all' ? 'chain' : 'store');
+  }
+  for (const params of ['store=invalid', 'group=unknown', 'store=all&store=norrebro', 'group=lunch&group=standard']) {
+    received = null;
+    assert.equal((await fetch(url + '/api/records/leaderboards?' + params, { headers: { Cookie: cookie } })).status, 400);
+    assert.equal(received, null);
+  }
+});
+
+test('leaderboard errors retain private diagnostics and the public helper contains no sales data', async () => {
+  databaseError = new Error('private leaderboard diagnostic');
+  try {
+    const response = await fetch(url + '/api/records/leaderboards', { headers: { Cookie: cookie } });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: 'Leaderboards are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE' });
+  } finally { databaseError = null; }
+  const asset = await fetch(url + '/js/records-leaderboards.js');
+  assert.equal(asset.status, 200); assert.match(await asset.text(), /RecordsLeaderboards/);
 });
 
 test('records endpoint returns structured database results', async () => {

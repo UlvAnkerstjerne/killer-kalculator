@@ -9,6 +9,7 @@ const { migrate } = require('../../lib/sales-db/migrate');
 const { createRepository } = require('../../lib/sales-db/repository');
 const { createDashboardReader } = require('../../lib/sales-db/dashboard');
 const { parseRecordsQuestion, STORES } = require('../../lib/sales-db/records');
+const { BOARDS } = require('../../lib/records-leaderboards');
 const { storeId } = require('../../lib/sales-db/values');
 const { context, line } = require('./helpers');
 const db = createDatabase(disposableConfig()), repo = createRepository(db, context);
@@ -155,4 +156,37 @@ test('a line-count or amount mismatch excludes lunch, instead of returning a pla
   await assert.rejects(readonly.transaction(s => s.query('SELECT source_key FROM sales_foundation.sales_line')));
   await assert.rejects(readonly.transaction(s => s.query('SELECT slug FROM sales_foundation.sales_store')));
   await assert.rejects(readonly.transaction(s => s.query('UPDATE sales_foundation.sales_day_state SET line_count=0')));
+});
+
+test('batched leaderboards match existing Records for every store and the chain, including weekend facts', async () => {
+  const before = await versions();
+  for (const store of [null, ...STORES]) {
+    const scope = { scope: store ? 'store' : 'chain', store };
+    for (const group of ['standard', 'lunch']) {
+      const batch = await reader.leaderboards(scope, group, '2024-03-06', Date.parse('2024-03-06T12:00:00Z'));
+      assert.equal(batch.boards.length, group === 'standard' ? 11 : 1);
+      for (const board of batch.boards) {
+        const individual = await reader.records(board.query, '2024-03-06', Date.parse('2024-03-06T12:00:00Z'));
+        assert.deepEqual(board.results, individual.results); assert.deepEqual(board.coverage, individual.coverage);
+        assert(board.results.length <= 5); assert(BOARDS.some(b => b.id === board.id));
+        if (board.id === 'weekends') for (const result of board.results) {
+          assert.equal(new Date(result.periodStart + 'T12:00:00Z').getUTCDay(), 6);
+          assert.equal(new Date(result.periodEnd + 'T12:00:00Z').getUTCDay(), 0);
+          for (const s of result.stores) {
+            const { rows: [raw] } = await db.query(`SELECT sum(revenue_excl)::text AS revenue FROM sales_foundation.sales_line
+              WHERE store_id=$1 AND business_date BETWEEN $2 AND $3`, [storeId(s.slug), result.periodStart, result.periodEnd]);
+            assert.equal(Number(raw.revenue), s.revenueExVat);
+          }
+        }
+      }
+    }
+  }
+  assert.equal(await versions(), before);
+});
+
+test('batch reader preserves schema and least-privilege readiness checks', async () => {
+  await db.transaction(async session => {
+    const direct = createDashboardReader({ transaction: work => work(session) });
+    await assert.rejects(direct.leaderboards({ scope: 'chain', store: null }, 'standard', '2024-03-06'), { code: 'DB_READ_ROLE_REQUIRED' });
+  });
 });

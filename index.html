@@ -12,6 +12,7 @@
   <!-- Canonical product-metrics engine: classifies by product ID, no fuzzy name matching -->
   <script src="/js/product-metrics.js"></script>
   <script src="/js/sales-data-status.js"></script>
+  <script src="/js/records-leaderboards.js"></script>
   <style>
     :root {
       --bg:        #0d0d0d;
@@ -889,6 +890,65 @@
       .f-group input, .f-group select { font-size: 16px; }
     }
 
+    /* ── Records / Hall of Fame ──────────────────────────────────── */
+    .records-hall { max-width: 1440px; padding-bottom: 28px; }
+    .records-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+    .records-eyebrow { color: #bd9999; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 5px; }
+    .records-heading h2 { font-size: 30px; letter-spacing: -.7px; }
+    .records-subtitle, .records-status { color: #aaa; font-size: 12px; margin-top: 6px; }
+    .records-scope { display: block; font-weight: 600; color: var(--text); margin-top: 9px; }
+    .records-jumps { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 22px; }
+    .records-jumps a, .records-refresh { border: 1px solid var(--border2); border-radius: 6px; background: var(--surface); color: #bbb; font: inherit; padding: 7px 12px; text-decoration: none; cursor: pointer; }
+    .records-jumps a:hover, .records-refresh:hover { color: #fff; border-color: var(--red); }
+    .records-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 16px; align-items: start; }
+    .records-board { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; scroll-margin-top: 18px; }
+    .records-board:focus { outline: 2px solid var(--red); outline-offset: 3px; }
+    .records-board-header { padding: 17px 18px 12px; display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+    .records-board h3 { font-size: 15px; font-weight: 700; }
+    .records-board-description { color: #999; font-size: 11px; margin-top: 3px; min-height: 33px; }
+    .records-link { color: #aaa; font-size: 11px; text-decoration: none; white-space: nowrap; }
+    .records-link:hover { color: #fff; text-decoration: underline; }
+    .records-ranks { list-style: none; padding: 0 18px; }
+    .records-entry { padding: 12px 0; border-top: 1px solid var(--border); }
+    .records-entry:first-child { border-top: 2px solid var(--red); padding-top: 15px; padding-bottom: 15px; }
+    .records-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; align-items: baseline; }
+    .records-rank { color: #999; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .records-entry:first-child .records-rank { color: #ebaaaa; font-weight: 700; }
+    .records-date { font-size: 12px; color: var(--text); line-height: 1.5; text-decoration: none; }
+    .records-date:hover { text-decoration: underline; }
+    .records-revenue { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .records-entry:first-child .records-revenue { font-size: 17px; }
+    .records-entry.is-linked { background: var(--red-dim); outline: 1px solid var(--red); outline-offset: 5px; }
+    .records-stores { margin: 6px 0 0 27px; font-size: 11px; color: #aaa; }
+    .records-stores summary, .records-coverage summary { cursor: pointer; }
+    .records-stores dl { margin-top: 8px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+    .records-stores dd { color: #ddd; font-variant-numeric: tabular-nums; }
+    .records-board-footer { margin-top: 3px; padding: 12px 18px 15px; border-top: 1px solid var(--border); color: #999; font-size: 11px; line-height: 1.65; }
+    .records-coverage { margin-top: 5px; }
+    .records-coverage div { margin-top: 5px; }
+    .records-warning { color: #d6b879; }
+    .records-empty { padding: 12px 18px 20px; color: #aaa; min-height: 95px; }
+    .records-error { color: #ffb1b1; }
+    .records-weekdays-title { font-size: 18px; margin: 30px 0 3px; }
+    .records-weekdays-subtitle { color: #999; margin-bottom: 15px; }
+    .records-rules { padding: 18px; background: var(--bg); border: 1px dashed var(--border2); border-radius: 10px; font-size: 12px; color: #aaa; line-height: 1.75; }
+    .records-rules h3 { color: #ddd; font-size: 14px; margin-bottom: 8px; }
+    .records-rules p + p { margin-top: 10px; }
+    button.records-store { display: block; width: 100%; background: transparent; color: var(--text); border: 0; border-left: 2px solid transparent; text-align: left; font: inherit; }
+    button.records-store.active { background: var(--red-dim); border-left-color: var(--red); }
+    button.records-store:hover { background: var(--surface2); }
+    .records-combined { margin-bottom: 8px; }
+    .records-mobile-scope { display: none; }
+    .records-hall a:focus-visible, .records-hall button:focus-visible, .records-hall summary:focus-visible, .records-store:focus-visible { outline: 2px solid var(--red-hi); outline-offset: 3px; }
+    #header.records-mode .period-bar, #header.records-mode .period-select-mobile { display: none; }
+    #header.records-mode .btn-logout { margin-left: auto; }
+    @media (max-width: 768px) {
+      .records-heading h2 { font-size: 26px; }
+      .records-heading { gap: 10px; }
+      .records-mobile-scope { display: inline-block; margin-top: 10px; }
+      .records-grid { grid-template-columns: 1fr; }
+    }
+
     /* ── Katering ─────────────────────────────────────────────────── */
     .katering-wrap        { max-width: 640px; margin: 0 auto; padding: 0 0 40px; }
     .katering-section     { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
@@ -1124,8 +1184,9 @@ const state = {
   editingInvoiceId: null,
   invoiceSupFrom: null,
   invoiceSupTo: null,
-  recordsQuestion: '',
-  recordsResponse: null,
+  recordsStore: 'all',
+  recordsBoard: 'days',
+  recordsDate: null,
 };
 
 const charts = {};
@@ -1921,6 +1982,7 @@ function escHtml(str) {
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────────
 function renderSidebarSkeleton() {
+  if (state.view === 'records') { renderRecordsStoreSelector(); return; }
   const list = document.getElementById('store-list');
   list.innerHTML = STORES.map(s => `
     <div class="store-item" id="si-${s.id}" data-id="${s.id}" onclick="setView('store:${s.id}')">
@@ -1933,6 +1995,7 @@ function renderSidebarSkeleton() {
 }
 
 async function loadSidebar() {
+  if (state.view === 'records') return;
   const { from, to } = getDateRange(state.period);
   const { start, end } = getCphDateRange(state.period);
   const { start: lyStart, end: lyEnd } = lyDateRange(state.period);
@@ -1946,6 +2009,8 @@ async function loadSidebar() {
     apiPlandaySalaries(from, to)
   ]);
 
+  // A dashboard request must not overwrite the Records scope selector.
+  if (state.view === 'records') return;
   STORES.forEach((s, i) => {
     const el = document.getElementById(`si-${s.id}`);
     if (!el) return;
@@ -3824,14 +3889,28 @@ function closeSidebar() {
 }
 
 function setView(view) {
+  if (view === 'records') {
+    if (state.view.startsWith('store:')) state.recordsStore = state.view.slice(6);
+    openRecordsBoard(state.recordsStore);
+    return;
+  }
+  const leavingRecords = state.view === 'records';
+  if (leavingRecords) {
+    recordsViewGeneration++;
+    // Keep the leaderboard URL in history when a user leaves via navigation.
+    // A back/forward hashchange already moved the URL and must not add an entry.
+    if (RecordsLeaderboards.parseHash(location.hash)) history.pushState(null, '', location.pathname + location.search);
+  }
   resetSalesDataNotices();
   state.view = view;
+  if (leavingRecords) { renderSidebarSkeleton(); loadSidebar(); }
   closeSidebar(); // close on mobile after navigation
   updateNav();
   renderMain();
 }
 
 function setPeriod(period) {
+  if (state.view === 'records') return; // All-time boards do not use dashboard date filters.
   resetSalesDataNotices();
   state.period = period;
   _chainLastRender = null; // Stale rollback would show wrong period
@@ -3851,6 +3930,7 @@ function setPeriod(period) {
 }
 
 function updateNav() {
+  document.getElementById('header').classList.toggle('records-mode', state.view === 'records');
   // Period buttons
   document.querySelectorAll('.pb').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.period === state.period);
@@ -3863,7 +3943,7 @@ function updateNav() {
 
   // Store items
   document.querySelectorAll('.store-item[data-id]').forEach(el => {
-    el.classList.toggle('active', state.view === `store:${el.dataset.id}`);
+    el.classList.toggle('active', state.view === 'records' ? state.recordsStore === el.dataset.id : state.view === `store:${el.dataset.id}`);
   });
 }
 
@@ -4188,126 +4268,183 @@ async function renderKateringView() {
   else renderKateringBeregnerTab();
 }
 
-const RECORD_PROMPTS = [
-  'Best day ever in Frederiksberg',
-  'Best Monday across the chain',
-  'Top 5 Fridays across the chain',
-  'Top 10 days in Nørrebro',
-  'Best week ever across the chain',
-  'Best month ever across the chain',
-  'Best lunch ever in Frederiksberg',
-  'Best Friday lunch across the chain',
-  'Top 5 weeks across the chain',
-  'Top 10 months in Nørrebro',
-  'Best week in Vesterbro',
-];
+// ── Records Hall of Fame ──────────────────────────────────────────────────────
+const RECORD_BOARDS = RecordsLeaderboards.BOARDS;
+let recordsViewGeneration = 0, recordsFocusPending = false, recordsBatches = {};
+const recordsClient = RecordsLeaderboards.createClient({
+  session: () => sessionActive ? sessionNonce : null,
+  today: () => unixToCphDate(Date.now() / 1000),
+  fetchBatch: async (store, group) => {
+    const response = await apiFetch('/api/records/leaderboards?' + new URLSearchParams({ store, group }));
+    if (!response || !response.ok) throw new Error('LEADERBOARDS_UNAVAILABLE');
+    const data = await response.json();
+    const expected = RECORD_BOARDS.filter(board => board.group === group);
+    const scopeMatches = store === 'all' ? data.scope?.scope === 'chain' : data.scope?.store?.slug === store;
+    if (!scopeMatches || data.group !== group || !Array.isArray(data.boards) || data.boards.length !== expected.length ||
+      expected.some(board => !data.boards.some(b => b.id === board.id && Array.isArray(b.results) && b.coverage))) {
+      throw new Error('LEADERBOARDS_UNAVAILABLE');
+    }
+    return data;
+  },
+});
 
 function recordsKr(value) {
   return new Intl.NumberFormat('da-DK', { maximumFractionDigits: 0 }).format(value) + ' kr';
 }
-
 function recordsDate(date) {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Copenhagen' })
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Copenhagen' })
     .format(new Date(date + 'T12:00:00Z'));
 }
-
 function recordsPeriodLabel(result, query) {
   if (query.period === 'month') return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Europe/Copenhagen' })
     .format(new Date(result.periodStart + 'T12:00:00Z'));
-  if (query.period === 'week') return recordsDate(result.periodStart) + ' – ' + recordsDate(result.periodEnd);
-  return recordsDate(result.date) + (query.daypart === 'lunch' ? ' · Lunch' : '');
+  if (['week', 'weekend'].includes(query.period)) {
+    const start = result.periodStart, end = result.periodEnd;
+    if (start.slice(0, 7) === end.slice(0, 7)) {
+      const month = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'Europe/Copenhagen' }).format(new Date(end + 'T12:00:00Z'));
+      return `${Number(start.slice(-2))}–${Number(end.slice(-2))} ${month}`;
+    }
+    return (start.slice(0, 4) === end.slice(0, 4) ? recordsDate(start).replace(/ \d{4}$/, '') : recordsDate(start)) + ' – ' + recordsDate(end);
+  }
+  return recordsDate(result.date);
 }
-
-function renderRecordsCoverage(response) {
-  const coverage = response.meta?.coverage;
-  if (!coverage) return '';
-  const unit = response.query.period || 'day';
+function renderRecordsStoreSelector() {
+  const stores = [{ id: 'all', name: 'All Stores Combined' }, ...STORES];
+  document.getElementById('store-list').innerHTML = stores.map(s => `<button type="button"
+    class="store-item records-store${s.id === 'all' ? ' records-combined' : ''}${s.id === state.recordsStore ? ' active' : ''}"
+    data-id="${s.id}" aria-pressed="${s.id === state.recordsStore}" onclick="openRecordsBoard('${s.id}', '${state.recordsBoard}')">
+    <span class="si-name">${escHtml(s.name)}</span></button>`).join('');
+}
+function renderRecordsCoverage(coverage) {
   const labels = {
-    missingCoverage: 'missing store-day coverage', unverifiedCoverage: 'unverified or pending store-day coverage',
-    invalidObservation: 'invalid coverage observation time', timestampUncertainty: 'uncertain transaction timestamps',
-    factsMismatch: 'transaction totals do not match verified day totals', noSales: 'no recorded sales for this store-day',
+    missingCoverage: 'missing store-day coverage', unverifiedCoverage: 'pending or unverified coverage',
+    invalidObservation: 'coverage not verified after the day ended', timestampUncertainty: 'uncertain transaction timestamps',
+    factsMismatch: 'transaction facts do not reconcile to verified totals', noSales: 'no recorded transactions',
   };
-  const reasons = Object.entries(coverage.exclusions).map(([code, counts]) =>
-    `${counts.periods} ${unit}${counts.periods === 1 ? '' : 's'} with ${labels[code] || code}`).join('; ');
+  const unit = coverage.period;
+  const span = coverage.eligibleFrom ? `${recordsDate(coverage.eligibleFrom)} – ${recordsDate(coverage.eligibleThrough)}` : 'No eligible historical periods';
   const names = Object.fromEntries(coverage.stores.map(s => [s.slug, s.name]));
-  return `<div style="margin-top:16px;padding:15px 18px;border:1px solid #343434;border-radius:8px;color:var(--muted);font-size:12px;line-height:1.65">
-    <b style="color:#ddd">Historical coverage</b>
-    <div>${coverage.historyFrom ? `Stored history: ${recordsDate(coverage.historyFrom)} – ${recordsDate(coverage.historyThrough)}.` : 'No stored historical coverage is available for this scope.'}</div>
-    <div>${coverage.eligiblePeriods} eligible ${unit}${coverage.eligiblePeriods === 1 ? '' : 's'} out of ${coverage.consideredPeriods} completed calendar ${unit}${coverage.consideredPeriods === 1 ? '' : 's'} checked${response.query.weekday ? ` (${escHtml(response.query.weekday.name)} only)` : ''}.
-      ${coverage.eligibleFrom ? `Eligible span: ${recordsDate(coverage.eligibleFrom)} – ${recordsDate(coverage.eligibleThrough)}; gaps are excluded.` : ''}</div>
-    <div>The current unfinished ${unit} and future dates are excluded. Only periods ending before ${recordsDate(coverage.cutoffExclusive)} can rank.</div>
-    ${coverage.excludedPeriods ? `<div style="color:#d6b879;margin-top:6px">${coverage.excludedPeriods} ${unit}${coverage.excludedPeriods === 1 ? '' : 's'} excluded: ${escHtml(reasons)}. Reasons can overlap.</div>` : ''}
-    ${coverage.timing ? `<div style="margin-top:6px">Lunch includes recorded sales before 16:00 Copenhagen time; transactions at 16:00 or later are excluded. Only unambiguous payment timestamps qualify. A date with any missing, fallback or DST-ambiguous transaction time is excluded (${coverage.timing.uncertainLines} uncertain lines across covered dates checked).</div>` : ''}
-    <div style="margin-top:6px">Records rank the available verified history, not dates before that history. Missing days are never treated as zero; verified closed days contribute zero to complete periods.</div>
-    <details style="margin-top:8px"><summary style="cursor:pointer">Coverage by store and excluded periods</summary>
-      ${coverage.stores.map(s => `<div style="margin-top:5px"><b>${escHtml(s.name)}</b>: ${s.historyFrom ? `${recordsDate(s.historyFrom)} – ${recordsDate(s.historyThrough)}` : 'no stored history'}; ${s.eligibleDays} eligible days for this ranking.</div>`).join('')}
-      ${coverage.excludedExamples.map(p => `<div style="margin-top:8px">${recordsDate(p.periodStart)}${p.periodEnd !== p.periodStart ? ` – ${recordsDate(p.periodEnd)}` : ''}: ${p.reasons.map(r => `${escHtml(labels[r.code] || r.code)} — ${escHtml(r.stores.map(slug => names[slug] || slug).join(', '))} (${r.storeDays} store-days)`).join('; ')}.</div>`).join('')}
-      ${coverage.excludedExamplesOmitted ? `<div style="margin-top:6px">${coverage.excludedExamplesOmitted} more excluded periods; all are included in the counts above.</div>` : ''}
-    </details>
-  </div>`;
+  return `<div class="records-board-footer"><div>${coverage.eligiblePeriods} eligible ${unit}${coverage.eligiblePeriods === 1 ? '' : 's'} · ${span}</div>
+    ${coverage.excludedPeriods ? `<div class="records-warning">${coverage.excludedPeriods} incomplete or ineligible ${unit}${coverage.excludedPeriods === 1 ? '' : 's'} excluded.</div>` : ''}
+    <details class="records-coverage"><summary>Coverage &amp; limitations</summary>
+      <div>${coverage.historyFrom ? `Stored history: ${recordsDate(coverage.historyFrom)} – ${recordsDate(coverage.historyThrough)}.` : 'No stored historical coverage for this scope.'}</div>
+      <div>${coverage.consideredPeriods} completed periods checked. The eligible span may contain excluded gaps. Current unfinished periods and future dates never rank.</div>
+      ${Object.entries(coverage.exclusions).map(([code, counts]) => `<div>${counts.periods} ${unit}${counts.periods === 1 ? '' : 's'}: ${escHtml(labels[code] || code)}. Reasons may overlap.</div>`).join('')}
+      ${coverage.timing ? `<div>Lunch uses recorded sales before 16:00 Copenhagen time. Transactions at or after 16:00 are excluded. A date with any missing, fallback or DST-ambiguous time is excluded (${coverage.timing.uncertainLines} uncertain transaction timestamps checked).</div>` : ''}
+      <div>Missing days are never treated as zero. Verified closed days contribute zero. Records cover the available verified history.</div>
+      ${coverage.stores.map(s => `<div><b>${escHtml(s.name)}</b>: ${s.historyFrom ? `${recordsDate(s.historyFrom)} – ${recordsDate(s.historyThrough)}` : 'no history'}; ${s.eligibleDays} eligible store-days checked.</div>`).join('')}
+      ${coverage.excludedExamples.map(p => `<div>${recordsDate(p.periodStart)}${p.periodEnd !== p.periodStart ? ' – ' + recordsDate(p.periodEnd) : ''}: ${p.reasons.map(r => `${escHtml(labels[r.code] || r.code)} (${escHtml(r.stores.map(s => names[s] || s).join(', '))})`).join('; ')}.</div>`).join('')}
+      ${coverage.excludedExamplesOmitted ? `<div>${coverage.excludedExamplesOmitted} additional excluded periods are included in the totals above.</div>` : ''}
+    </details></div>`;
 }
-
-function renderRecordsResults(response) {
-  if (!response) return '';
-  if (response.error) return `<div style="margin-top:18px;padding:16px;border:1px solid #7b2d2d;background:#281717;color:#ff8d8d;border-radius:8px">${escHtml(response.error)}</div>`;
-  const coverage = renderRecordsCoverage(response);
-  if (!response.results.length) return '<div style="margin-top:18px;color:var(--muted)">No eligible complete periods matched that question.</div>' + coverage;
-  const scope = response.query.scope === 'chain' ? 'All six stores' : response.query.store.name;
-  const rows = response.results.map((result, index) => `
-    <div style="padding:18px 0;${index ? 'border-top:1px solid #2c2c2c' : ''}">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div><span style="color:var(--muted);font-size:12px;margin-right:10px">#${index + 1}</span><b>${recordsPeriodLabel(result, response.query)}</b></div>
-        <div style="font-size:22px;font-weight:800;color:#fff">${recordsKr(result.revenueExVat)}</div>
-      </div>
-      ${response.query.scope === 'chain' ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:13px">
-        ${result.stores.map(store => `<div style="background:#191919;border:1px solid #2c2c2c;border-radius:6px;padding:9px 11px"><div style="font-size:11px;color:var(--muted)">${escHtml(store.name)}</div><b>${recordsKr(store.revenueExVat)}</b></div>`).join('')}
-      </div>` : ''}
-    </div>`).join('');
-  return `<div style="margin-top:20px;border:1px solid #2c2c2c;border-radius:9px;padding:4px 18px 8px;background:#131313">
-    <div style="padding:14px 0 7px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">${escHtml(scope)} · Revenue ex VAT · Complete ${response.query.period || 'day'}s${response.query.daypart === 'lunch' ? ' · Lunch before 16:00' : ''}</div>${rows}</div>${coverage}`;
+function renderRecordBoard(board) {
+  const batch = recordsBatches[board.group];
+  const data = batch?.boards?.find(b => b.id === board.id);
+  const header = `<header class="records-board-header"><div><h3 id="records-title-${board.id}">${board.title}</h3>
+    <div class="records-board-description">${board.description} · Revenue ex VAT</div></div>
+    <a class="records-link" href="${escHtml(RecordsLeaderboards.href(state.recordsStore, board.id))}" aria-label="Link to ${board.title.toLowerCase()}">Link</a></header>`;
+  if (!data) return header + `<div class="records-empty${batch?.error ? ' records-error' : ''}">${batch?.error ?
+    `Temporarily unavailable. <button class="records-refresh" onclick="retryRecordsGroup('${board.group}')">Retry</button>` : 'Loading verified records…'}</div>`;
+  const rows = data.results.map((result, index) => {
+    const linked = state.recordsBoard === board.id && state.recordsDate === result.periodStart;
+    return `<li class="records-entry${linked ? ' is-linked' : ''}" id="record-${board.id}-${result.periodStart}">
+      <div class="records-row"><span class="records-rank">${index + 1}</span>
+        <a class="records-date" href="${escHtml(RecordsLeaderboards.href(state.recordsStore, board.id, result.periodStart))}">${recordsPeriodLabel(result, data.query)}</a>
+        <span class="records-revenue">${recordsKr(result.revenueExVat)}</span></div>
+      ${data.query.scope === 'chain' ? `<details class="records-stores"><summary>By store</summary><dl>${result.stores.map(s =>
+        `<dt>${escHtml(s.name)}</dt><dd>${recordsKr(s.revenueExVat)}</dd>`).join('')}</dl></details>` : ''}</li>`;
+  }).join('');
+  const missingLinkedDate = state.recordsBoard === board.id && state.recordsDate && !data.results.some(r => r.periodStart === state.recordsDate);
+  return header + (rows ? `<ol class="records-ranks" aria-label="Top five ${board.title.toLowerCase()}">${rows}</ol>` :
+    '<div class="records-empty">No complete, eligible records are available for this category. See coverage below.</div>') +
+    (data.results.length > 0 && data.results.length < 5 ? `<div class="records-empty">Only ${data.results.length} eligible record${data.results.length === 1 ? '' : 's'} in the available history.</div>` : '') +
+    (missingLinkedDate ? `<div class="records-empty records-warning">The linked period (${recordsDate(state.recordsDate)}) is outside the current top five or is not eligible.</div>` : '') +
+    renderRecordsCoverage(data.coverage);
 }
+function updateRecordsGroup(group) {
+  for (const board of RECORD_BOARDS.filter(b => b.group === group)) {
+    const element = document.getElementById('records-' + board.id);
+    if (element) element.innerHTML = renderRecordBoard(board);
+  }
+  const status = document.getElementById('records-status');
+  const batch = recordsBatches.standard, coverage = batch?.boards?.find(b => b.id === 'days')?.coverage;
+  if (status) status.textContent = batch?.error ? 'Calendar records are unavailable. Retry to check again.' : coverage ?
+    (coverage.historyFrom ? `Stored history: ${recordsDate(coverage.historyFrom)} – ${recordsDate(coverage.historyThrough)}. Each board shows its eligible coverage.` : 'No historical coverage is available for this store.') : 'Checking verified historical coverage…';
+  focusRecordsTarget();
+}
+async function loadRecordsGroup(group, generation = recordsViewGeneration) {
+  const store = state.recordsStore, nonce = sessionNonce;
+  let result;
+  try { result = await recordsClient.load(store, group); }
+  catch { result = { error: true }; }
+  if (!result || !sessionActive || nonce !== sessionNonce || generation !== recordsViewGeneration || state.view !== 'records' || store !== state.recordsStore) return;
+  recordsBatches[group] = result;
+  updateRecordsGroup(group);
+}
+async function loadRecordsHall(generation) {
+  await loadRecordsGroup('standard', generation);
+  if (generation === recordsViewGeneration && state.view === 'records' && sessionActive) await loadRecordsGroup('lunch', generation);
+}
+function retryRecordsGroup(group) {
+  recordsBatches[group] = null; updateRecordsGroup(group); void loadRecordsGroup(group);
+}
+function refreshRecords() {
+  recordsClient.clear(); renderRecordsView();
+}
+function focusRecordsTarget() {
+  if (!recordsFocusPending) return;
+  const board = RECORD_BOARDS.find(b => b.id === state.recordsBoard);
+  if (!board || !recordsBatches[board.group]) return;
+  const target = document.getElementById(state.recordsDate ? `record-${board.id}-${state.recordsDate}` : '') || document.getElementById('records-' + board.id);
+  if (!target) return;
+  recordsFocusPending = false;
+  // Focus the section for keyboard users; scroll only after its data has loaded.
+  document.getElementById('records-' + board.id)?.focus({ preventScroll: true });
+  target.scrollIntoView({ block: 'start', behavior: 'auto' });
+}
+function applyRecordsLocation() {
+  if (!sessionActive) return;
+  const target = RecordsLeaderboards.parseHash(location.hash);
+  if (!target) {
+    if (state.view === 'records') setView('chain');
+    return;
+  }
+  resetSalesDataNotices();
+  state.view = 'records'; state.recordsStore = target.store;
+  state.recordsBoard = target.board; state.recordsDate = target.date;
+  recordsFocusPending = new URLSearchParams(location.hash.split('?')[1] || '').has('board');
+  closeSidebar(); renderSidebarSkeleton(); renderMain();
+}
+function openRecordsBoard(store, board = null) {
+  const target = board ? RecordsLeaderboards.href(store, board) : '#records?' + new URLSearchParams({ store });
+  if (location.hash === target) applyRecordsLocation();
+  else location.hash = target;
+}
+window.addEventListener('hashchange', applyRecordsLocation);
 
 function renderRecordsView() {
-  const main = document.getElementById('main');
-  main.innerHTML = `<div class="view-header"><div><h2>Records</h2><div style="color:var(--muted);margin-top:5px">Ask the Kalculator about your best revenue days, weeks, months and lunches.</div></div></div>
-    <div style="max-width:850px">
-      <form onsubmit="askRecords(event)" style="display:flex;gap:9px;align-items:stretch">
-        <input id="records-question" maxlength="200" value="${escHtml(state.recordsQuestion).replace(/"/g, '&quot;')}" placeholder="e.g. Best Monday across the chain" style="flex:1;min-width:0;background:#151515;color:#fff;border:1px solid #3b3b3b;border-radius:7px;padding:13px 14px;font-size:15px">
-        <button id="records-submit" type="submit" style="background:#b30000;color:#fff;border:0;border-radius:7px;padding:0 20px;font-weight:700;cursor:pointer">Ask</button>
-      </form>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px">
-        ${RECORD_PROMPTS.map(prompt => `<button onclick="useRecordsPrompt('${prompt.replace(/'/g, "\\'")}')" style="background:#1a1a1a;color:#aaa;border:1px solid #343434;border-radius:999px;padding:7px 11px;cursor:pointer;font-size:12px">${prompt}</button>`).join('')}
-      </div>
-      <div id="records-output">${renderRecordsResults(state.recordsResponse)}</div>
-      <div style="margin-top:18px;color:#666;font-size:12px;line-height:1.55">“Across the chain” means the same calendar period across all six stores, with every day covered. Weeks run Monday–Sunday; months follow the Copenhagen calendar. Lunch ranks individual dates before 16:00. Unfinished periods and incomplete coverage are excluded. “Best” means revenue excluding VAT.</div>
-    </div>`;
-}
-
-function useRecordsPrompt(prompt) {
-  state.recordsQuestion = prompt;
-  renderRecordsView();
-  document.getElementById('records-question').focus();
-}
-
-async function askRecords(event) {
-  event.preventDefault();
-  const input = document.getElementById('records-question');
-  const button = document.getElementById('records-submit');
-  const question = input.value.trim();
-  if (!question) return;
-  state.recordsQuestion = question;
-  button.disabled = true;
-  button.textContent = 'Checking…';
-  document.getElementById('records-output').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> Checking completed periods…</div>';
-  try {
-    const res = await apiFetch('/api/records/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
-    if (!res) return;
-    const data = await res.json();
-    state.recordsResponse = res.ok ? data : { error: data.error || 'Could not answer that question.' };
-  } catch {
-    state.recordsResponse = { error: 'Records are temporarily unavailable.' };
-  }
-  if (state.view === 'records') renderRecordsView();
+  const generation = ++recordsViewGeneration;
+  recordsBatches = { standard: recordsClient.peek(state.recordsStore, 'standard'), lunch: recordsClient.peek(state.recordsStore, 'lunch') };
+  const scope = state.recordsStore === 'all' ? 'All Stores Combined' : STORES.find(s => s.id === state.recordsStore).name;
+  const section = board => `<section class="records-board" id="records-${board.id}" tabindex="-1" aria-labelledby="records-title-${board.id}">${renderRecordBoard(board)}</section>`;
+  document.getElementById('main').innerHTML = `<div class="records-hall">
+    <header class="records-heading"><div><div class="records-eyebrow">Records · Top 5</div><h2>Hall of Fame</h2>
+      <p class="records-subtitle">The best of your verified history. Revenue excluding VAT.</p><span class="records-scope">${escHtml(scope)}</span>
+      <button class="records-refresh records-mobile-scope" onclick="toggleSidebar()">Choose store</button></div>
+      <button class="records-refresh" onclick="refreshRecords()">Refresh</button></header>
+    <div id="records-status" class="records-status" role="status">Checking verified historical coverage…</div>
+    <nav class="records-jumps" aria-label="Leaderboard categories">${[
+      ['days', 'Days'], ['weeks', 'Weeks'], ['months', 'Months'], ['monday', 'Weekdays'], ['lunches', 'Lunches'], ['weekends', 'Weekends'],
+    ].map(([id, name]) => `<a href="${escHtml(RecordsLeaderboards.href(state.recordsStore, id))}">${name}</a>`).join('')}</nav>
+    <div class="records-grid">${RECORD_BOARDS.filter(b => !b.weekday).map(section).join('')}
+      <aside class="records-rules"><h3>What makes a record?</h3><p>Every date must have verified coverage. Weeks run Monday–Sunday, months follow the calendar, and weekends combine Saturday + Sunday.</p>
+        <p>All Stores Combined sums the same dates across all six stores. Missing data never counts as zero; verified closures do.</p>
+        <p>Lunch uses recorded sales before 16:00 Copenhagen time. Uncertain timestamps disqualify the date. Current unfinished periods are always excluded.</p></aside></div>
+    <h2 class="records-weekdays-title">Every day has its champions</h2><p class="records-weekdays-subtitle">The five best individual dates for each weekday.</p>
+    <div class="records-grid">${RECORD_BOARDS.filter(b => b.weekday).map(section).join('')}</div>
+  </div>`;
+  updateRecordsGroup('standard'); updateRecordsGroup('lunch');
+  void loadRecordsHall(generation);
 }
 
 function renderMain() {
@@ -4360,6 +4497,9 @@ function onSessionExpired(message) {
   sessionActive = false;
   csrfToken = null;
   state.cache = {};
+  recordsClient.clear();
+  recordsViewGeneration++;
+  recordsBatches = {};
   _salesCache.clear();
   _salesInFlight.clear(); // Abandon all in-flight requests
   _revenueSummaryCache.clear();
@@ -4431,6 +4571,12 @@ document.addEventListener('keydown', e => {
 
 // ── Boot ────────────────────────────────────────────────────────────────────────
 async function boot() {
+  const recordsLink = RecordsLeaderboards.parseHash(location.hash);
+  if (recordsLink) {
+    state.view = 'records'; state.recordsStore = recordsLink.store;
+    state.recordsBoard = recordsLink.board; state.recordsDate = recordsLink.date;
+    recordsFocusPending = new URLSearchParams(location.hash.split('?')[1] || '').has('board');
+  }
   loadInvoices();
   await loadMeat();
 
