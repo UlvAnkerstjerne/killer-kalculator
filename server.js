@@ -16,7 +16,7 @@ const { computeMetrics } = require('./lib/product-metrics');
 const databaseSales = require('./lib/sales-read-source').createSalesReadSource();
 const { selectSalesRead, providerReadMeta } = require('./lib/sales-read-policy');
 const { metricCoverage } = require('./lib/sales-metric-coverage');
-const { parseRecordsQuestion } = require('./lib/sales-db/records');
+const { parseRecordsQuestion, parseLeaderboardsRequest } = require('./lib/sales-db/records');
 const databaseOnly = databaseSales && databaseSales.policy !== 'covered-history';
 const { createSalesRangeCache } = require('./lib/sales-range-cache');
 const { deriveSalesSubrange } = require('./lib/sales-range-derivation');
@@ -134,6 +134,10 @@ app.get('/js/sales-data-status.js', (_req, res) => {
 app.get('/js/product-metrics.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.sendFile(path.join(__dirname, 'lib', 'product-metrics.js'));
+});
+app.get('/js/records-leaderboards.js', (_req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'lib', 'records-leaderboards.js'));
 });
 
 // ── Auth routes ───────────────────────────────────────────────────────────────
@@ -477,6 +481,15 @@ app.get('/api/sales-readiness', requireAuth, async (_req, res) => {
   if (!databaseSales) return res.json({ ready: true, source: 'onlinepos' });
   try { return res.json({ ...await databaseSales.ready(), source: databaseOnly ? 'database' : 'onlinepos', readPolicy: databaseSales.policy || 'database-only' }); }
   catch { return res.status(503).json({ ready: false, source: 'database', code: 'DB_READ_UNAVAILABLE' }); }
+});
+
+app.get('/api/records/leaderboards', requireAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const parsed = parseLeaderboardsRequest(req.query);
+  if (!parsed.ok) return res.status(400).json({ error: parsed.message, code: parsed.code });
+  if (!databaseSales?.leaderboards) return res.status(503).json({ error: 'Leaderboards are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE' });
+  try { return res.json(await databaseSales.leaderboards(parsed.scope, parsed.group, cphDateStr())); }
+  catch { return res.status(503).json({ error: 'Leaderboards are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE' }); }
 });
 
 app.post('/api/records/query', requireAuth, requireCsrf, async (req, res) => {
