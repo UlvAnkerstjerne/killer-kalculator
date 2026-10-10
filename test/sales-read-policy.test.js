@@ -58,13 +58,16 @@ test('failed store is identifiable from salesReadMeta in the error',async()=>{
   try { await selectSalesRead(reader,{storeSlug:'christianshavn',start:'2026-01-01',end:'2026-10-05',today:'2026-10-06'}); assert.fail('should throw'); }
   catch(e) { assert.equal(e.salesReadMeta.code,'DB_READ_UNAVAILABLE'); assert.equal(e.salesReadMeta.storeId,'christianshavn'); }
 });
-test('new-view consumers of a coalesced failed sales request retain the error notice',async()=>{
- const notices=[],elements=new Map(); let release;
- const context={SalesDataStatus:require('../lib/sales-data-status'),STORES:[],sessionActive:true,sessionNonce:1,Date,SALES_CACHE_MAX_ENTRIES:120,SALES_CACHE_HISTORICAL_TTL_MS:21600000,_salesCache:new Map(),_salesInFlight:new Map(),readSalesCache:()=>null,document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},apiFetch:()=>new Promise(r=>release=r)};
+test('new-view consumers of a coalesced failed sales request retain error metadata and retry guidance',async()=>{
+ let release;
+ const context={SalesDataStatus:require('../lib/sales-data-status'),STORES:[],sessionActive:true,sessionNonce:1,Date,SALES_CACHE_MAX_ENTRIES:120,SALES_CACHE_HISTORICAL_TTL_MS:21600000,_salesCache:new Map(),_salesInFlight:new Map(),readSalesCache:()=>null,apiFetch:()=>new Promise(r=>release=r)};
  vm.createContext(context);vm.runInContext(html.slice(html.indexOf('const salesDataNotices ='),html.indexOf('function readRevenueSummaryCache')),context);
  const first=context.apiSalesRange('norrebro',args.start,args.end);context.resetSalesDataNotices();const second=context.apiSalesRange('norrebro',args.start,args.end);
  release({ok:false,json:async()=>({meta:{source:'database',storeId:'norrebro',start:args.start,end:args.end,complete:false,code:'DB_READ_UNAVAILABLE'}})});
- const settled=await Promise.allSettled([first,second]);assert(settled.every(r=>r.status==='rejected'));assert.match(elements.get('sales-data-status-detail').textContent,/Database read failed/);
+ const settled=await Promise.allSettled([first,second]);assert(settled.every(r=>r.status==='rejected'&&/Stored sales unavailable\. Please try again\./.test(r.reason.message)));
+ assert.equal(context._salesCache.size,0);
+ const notice=vm.runInContext('salesDataNotices.values().next().value',context);
+ assert.equal(notice.meta.code,'DB_READ_UNAVAILABLE');assert.equal(notice.meta.complete,false);assert.match(notice.text,/Database read failed/);
 });
 
 // ── Hybrid routing: covered history + today ─────────────────────────────────
