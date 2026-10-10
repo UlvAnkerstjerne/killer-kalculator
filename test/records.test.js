@@ -36,7 +36,7 @@ test('store records use completed positive days and return a breakdown', async (
   const session = { query: async (sql, params) => {
     assert.match(sql, /d\.line_count > 0/);
     assert.match(sql, /d\.business_date < \$2/);
-    assert.deepEqual(params, ['frederiksberg', '2026-10-09', null, 1]);
+    assert.deepEqual(params, [5, '2026-10-09', null, 1]);
     return { rows: [{ date: '2026-09-12', weekdayIso: 6, revenueExVat: '123456.78' }] };
   } };
   const parsed = parseRecordsQuestion('Best day in Frederiksberg').query;
@@ -51,12 +51,14 @@ test('chain records require all six stores on the same date and preserve breakdo
     assert.match(sql, /HAVING count\(\*\) = 6/);
     assert.deepEqual(params, ['2026-10-09', 1, 1]);
     return { rows: slugs.map((slug, index) => ({ date: '2026-09-21', weekdayIso: 1,
-      revenueExVat: '600', slug, storeRevenueExVat: String(50 + index * 20) })) };
+      revenueExVat: '600', storeId: require('../lib/sales-db/values').storeId(slug), storeRevenueExVat: String(50 + index * 20) })) };
   } };
   const parsed = parseRecordsQuestion('Best Monday across the chain').query;
   const [result] = await queryRecords(session, parsed, '2026-10-09');
   assert.equal(result.revenueExVat, 600);
   assert.equal(result.stores.length, 6);
+  assert.deepEqual(result.stores.map(store => store.slug), slugs);
+  assert.equal(result.stores.reduce((total, store) => total + store.revenueExVat, 0), 600);
   assert.equal(result.stores.find(store => store.slug === 'norrebro').name, 'Nørrebro');
 });
 
