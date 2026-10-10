@@ -1,0 +1,843 @@
+{
+ "robust": [
+  {
+   "name": "odd",
+   "values": [
+    3.0,
+    1.0,
+    4.0,
+    1.0,
+    5.0,
+    9.0,
+    2.0
+   ],
+   "median": 3.0,
+   "mad": 2.0,
+   "madScaled": 2.965204437011204
+  },
+  {
+   "name": "even",
+   "values": [
+    3.0,
+    1.0,
+    4.0,
+    1.0,
+    5.0,
+    9.0,
+    2.0,
+    6.0
+   ],
+   "median": 3.5,
+   "mad": 2.0,
+   "madScaled": 2.965204437011204
+  },
+  {
+   "name": "with_outlier",
+   "values": [
+    38.5502506623,
+    49.480233561,
+    47.8680668227,
+    52.5003156257,
+    52.279952504,
+    50.7502245587,
+    54.3409218425,
+    53.1140099998,
+    53.1737564341,
+    53.4932671655,
+    46.1242822088,
+    48.2356863785,
+    42.2992166237,
+    57.0576069497,
+    49.6277447282,
+    56.4998254915,
+    39.3901996566,
+    50.1392033986,
+    55.8313902909,
+    53.3896624042,
+    53.4421710627,
+    51.4486820617,
+    55.6105987748,
+    54.7497788772,
+    48.3757735241,
+    49.1418889068,
+    49.0814696318,
+    52.5420567393,
+    36.8017559428,
+    56.5019137399,
+    500.0
+   ],
+   "median": 52.279952504,
+   "mad": 3.138063597200002,
+   "madScaled": 4.652500051020393
+  },
+  {
+   "name": "single",
+   "values": [
+    7.5
+   ],
+   "median": 7.5,
+   "mad": 0.0,
+   "madScaled": 0.0
+  },
+  {
+   "name": "constant",
+   "values": [
+    4.0,
+    4.0,
+    4.0,
+    4.0
+   ],
+   "median": 4.0,
+   "mad": 0.0,
+   "madScaled": 0.0
+  },
+  {
+   "name": "negative",
+   "values": [
+    -23.5201820487,
+    -23.2241986682,
+    -16.3230251108,
+    -17.107604157,
+    -22.8600086921,
+    -17.0261490133,
+    -20.8812061361,
+    -21.187695806,
+    -21.3263638754,
+    -16.4332811746,
+    -23.8283021716,
+    -19.6993457859,
+    -19.3048928643,
+    -20.1192837255,
+    -17.8038382536,
+    -21.0416682292,
+    -12.2262004897
+   ],
+   "median": -20.1192837255,
+   "mad": 2.7407249665999984,
+   "madScaled": 4.063404915794849
+  }
+ ],
+ "sameWeekday": {
+  "series": [
+   {
+    "date": "2026-01-01",
+    "value": 1075.62,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-02",
+    "value": 1145.33,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-03",
+    "value": 1037.02,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-04",
+    "value": 975.01,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-05",
+    "value": 1035.03,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-06",
+    "value": 1032.09,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-07",
+    "value": 1044.91,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-08",
+    "value": 1065.2,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-09",
+    "value": 1186.08,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-10",
+    "value": 1144.66,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-11",
+    "value": 985.04,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-12",
+    "value": 1025.07,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-13",
+    "value": 1120.98,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-14",
+    "value": 953.25,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-15",
+    "value": 1019.57,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-16",
+    "value": 1110.25,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-17",
+    "value": 998.28,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-18",
+    "value": 1093.93,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-19",
+    "value": 1067.2,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-20",
+    "value": 1093.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-21",
+    "value": 1013.56,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-22",
+    "value": 935.29,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-23",
+    "value": 1157.52,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-24",
+    "value": 1045.41,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-25",
+    "value": 1037.64,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-26",
+    "value": 1121.04,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-27",
+    "value": 988.75,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-28",
+    "value": 942.48,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-29",
+    "value": 966.32,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-30",
+    "value": 1192.61,
+    "eligible": true
+   },
+   {
+    "date": "2026-01-31",
+    "value": null,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-01",
+    "value": 985.63,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-02",
+    "value": 1015.51,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-03",
+    "value": 949.6,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-04",
+    "value": 1000.11,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-05",
+    "value": 985.64,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-06",
+    "value": 1028.19,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-07",
+    "value": null,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-08",
+    "value": 921.79,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-09",
+    "value": 915.55,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-10",
+    "value": 1038.05,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-11",
+    "value": 970.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-12",
+    "value": 950.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-13",
+    "value": 1032.63,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-14",
+    "value": null,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-15",
+    "value": 1045.56,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-16",
+    "value": 939.28,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-17",
+    "value": 1005.4,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-18",
+    "value": 999.01,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-19",
+    "value": 994.23,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-20",
+    "value": 1217.96,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-21",
+    "value": null,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-22",
+    "value": 947.69,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-23",
+    "value": 1014.31,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-24",
+    "value": 1015.96,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-25",
+    "value": 1020.29,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-26",
+    "value": 1121.08,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-27",
+    "value": 1197.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-02-28",
+    "value": 991.85,
+    "eligible": false
+   },
+   {
+    "date": "2026-03-01",
+    "value": 959.44,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-02",
+    "value": 1086.86,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-03",
+    "value": 923.27,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-04",
+    "value": 1059.32,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-05",
+    "value": 1004.28,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-06",
+    "value": 1240.1,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-07",
+    "value": 979.94,
+    "eligible": false
+   },
+   {
+    "date": "2026-03-08",
+    "value": 1069.23,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-09",
+    "value": 997.52,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-10",
+    "value": 927.06,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-11",
+    "value": 1153.61,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-12",
+    "value": 1006.51,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-13",
+    "value": 1208.09,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-14",
+    "value": 1113.83,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-15",
+    "value": 959.87,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-16",
+    "value": 994.64,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-17",
+    "value": 1092.98,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-18",
+    "value": 1087.91,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-19",
+    "value": 1089.43,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-20",
+    "value": 1117.76,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-21",
+    "value": 985.7,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-22",
+    "value": 1115.59,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-23",
+    "value": 1008.11,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-24",
+    "value": 940.98,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-25",
+    "value": 1087.44,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-26",
+    "value": 1102.92,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-27",
+    "value": 1154.18,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-28",
+    "value": 914.09,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-29",
+    "value": 999.99,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-30",
+    "value": 923.3,
+    "eligible": true
+   },
+   {
+    "date": "2026-03-31",
+    "value": 980.65,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-01",
+    "value": 1026.76,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-02",
+    "value": 991.48,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-03",
+    "value": 1179.55,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-04",
+    "value": 1102.16,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-05",
+    "value": 897.18,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-06",
+    "value": 1017.53,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-07",
+    "value": 986.97,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-08",
+    "value": 832.48,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-09",
+    "value": 937.76,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-10",
+    "value": 1072.86,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-11",
+    "value": 998.57,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-12",
+    "value": 966.3,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-13",
+    "value": 1062.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-14",
+    "value": 1103.13,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-15",
+    "value": 964.53,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-16",
+    "value": 990.49,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-17",
+    "value": 1228.09,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-18",
+    "value": 967.74,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-19",
+    "value": 891.65,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-20",
+    "value": 922.54,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-21",
+    "value": 1044.19,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-22",
+    "value": 948.45,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-23",
+    "value": 1026.82,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-24",
+    "value": 1101.35,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-25",
+    "value": 995.43,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-26",
+    "value": 1087.22,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-27",
+    "value": 877.31,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-28",
+    "value": 1018.47,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-29",
+    "value": 1060.32,
+    "eligible": true
+   },
+   {
+    "date": "2026-04-30",
+    "value": 1017.19,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-01",
+    "value": 1216.37,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-02",
+    "value": 988.14,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-03",
+    "value": 1006.62,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-04",
+    "value": 1000.69,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-05",
+    "value": 1036.94,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-06",
+    "value": 955.3,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-07",
+    "value": 997.76,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-08",
+    "value": 1210.93,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-09",
+    "value": 1065.71,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-10",
+    "value": 1031.17,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-11",
+    "value": 1032.03,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-12",
+    "value": 1016.67,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-13",
+    "value": 1026.76,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-14",
+    "value": 1024.23,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-15",
+    "value": 1221.32,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-16",
+    "value": 1043.9,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-17",
+    "value": 1057.95,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-18",
+    "value": 1086.54,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-19",
+    "value": 978.9,
+    "eligible": true
+   },
+   {
+    "date": "2026-05-20",
+    "value": 1101.39,
+    "eligible": true
+   }
+  ],
+  "targetDate": "2026-05-14",
+  "lookbackWeeks": 8,
+  "minObservations": 4,
+  "weekday": 4,
+  "n": 8,
+  "usedDates": [
+   "2026-03-19",
+   "2026-03-26",
+   "2026-04-02",
+   "2026-04-09",
+   "2026-04-16",
+   "2026-04-23",
+   "2026-04-30",
+   "2026-05-07"
+  ],
+  "excluded": [],
+  "median": 1007.475,
+  "mad": 18.164999999999964,
+  "madScaled": 26.931469299154205
+ }
+}
