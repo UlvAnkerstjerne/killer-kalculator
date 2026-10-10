@@ -91,7 +91,22 @@ test('pre-fetch interruption and invalid library credentials never invoke provid
 });
 test('web startup and Railway remain isolated from the dormant worker', () => {
   const server = fs.readFileSync(require('node:path').join(__dirname, '../../server.js'), 'utf8');
-  assert.equal(/sales-worker|sales-sync|sales-db/.test(server), false);
+  assert.equal(/sales-worker|sales-sync/.test(server), false);
+  // Records imports the pure parser from sales-db. Default web startup must
+  // still avoid loading PostgreSQL, migrations or any write-capable modules.
+  const probe = spawnSync(process.execPath, ['-e', `
+    process.env.NODE_ENV = 'test';
+    delete process.env.KK_SALES_READ_SOURCE;
+    delete process.env.KK_SALES_READ_POLICY;
+    const Module = require('node:module'), load = Module._load;
+    Module._load = function(id, ...args) {
+      if (/^(pg|pg-pool)$/.test(id) || /sales-(worker|sync)/.test(id) ||
+          /sales-db\\/(database|migrate|repository|identity|facts)/.test(id)) throw Error('unexpected database/write module');
+      return load.call(this, id, ...args);
+    };
+    require('./server');
+  `], { cwd: require('node:path').join(__dirname, '../..'), encoding: 'utf8', timeout: 10000 });
+  assert.equal(probe.status, 0, probe.stderr);
   assert.equal(require('../../package.json').scripts.start, 'node server.js');
   const toml = fs.readFileSync(require('node:path').join(__dirname, '../../railway.toml'), 'utf8');
   assert.match(toml, /startCommand/); assert.match(toml, /node start\.js/);

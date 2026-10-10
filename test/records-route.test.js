@@ -9,9 +9,11 @@ process.env.KK_PASSWORD_HASH = bcrypt.hashSync('synthetic-password', 4);
 process.env.KK_SESSION_SECRET = 'synthetic-session-only';
 
 let received = null;
+let databaseError = null;
 require.cache[require.resolve('../lib/sales-read-source')] = { exports: { createSalesReadSource: () => ({
   policy: 'covered-history',
   async records(query, today) {
+    if (databaseError) throw databaseError;
     received = { query, today };
     return [{ date: '2026-09-21', weekdayIso: 1, revenueExVat: 600,
       stores: [{ slug: 'norrebro', name: 'Nørrebro', revenueExVat: 100 }] }];
@@ -57,4 +59,17 @@ test('records endpoint rejects unsupported questions before database access', as
     body: JSON.stringify({ question: 'Tell me something interesting' }) });
   assert.equal(response.status, 400);
   assert.equal(received, null);
+});
+
+test('records endpoint keeps database failures private', async () => {
+  databaseError = new Error('private database diagnostic');
+  try {
+    const response = await fetch(url + '/api/records/query', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie, 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ question: 'Best Monday across the chain' }) });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: 'Records are temporarily unavailable.', code: 'DB_READ_UNAVAILABLE',
+    });
+  } finally { databaseError = null; }
 });

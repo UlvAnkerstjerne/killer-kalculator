@@ -10,7 +10,7 @@
     "sales:sync:plan": "node scripts/sales-sync.js --plan",
     "sales:sync": "node scripts/sales-sync.js --apply",
     "test:worker:db": "node scripts/run-sales-tests.js worker",
-    "test:dashboard:db": "node --test test/sales-db/dashboard-postgres.test.js",
+    "test:dashboard:db": "node --test --test-concurrency=1 test/sales-db/dashboard-postgres.test.js test/sales-db/records-postgres.test.js",
     "sales:daily": "node scripts/sales-daily.js --apply",
     "sales:daily:readiness": "node scripts/sales-daily.js --readiness",
     "test:daily:db": "node scripts/run-sales-tests.js daily"
